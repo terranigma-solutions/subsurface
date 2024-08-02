@@ -3,7 +3,7 @@ from typing import TextIO, Union
 
 import numpy as np
 
-from subsurface import optional_requirements
+from .... import optional_requirements
 
 
 def dxf_from_file_to_vertex(file_path: str):

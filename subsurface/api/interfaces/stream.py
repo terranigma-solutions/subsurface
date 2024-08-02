@@ -2,14 +2,14 @@ from typing import TextIO
 
 import pandas
 
-import subsurface
+from ...core.structs.base_structures import UnstructuredData
 from ...modules.reader import dxf_stream_to_unstruct_input
 
 
-def DXF_stream_to_unstruc(stream: TextIO) -> subsurface.UnstructuredData:
+def DXF_stream_to_unstruc(stream: TextIO) -> UnstructuredData:
     vertex, cells, cell_attr_int, cell_attr_map = dxf_stream_to_unstruct_input(stream)
 
-    unstruct = subsurface.UnstructuredData.from_array(
+    unstruct = UnstructuredData.from_array(
         vertex,
         cells,
         cells_attr=pandas.DataFrame(cell_attr_int, columns=["Shaft id"]),
