@@ -66,6 +66,15 @@ def _dxf_dataset_to_unstruct_input(dataset):
 
 
 def _map_cell_attr_strings_to_integers(cell_attr):
-    d = dict([(y, x + 1) for x, y in enumerate(sorted(set(np.unique(cell_attr))))])
-    cell_attr_int = np.array([d[x] for x in cell_attr])
-    return cell_attr_int, d
+    # Get unique sorted values from the cell_attr array
+    unique_values = np.unique(cell_attr)
+    sorted_unique_values = sorted(unique_values)
+
+    # Create a mapping from string values to integers starting from 1
+    value_to_int_mapping = {str(value): index + 1 for index, value in enumerate(sorted_unique_values)}
+
+    # Map the original cell_attr values to their corresponding integers
+    cell_attr_int = np.array([value_to_int_mapping[value] for value in cell_attr])
+
+    return cell_attr_int, value_to_int_mapping
+

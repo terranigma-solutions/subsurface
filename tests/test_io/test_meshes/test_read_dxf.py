@@ -1,6 +1,5 @@
 import pytest
 
-from conftest import RequirementsLevel
 from subsurface.core.structs import UnstructuredData
 from subsurface import TriSurf, PointSet, optional_requirements
 from subsurface.modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
@@ -10,6 +9,8 @@ import subsurface.modules.visualization as sb_viz
 
 import numpy as np
 import pandas
+
+from tests.conftest import RequirementsLevel
 
 
 @pytest.mark.skipif(
