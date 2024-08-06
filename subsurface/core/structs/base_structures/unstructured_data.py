@@ -9,7 +9,7 @@ from subsurface.core.structs.base_structures._unstructured_data_constructor impo
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 
 
-@dataclass(frozen=False) 
+@dataclass(frozen=False)
 class UnstructuredData:
     data: xr.Dataset
     cells_attr_name: str = "cell_attrs"
@@ -132,7 +132,7 @@ class UnstructuredData:
             ds = ds.reset_index('cell')
         except (KeyError, ValueError) as e:
             print(f"{e} xarray dataset must include 'cell' key (KeyError) or xarray 'cell' has no index (ValueError).")
-        
+
         # Check that the Dataset data_vars names matches, "vertex", "cells", default_cells_attributes_name and default_points_attributes_name
         # and raise an error pointing out which one is missing
         _vars = [var in ds.data_vars for var in ["vertex", "cells", default_cells_attributes_name, default_points_attributes_name]]
@@ -163,11 +163,11 @@ class UnstructuredData:
     @property
     def cell_attributes(self):
         return self.attributes
-    
+
     @cell_attributes.setter
     def cell_attributes(self, dataframe):
         self.attributes = dataframe
-        
+
     @property
     def points_attributes(self) -> pd.DataFrame:
         data_array: xr.DataArray = self.data[self.vertex_attr_name]
@@ -221,10 +221,21 @@ class UnstructuredData:
         c = xr.Dataset({'v': a, 'e': b, 'a': e})
         return c
 
-    def to_binary(self, order='F'):
+    def to_binary_legacy(self, order='F'):
         bytearray_le = self._to_bytearray(order)
         header = self._set_binary_header()
         return bytearray_le, header
+
+    def to_binary(self, order='F'):
+        body_ = self._to_bytearray(order)
+        header_ = self._set_binary_header()
+        import json
+        header_json = json.dumps(header_)
+        header_json_bytes = header_json.encode('utf-8')
+        header_json_length = len(header_json_bytes)
+        header_json_length_bytes = header_json_length.to_bytes(4, byteorder='little')
+        file = header_json_length_bytes + header_json_bytes + body_
+        return file
 
     def _set_binary_header(self):
         header = {
