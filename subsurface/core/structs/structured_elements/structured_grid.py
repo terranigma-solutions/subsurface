@@ -1,5 +1,6 @@
 import numpy as np
-from subsurface.core.structs.base_structures import StructuredData
+from ..base_structures import StructuredData
+
 
 class StructuredGrid:
     # TODO check structured_data has three coordinates

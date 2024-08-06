@@ -51,8 +51,7 @@ class StructuredData:
                 dim_names = ['x', 'y', 'z']
             else:
                 dim_names = ['dim' + str(i) for i in range(array.ndim)]
-        # if they are more than 3 we do not know the dimension name but it should
-        # valid:
+        # if they are more than 3 we do not know the dimension name but it should valid:
         return cls(xr.Dataset({data_array_name: (dim_names, array)}, coords=coords), data_array_name)
 
     @classmethod
@@ -62,6 +61,25 @@ class StructuredData:
     @classmethod
     def from_dict(cls, data_dict: Dict[str, xr.DataArray], coords: Dict[str, str] = None):
         return cls(xr.Dataset(data_vars=data_dict, coords=coords))
+    
+    @classmethod
+    def from_pyvista_unstructured_grid(cls, grid: "pyvista.UnstructuredGrid"):
+        # Extract points and cells
+        points = grid.points
+        cells = grid.cells.reshape(-1, 4)[:, 1:]  # Assuming tetrahedral cells (4 points per cell)
+
+        # Create DataArray for points and cells
+        points_da = xr.DataArray(points, dims=["point_id", "coord"], name="points")
+        cells_da = xr.DataArray(cells, dims=["cell_id", "node"], name="cells")
+
+        # Extract cell data and point data (if any)
+        data_vars = {"points": points_da, "cells": cells_da}
+
+        for name in grid.array_names:
+            data_vars[name] = xr.DataArray(grid[name], dims=["cell_id"], name=name)
+
+        return cls(xr.Dataset(data_vars), "points")
+        
 
     @property
     def values(self):

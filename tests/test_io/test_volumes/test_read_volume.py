@@ -44,20 +44,17 @@ def test_volumetric_mesh_to_subsurface():
     mesh = to_pyvista_points(ps)
     pv_plot([mesh], image_2d=True)
 
-    new_file = open("test_volume.le", "wb")
-    new_file.write(ud.to_binary())
-
     return ud, mesh
 
 
 def test_interpolate_ud_to_sd():
     ud, ud_mesh = test_volumetric_mesh_to_subsurface()
     sd: subsurface.StructuredData  = interpolate_unstructured_data_to_structured_data(
-        ud, "pres", [50, 50, 50])
+        ud=ud,
+        attr_name="pres",
+        resolution=[50, 50, 50]
+    )
 
-    new_file = open("test_volume.le", "wb")
-    new_file.write(sd.to_binary())
-    
     sg = StructuredGrid(sd)
 
     mesh = to_pyvista_grid(sg)
