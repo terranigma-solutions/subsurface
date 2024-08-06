@@ -13,14 +13,19 @@ from subsurface import StructuredGrid
 from subsurface.modules.visualization import to_pyvista_grid, pv_plot
 from tests.conftest import RequirementsLevel
 
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_VOLUME) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_VOLUME"
+)
+
 
 def generate_vtk_unstruct():
     """ Use this function only to generate vtk files for testing purposes """
 
-    grid = examples.load_hexbeam()
+    grid: pyvista.UnstructuredGrid = examples.load_hexbeam()
     grid.cell_data['Cell Number'] = range(grid.n_cells)
     grid.plot(scalars='Cell Number')
-    
+
     # Write vtk
     grid.save("test_unstruct.vtk")
 
@@ -37,23 +42,15 @@ def generate_vtk_struct():
     grid.save("test_structured.vtk")
 
 
-# TODO: [ ] Make vtk reader using probably pyvista
-# TODO: [ ] Convert to structured data
+# TODO: [x] Make vtk reader using probably pyvista
+# TODO: [x] Convert to structured data
 # TODO: [ ] Export to le file
-# new_file = open("test_volume.le", "wb")
-# new_file.write(sd.to_binary())
 
 pf = pathlib.Path(__file__).parent.absolute()
 data_path = pf.joinpath('../../data/volume/')
 
 
-pytestmark = pytest.mark.skipif(
-    condition=(RequirementsLevel.READ_VOLUME) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
-    reason="Need to set the READ_VOLUME"
-)
-
-
-def test_vtk_file_to_structured_data():
+def test_vtk_file_to_structured_data() -> subsurface.StructuredData:
     # read vtk file with pyvista
     pyvista_obj: pv.UnstructuredGrid = pv.read(data_path.joinpath('test_structured.vtk'))
     try:
@@ -63,10 +60,10 @@ def test_vtk_file_to_structured_data():
 
     active_scalars = "Cell Number"
 
-    if PLOT:=True:
+    if PLOT := False:
         pyvista_struct.set_active_scalars(active_scalars)
         pyvista_struct.plot()
-    
+
     struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
         grid=pyvista_struct,
         data_array_name=active_scalars
@@ -75,4 +72,29 @@ def test_vtk_file_to_structured_data():
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
 
     mesh = to_pyvista_grid(sg)
-    pv_plot([mesh], image_2d=False )
+    pv_plot([mesh], image_2d=True)
+    return struct
+
+
+def test_vtk_file_to_binary():
+    struct: subsurface.StructuredData = test_vtk_file_to_structured_data()
+    print(struct.bounds)
+    
+    struct.active_data_array_name = "Cell Number"
+    binary_cell_number = struct.to_binary()
+
+    
+    struct.active_data_array_name = "Random"
+    binary_random = struct.to_binary()
+
+    if WRITE_TO_DISK:=False:
+        new_file = open("test_volume_Cell Number.le", "wb")
+        new_file.write(binary_cell_number)
+        new_file = open("test_volume_Random.le", "wb")
+        new_file.write(binary_random)
+
+    
+    
+    
+    
+    

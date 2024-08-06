@@ -43,7 +43,7 @@ def test_profile_to_binary(data_path):
     imageio = optional_requirements.require_imageio()
     cross = imageio.imread(data_path + '/profiles/Profil1_cropped.png')
     struct = StructuredData.from_numpy(np.array(cross))
-    texture_binary, texture_header = struct.default_data_array_to_binary()
+    texture_binary, texture_header = struct.default_data_array_to_binary_legacy()
 
     origin = [
             traces.loc[0, 'geometry'].xy[0][0],

@@ -1,18 +1,26 @@
+import enum
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Literal
 
 import numpy as np
 import xarray as xr
 
-__all__ = ['StructuredData', ]
+from ....optional_requirements import require_pyvista
 
-from subsurface.optional_requirements import require_pyvista
+
+class StructuredDataType(enum.Enum):
+    REGULAR_AXIS_ALIGNED = 0  #: Regular axis aligned grid. Distance between consecutive points is constant
+    REGULAR_AXIS_UNALIGNED = 1  #: Regular axis unaligned grid. Distance between consecutive points is constant
+    IRREGULAR_AXIS_ALIGNED = 2  #: Irregular axis aligned grid. Distance between consecutive points is not constant
+    IRREGULAR_AXIS_UNALIGNED = 3  #: Irregular axis unaligned grid. Distance between consecutive points is not constant
 
 
 @dataclass(frozen=False)
 class StructuredData:
     data: xr.Dataset
-    _data_array_name: str = "data_array"
+    _active_data_array_name: str = "data_array"
+    type: StructuredDataType = StructuredDataType.REGULAR_AXIS_ALIGNED
+    dtype: Literal["float32", "float64"] = "float32"
 
     """Primary structure definition for structured data
 
@@ -33,15 +41,15 @@ class StructuredData:
     """
 
     @property
-    def data_array_name(self):
+    def active_data_array_name(self):
         data_var_list = list(self.data.data_vars.keys())
-        if self._data_array_name not in data_var_list:
+        if self._active_data_array_name not in data_var_list:
             raise ValueError("data_array_name not found in data_vars: {}".format(data_var_list))
-        return self._data_array_name
+        return self._active_data_array_name
 
-    @data_array_name.setter
-    def data_array_name(self, data_array_name: str):
-        self._data_array_name = data_array_name
+    @active_data_array_name.setter
+    def active_data_array_name(self, data_array_name: str):
+        self._active_data_array_name = data_array_name
 
     @classmethod
     def from_numpy(cls, array: np.ndarray, coords: dict = None, data_array_name: str = "data_array",
@@ -120,37 +128,80 @@ class StructuredData:
 
     @property
     def values(self):
-        return self.data[self.data_array_name].values
+        return self.data[self.active_data_array_name].values
 
     @property
-    def default_data_array(self):
-        return self.data[self.data_array_name]
+    def bounds(self):
+        array_: xr.DataArray = self.data[self.active_data_array_name]
+        bounds = self._get_bounds(array_)
+        return bounds
+    
+    @property
+    def shape(self):
+        return self.active_data_array.shape
 
-    def default_data_array_to_binary(self, order='F'):
-        bytearray_le = self._to_bytearray(self.default_data_array, order)
-        header = self._set_binary_header(self.default_data_array)
-
-        return bytearray_le, header
-
-    def to_binary(self, data_array: xr.DataArray, order: str = 'F') -> Tuple[bytes, Dict]:
-        bytearray_le = self._to_bytearray(data_array, order)
-        header = self._set_binary_header(data_array)
-        return bytearray_le, header
+    @property
+    def active_data_array(self):
+        return self.data[self.active_data_array_name]
 
     @staticmethod
-    def _set_binary_header(data_array: xr.DataArray) -> Dict:
-        header = {"data_shape": data_array.shape}
+    def _get_bounds(xr_obj: xr.DataArray):
+        bounds = {}
+        for coord in xr_obj.coords:
+            bounds[coord] = (xr_obj[coord].min().item(), xr_obj[coord].max().item())
+        return bounds
+
+    def default_data_array_to_binary_legacy(self, order: Literal["K", "A", "C", "F"] = 'F'):
+        bytearray_le = self._to_bytearray(order=order)
+        header = self._set_binary_header()
+
+        return bytearray_le, header
+
+    def to_binary(self, order: Literal["K", "A", "C", "F"] = 'F') -> bytes:
+        """Converts the structured data to a binary file
+        
+        Notes: 
+            Only the active data array is converted to binary for now 
+        """
+        
+        body_ = self._to_bytearray(order)
+        header = self._set_binary_header()
+
+        import json
+        header_json = json.dumps(header)
+        header_json_bytes = header_json.encode('utf-8')
+        header_json_length = len(header_json_bytes)
+        header_json_length_bytes = header_json_length.to_bytes(4, byteorder='little')
+        file = header_json_length_bytes + header_json_bytes + body_
+        return file
+
+    def _set_binary_header(self) -> Dict:
+        data_array = self.active_data_array
+
+        match self.type:
+            case StructuredDataType.REGULAR_AXIS_ALIGNED:
+                header = {
+                        "data_shape": self.shape,
+                        "bounds"    : self.bounds,
+                        "transform" : None,
+                        "dtype"     : self.dtype,
+                        "data_name" : self.active_data_array_name
+                }
+            case _:
+                raise NotImplementedError(f"StructuredDataType {self.type} not implemented yet")
+
         return header
 
-    @staticmethod
-    def _to_bytearray(data_array: xr.DataArray, order: str) -> bytes:
-        data = data_array.values.astype('float32').tobytes(order)
+    def _to_bytearray(self, order: Literal["K", "A", "C", "F"]) -> bytes:
+        data_array = self.active_data_array
+
+        data = data_array.values.astype(self.dtype).tobytes(order)
         bytearray_le = data
         return bytearray_le
 
     @classmethod
     def _default_dim_names(cls, n_dims: int):
-        if n_dims== 2:
+        if n_dims == 2:
             dim_names = ['x', 'y']
         elif n_dims == 3:
             dim_names = ['x', 'y', 'z']

@@ -226,7 +226,7 @@ class UnstructuredData:
         header = self._set_binary_header()
         return bytearray_le, header
 
-    def to_binary(self, order='F'):
+    def to_binary(self, order='F') -> bytes:
         body_ = self._to_bytearray(order)
         header_ = self._set_binary_header()
         import json

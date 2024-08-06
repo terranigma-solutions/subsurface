@@ -220,7 +220,7 @@ def to_pyvista_grid(
         attribute_slice = dict()
 
     if data_set_name is None:
-        data_set_name = structured_grid.ds.data_array_name
+        data_set_name = structured_grid.ds.active_data_array_name
 
     cart_dims = structured_grid.cartesian_dimensions
     data_dims = structured_grid.ds.data[data_set_name].sel(**attribute_slice).ndim
@@ -257,7 +257,7 @@ def update_grid_attribute(
         attribute_slice = dict()
 
     if data_set_name is None:
-        data_set_name = structured_grid.ds.data_array_name
+        data_set_name = structured_grid.ds.active_data_array_name
     import xarray as xr
     dataset: xr.DataArray = structured_grid.ds.data[data_set_name]
 
