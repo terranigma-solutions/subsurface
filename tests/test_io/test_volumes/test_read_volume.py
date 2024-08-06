@@ -1,7 +1,7 @@
 import pathlib
 import pytest
 
-from conftest import RequirementsLevel
+import subsurface
 from subsurface.modules.reader.volume.volume_utils import interpolate_unstructured_data_to_structured_data
 from subsurface.core.structs import PointSet, StructuredGrid
 
@@ -9,6 +9,7 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.modules.reader.volume.read_volume import read_volumetric_mesh_coord_file, read_volumetric_mesh_attr_file, \
     read_volumetric_mesh_to_subsurface
 from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_grid
+from tests.conftest import RequirementsLevel
 
 pf = pathlib.Path(__file__).parent.absolute()
 data_path = pf.joinpath('../../data/volume/')
@@ -21,7 +22,7 @@ pytestmark = pytest.mark.skipif(
 
 def test_volumetric_mesh_to_subsurface():
     ud = read_volumetric_mesh_to_subsurface(
-        GenericReaderFilesHelper(
+        reader_helper_coord=GenericReaderFilesHelper(
             data_path.joinpath('mesh'),
             header=None,
             index_col=False,
@@ -33,7 +34,7 @@ def test_volumetric_mesh_to_subsurface():
                 "nrows": None,
             }
         ),
-        GenericReaderFilesHelper(
+        reader_helper_attr=GenericReaderFilesHelper(
             data_path.joinpath('out_all00'),
             index_col=False,
             additional_reader_kwargs={"sep": ","}
@@ -42,16 +43,25 @@ def test_volumetric_mesh_to_subsurface():
     ps = PointSet(ud)
     mesh = to_pyvista_points(ps)
     pv_plot([mesh], image_2d=True)
+
+    new_file = open("test_volume.le", "wb")
+    new_file.write(ud.to_binary())
+
     return ud, mesh
 
 
 def test_interpolate_ud_to_sd():
     ud, ud_mesh = test_volumetric_mesh_to_subsurface()
-    sd = interpolate_unstructured_data_to_structured_data(ud, "pres", [50, 50, 50])
+    sd: subsurface.StructuredData  = interpolate_unstructured_data_to_structured_data(
+        ud, "pres", [50, 50, 50])
+
+    new_file = open("test_volume.le", "wb")
+    new_file.write(sd.to_binary())
+    
     sg = StructuredGrid(sd)
 
     mesh = to_pyvista_grid(sg)
-    pv_plot([mesh, ud_mesh], image_2d=True)
+    pv_plot([mesh, ud_mesh], image_2d=False )
 
 
 def test_read_volumetric_mesh():
