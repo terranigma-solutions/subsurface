@@ -1,10 +1,12 @@
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import numpy as np
 import xarray as xr
 
 __all__ = ['StructuredData', ]
+
+from subsurface.optional_requirements import require_pyvista
 
 
 @dataclass(frozen=False)
@@ -45,41 +47,65 @@ class StructuredData:
     def from_numpy(cls, array: np.ndarray, coords: dict = None, data_array_name: str = "data_array",
                    dim_names: List[str] = None):
         if dim_names is None:
-            if array.ndim == 2:
-                dim_names = ['x', 'y']
-            elif array.ndim == 3:
-                dim_names = ['x', 'y', 'z']
-            else:
-                dim_names = ['dim' + str(i) for i in range(array.ndim)]
+            dim_names = cls._default_dim_names(array)
         # if they are more than 3 we do not know the dimension name but it should valid:
-        return cls(xr.Dataset({data_array_name: (dim_names, array)}, coords=coords), data_array_name)
+
+        dataset: xr.Dataset = xr.Dataset(
+            data_vars={
+                    data_array_name: (dim_names, array)
+            },
+            coords=coords
+        )
+
+        return cls(dataset, data_array_name)
 
     @classmethod
     def from_data_array(cls, data_array: xr.DataArray, data_array_name: str = "data_array"):
-        return cls(xr.Dataset({data_array_name: data_array}), data_array_name)
+        dataset: xr.Dataset = xr.Dataset(
+            data_vars={
+                    data_array_name: data_array
+            },
+            coords=data_array.coords
+        )
+
+        return cls(dataset, data_array_name)
 
     @classmethod
-    def from_dict(cls, data_dict: Dict[str, xr.DataArray], coords: Dict[str, str] = None):
-        return cls(xr.Dataset(data_vars=data_dict, coords=coords))
-    
-    @classmethod
-    def from_pyvista_unstructured_grid(cls, grid: "pyvista.UnstructuredGrid"):
-        # Extract points and cells
-        points = grid.points
-        cells = grid.cells.reshape(-1, 4)[:, 1:]  # Assuming tetrahedral cells (4 points per cell)
+    def from_dict(cls, data_dict: Dict[str, xr.DataArray], coords: Dict[str, str] = None, data_array_name: str = "data_array"):
+        dataset: xr.Dataset = xr.Dataset(data_vars=data_dict, coords=coords)
+        return cls(dataset, data_array_name)
 
-        # Create DataArray for points and cells
-        points_da = xr.DataArray(points, dims=["point_id", "coord"], name="points")
-        cells_da = xr.DataArray(cells, dims=["cell_id", "node"], name="cells")
+    @classmethod
+    def from_pyvista_structured_grid(
+            cls,
+            grid: Union["pyvista.ExplicitStructuredGrid", "pyvista.StructuredGrid"],
+            data_array_name: str = "data_array"
+    ):
+        pyvista = require_pyvista()
+        # Extract p
 
         # Extract cell data and point data (if any)
-        data_vars = {"points": points_da, "cells": cells_da}
+        data_vars = {}
 
-        for name in grid.array_names:
-            data_vars[name] = xr.DataArray(grid[name], dims=["cell_id"], name=name)
+        # TODO: I need to do something with the bounds
+        bounds: tuple = grid.bounds
 
-        return cls(xr.Dataset(data_vars), "points")
-        
+        for name in grid.cell_data:
+            cell_attr_data: pyvista.pyvista_ndarray = grid[name]
+            dimensions = np.array(grid.dimensions) - 1
+            cell_attr_data_reshaped = cell_attr_data.reshape(dimensions, order='F')
+
+            data_vars[name] = xr.DataArray(
+                data=cell_attr_data_reshaped,
+                dims=cls._default_dim_names(cell_attr_data_reshaped),
+                name=name
+            )
+
+        dataset: xr.Dataset = xr.Dataset(
+            data_vars=data_vars,
+            coords=None
+        )
+        return cls(dataset, data_array_name)
 
     @property
     def values(self):
@@ -94,12 +120,12 @@ class StructuredData:
         header = self._set_binary_header(self.default_data_array)
 
         return bytearray_le, header
-    
+
     def to_binary(self, data_array: xr.DataArray, order: str = 'F') -> Tuple[bytes, Dict]:
         bytearray_le = self._to_bytearray(data_array, order)
         header = self._set_binary_header(data_array)
         return bytearray_le, header
-        
+
     @staticmethod
     def _set_binary_header(data_array: xr.DataArray) -> Dict:
         header = {"data_shape": data_array.shape}
@@ -110,3 +136,13 @@ class StructuredData:
         data = data_array.values.astype('float32').tobytes(order)
         bytearray_le = data
         return bytearray_le
+
+    @classmethod
+    def _default_dim_names(cls, array):
+        if array.ndim == 2:
+            dim_names = ['x', 'y']
+        elif array.ndim == 3:
+            dim_names = ['x', 'y', 'z']
+        else:
+            dim_names = ['dim' + str(i) for i in range(array.ndim)]
+        return dim_names

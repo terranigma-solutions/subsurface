@@ -162,7 +162,6 @@ def to_pyvista_line(
         scalar_type: PyvistaScalarType = PyvistaScalarType.POINT,
         active_scalar: Optional[str] = None
 ):
-    
     nve = line_set.data.n_vertex_per_element
     vertices = line_set.data.vertex
     cells = np.c_[np.full(line_set.data.n_elements, nve),
@@ -173,7 +172,7 @@ def to_pyvista_line(
         mesh.lines = cells
     else:
         raise NotImplementedError
-    
+
     match scalar_type:
         case PyvistaScalarType.POINT:
             mesh.point_data.update(line_set.data.points_attributes_to_dict)
@@ -201,10 +200,12 @@ def to_pyvista_tetra(tetra_mesh: TetraMesh):
     return mesh
 
 
-def to_pyvista_grid(structured_grid: StructuredGrid,
-                    data_set_name: str = None,
-                    attribute_slice: dict = None,
-                    data_order: str = 'F'):
+def to_pyvista_grid(
+        structured_grid: StructuredGrid,
+        data_set_name: str = None,
+        attribute_slice: dict = None,
+        data_order: str = 'F'
+) -> "pyvista.StructuredGrid":
     """
 
     Args:
@@ -222,9 +223,7 @@ def to_pyvista_grid(structured_grid: StructuredGrid,
         data_set_name = structured_grid.ds.data_array_name
 
     cart_dims = structured_grid.cartesian_dimensions
-    data_dims = structured_grid.ds.data[data_set_name].sel(
-        **attribute_slice
-    ).ndim
+    data_dims = structured_grid.ds.data[data_set_name].sel(**attribute_slice).ndim
     if cart_dims < data_dims:
         raise AttributeError('Data dimension and cartesian dimensions must match.'
                              'Possibly there are not valid dimension name in the'
