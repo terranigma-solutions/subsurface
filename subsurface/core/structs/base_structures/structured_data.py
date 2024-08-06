@@ -47,7 +47,7 @@ class StructuredData:
     def from_numpy(cls, array: np.ndarray, coords: dict = None, data_array_name: str = "data_array",
                    dim_names: List[str] = None):
         if dim_names is None:
-            dim_names = cls._default_dim_names(array)
+            dim_names = cls._default_dim_names(array.ndim)
         # if they are more than 3 we do not know the dimension name but it should valid:
 
         dataset: xr.Dataset = xr.Dataset(
@@ -88,22 +88,33 @@ class StructuredData:
         data_vars = {}
 
         # TODO: I need to do something with the bounds
+
+        dimensions = np.array(grid.dimensions) - 1
+        default_dim_names = cls._default_dim_names(dimensions.shape[0])
+
         bounds: tuple = grid.bounds
+        coords = {}
+        for i, dim in enumerate(default_dim_names):
+            coords[dim] = np.linspace(
+                start=bounds[i * 2],
+                stop=bounds[i * 2 + 1],
+                num=dimensions[i],
+                endpoint=False
+            )
 
         for name in grid.cell_data:
             cell_attr_data: pyvista.pyvista_ndarray = grid[name]
-            dimensions = np.array(grid.dimensions) - 1
             cell_attr_data_reshaped = cell_attr_data.reshape(dimensions, order='F')
 
             data_vars[name] = xr.DataArray(
                 data=cell_attr_data_reshaped,
-                dims=cls._default_dim_names(cell_attr_data_reshaped),
+                dims=default_dim_names,
                 name=name
             )
 
         dataset: xr.Dataset = xr.Dataset(
             data_vars=data_vars,
-            coords=None
+            coords=coords
         )
         return cls(dataset, data_array_name)
 
@@ -138,11 +149,11 @@ class StructuredData:
         return bytearray_le
 
     @classmethod
-    def _default_dim_names(cls, array):
-        if array.ndim == 2:
+    def _default_dim_names(cls, n_dims: int):
+        if n_dims== 2:
             dim_names = ['x', 'y']
-        elif array.ndim == 3:
+        elif n_dims == 3:
             dim_names = ['x', 'y', 'z']
         else:
-            dim_names = ['dim' + str(i) for i in range(array.ndim)]
+            dim_names = ['dim' + str(i) for i in range(n_dims)]
         return dim_names

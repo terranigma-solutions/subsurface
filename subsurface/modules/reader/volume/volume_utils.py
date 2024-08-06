@@ -6,7 +6,6 @@ import numpy as np
 
 from ....core.structs import UnstructuredData, StructuredData
 
-
 __all__ = ['interpolate_unstructured_data_to_structured_data', ]
 
 
@@ -30,9 +29,12 @@ def interpolate_unstructured_data_to_structured_data(
 
     grid = np.meshgrid(*coords.values())
 
-    interpolated_attributes = griddata(ud.vertex,
-                                       ud.attributes.loc[:, attr_name],
-                                       tuple(grid), method=interpolation_method.value)
+    interpolated_attributes = griddata(
+        points=ud.vertex,
+        values=ud.attributes.loc[:, attr_name],
+        xi=tuple(grid),
+        method=interpolation_method.value
+    )
 
     sd = StructuredData.from_numpy(
         array=interpolated_attributes,

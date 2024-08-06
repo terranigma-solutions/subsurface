@@ -25,7 +25,7 @@ def generate_vtk_unstruct():
     grid.save("test_unstruct.vtk")
 
 
-def test_generate_vtk_struct():
+def generate_vtk_struct():
     """ Use this function only to generate vtk files for testing purposes """
 
     grid: pyvista.ExplicitStructuredGrid = examples.load_explicit_structured()
@@ -60,14 +60,16 @@ def test_vtk_file_to_structured_data():
         pyvista_struct: pv.ExplicitStructuredGrid = pyvista_obj.cast_to_explicit_structured_grid()
     except Exception as e:
         raise "The file is not a structured grid"
-    
+
+    active_scalars = "Cell Number"
+
     if PLOT:=True:
-        pyvista_struct.set_active_scalars("Cell Number")
+        pyvista_struct.set_active_scalars(active_scalars)
         pyvista_struct.plot()
     
     struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
         grid=pyvista_struct,
-        data_array_name="Cell Number"
+        data_array_name=active_scalars
     )
 
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
