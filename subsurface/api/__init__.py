@@ -1,1 +1,1 @@
-from .interfaces.stream import DXF_stream_to_unstruc
+from .interfaces.stream import DXF_stream_to_unstruc, OMF_stream_to_unstruc
