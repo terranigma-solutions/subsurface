@@ -77,4 +77,3 @@ def _map_cell_attr_strings_to_integers(cell_attr):
     cell_attr_int = np.array([value_to_int_mapping[value] for value in cell_attr])
 
     return cell_attr_int, value_to_int_mapping
-
