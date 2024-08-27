@@ -9,7 +9,7 @@ from subsurface.core.geological_formats.boreholes.survey import Survey
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 from subsurface.core.structs.unstructured_elements import PointSet
-from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith
+from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_assay
 from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_line, init_plotter
 
 dotenv.load_dotenv()
@@ -145,38 +145,19 @@ def test_read_stratigraphy():
         p.show()
 
 
-def test_merge_collar_survey():
-    reader_collar: GenericReaderFilesHelper = GenericReaderFilesHelper(
-        file_or_buffer=os.getenv("PATH_TO_SPREMBERG_COLLAR"),
-        header=0,
-        usecols=[0, 1, 2, 4],
+def test_read_attr_only_depth():
+    pass
+
+
+def test_read_attr():
+    reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=data_folder + "geology.csv",
         columns_map={
-                "hole_id"            : "id",  # ? Index name is not mapped
-                "X_GK5_incl_inserted": "x",
-                "Y__incl_inserted"   : "y",
-                "Z_GK"               : "z"
+                'HOLE-ID': 'id',
+                'FROM'   : 'top',
+                'TO'     : 'base',
+                'GEOLOGY': 'component lith'
         }
     )
-    df_collar = read_collar(reader_collar)
-    collar = Collars.from_df(df_collar)
 
-    reader_survey: GenericReaderFilesHelper = GenericReaderFilesHelper(
-        file_or_buffer=os.getenv("PATH_TO_SPREMBERG_SURVEY"),
-        columns_map={
-                'depth'  : 'md',
-                'dip'    : 'dip',
-                'azimuth': 'azi'
-        },
-    )
-
-    survey = Survey.from_df(read_survey(reader_survey))
-
-    borehole_set = BoreholeSet(
-        collars=collar,
-        survey=survey,
-        merge_option=MergeOptions.INTERSECT
-    )
-
-    if PLOT:
-        s = to_pyvista_line(line_set=borehole_set.combined_trajectory, radius=50)
-        pv_plot([s], image_2d=True)
+    lith: pd.DataFrame = read_assay(reader)
