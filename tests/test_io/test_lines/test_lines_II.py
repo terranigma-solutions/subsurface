@@ -125,7 +125,7 @@ def test_read_stratigraphy():
         _plot(scalar, trajectory, collar)
 
 
-def _plot(scalar, trajectory, collars = None):
+def _plot(scalar, trajectory, collars=None):
     s = to_pyvista_line(
         line_set=trajectory,
         active_scalar=scalar,
@@ -135,7 +135,7 @@ def _plot(scalar, trajectory, collars = None):
     import matplotlib.pyplot as plt
     boring_cmap = plt.get_cmap("viridis", 8)
     p.add_mesh(s, cmap=boring_cmap)
-    
+
     if collars is not None:
         collar_mesh = to_pyvista_points(collars.collar_loc)
         p.add_mesh(collar_mesh, render_points_as_spheres=True)
@@ -161,7 +161,6 @@ def test_read_attr():
         )
         pv_plot([s], image_2d=False)
 
-
         s = to_pyvista_line(
             line_set=survey.survey_trajectory,
             radius=10,
@@ -182,12 +181,13 @@ def test_read_attr_into_borehole():
         merge_option=MergeOptions.INTERSECT
     )
 
+    # borehole_set.combined_trajectory.data.to_binary()
+
     _plot(
         scalar="MnO",
         trajectory=borehole_set.combined_trajectory,
         collars=collars
     )
-
 
 
 def _read_geochem_into_survey() -> Survey:
@@ -212,4 +212,3 @@ def _read_geochem_into_survey() -> Survey:
     survey: Survey = Survey.from_df(df)
     survey.update_survey_with_attr(attributes)
     return survey
-

@@ -33,21 +33,19 @@ class Survey:
             df=_correct_angles(df)
         )
         # Grab the unique ids
-        unique_ids = trajectories.points_attributes["well_name"].unique()
+        unique_ids = trajectories.points_attributes["well_id"].unique()
 
-        # fill well_id_mapper
-        well_id_mapper = {well_id: e for e, well_id in enumerate(unique_ids)}
 
         return cls(
             ids=unique_ids,
             survey_trajectory=LineSet(data=trajectories, radius=RADIUS),
-            well_id_mapper=well_id_mapper
+            well_id_mapper=trajectories.data.attrs["well_id_mapper"]
         )
 
     def get_well_string_id(self, well_id: int) -> str:
         return self.ids[well_id]
 
-    def get_well_id(self, well_string_id: Union[str, Hashable]) -> int:
+    def get_well_num_id(self, well_string_id: Union[str, Hashable]) -> int:
         return self.well_id_mapper.get(well_string_id, None)
 
     def update_survey_with_lith(self, lith: pd.DataFrame):
@@ -99,7 +97,7 @@ def _combine_survey_and_attrs(attrs: pd.DataFrame, survey: Survey) -> Unstructur
 
 def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.DataFrame:
     trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
-    trajectory_well_name: xr.DataArray = trajectory.sel({'vertex_attr': 'well_name'})
+    trajectory_well_id: xr.DataArray = trajectory.sel({'vertex_attr': 'well_id'})
     measured_depths: np.ndarray = trajectory.sel({'vertex_attr': 'measured_depths'}).values.astype(np.float_)
 
     # Add any missing columns from attrs to new_attrs
@@ -121,7 +119,8 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
             print(f"Well '{survey_well_name}' does not exist in the attributes DataFrame.")
             continue
 
-        trajectory_well_mask = (trajectory_well_name == survey_well_name).values
+        survey_well_id = survey.get_well_num_id(survey_well_name)
+        trajectory_well_mask = (trajectory_well_id == survey_well_id).values
 
         # Apply mask to measured depths for the current well
         well_measured_depths = measured_depths[trajectory_well_mask]
@@ -163,7 +162,7 @@ def _map_attrs_to_measured_depths_(attrs: pd.DataFrame, new_attrs: pd.DataFrame,
     new_columns = attrs.columns.difference(new_attrs.columns)
     new_attrs = pd.concat([new_attrs, pd.DataFrame(columns=new_columns)], axis=1)
     for index, row in attrs.iterrows():
-        well_id = survey.get_well_id(index)
+        well_id = survey.get_well_num_id(index)
         if well_id is None:
             print(f'Well ID {index} not found in survey trajectory. Skipping lithology assignment.')
 
@@ -206,8 +205,8 @@ def _data_frame_to_unstructured_data(df: 'pd.DataFrame'):
 
     cum_vertex: np.ndarray = np.empty((0, 3), dtype=np.float_)
     cells: np.ndarray = np.empty((0, 2), dtype=np.int_)
-    cell_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'])
-    vertex_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'])
+    cell_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'], dtype=np.float32)
+    vertex_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'], dtype=np.float32)
 
     for e, (borehole_id, data) in enumerate(df.groupby(level=0)):
         dev: wp.deviation = wp.deviation(
@@ -233,7 +232,7 @@ def _data_frame_to_unstructured_data(df: 'pd.DataFrame'):
         vertex_attr = pd.concat([vertex_attr, pd.DataFrame(
             {
                     'well_id'        : [e] * len(pos.depth),
-                    'well_name'      : borehole_id,
+                    # 'well_name'      : borehole_id,
                     'measured_depths': measured_depths,
             }
         )])
@@ -244,6 +243,8 @@ def _data_frame_to_unstructured_data(df: 'pd.DataFrame'):
         vertex_attr=vertex_attr.reset_index(),
         cells_attr=cell_attr.reset_index()
     )
+    
+    unstruct.data.attrs["well_id_mapper"] = {well_id: e for e, well_id in enumerate(df.index.unique(level=0))}
 
     return unstruct
 

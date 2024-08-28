@@ -14,7 +14,7 @@ class MergeOptions(enum.Enum):
 
 
 def create_combined_trajectory(collars: Collars, survey: Survey, merge_option: MergeOptions, slice_: slice):
-    collar_df = _create_collar_df(collars, slice_)
+    collar_df = _create_collar_df(collars, slice_, survey.well_id_mapper)
     survey_df_vertex = _create_survey_df(survey)
 
     if merge_option == MergeOptions.RAISE:
@@ -26,9 +26,10 @@ def create_combined_trajectory(collars: Collars, survey: Survey, merge_option: M
         raise ValueError("Unsupported merge option")
 
 
-def _create_collar_df(collars, slice_):
+def _create_collar_df(collars, slice_, well_id_mapper: dict ):
     collar_df = pd.DataFrame(collars.collar_loc.points[slice_], columns=['X', 'Y', 'Z'])
-    collar_df['well_id'] = collars.ids[slice_]
+    selected_collars:list = collars.ids[slice_]
+    collar_df['well_id'] = pd.Series(selected_collars).map(well_id_mapper)
     return collar_df
 
 
