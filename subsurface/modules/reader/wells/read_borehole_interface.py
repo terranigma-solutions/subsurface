@@ -45,8 +45,15 @@ def read_lith(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     return lith_df
 
 
-def read_assay(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
-    raise NotImplementedError('Assay data reader is not implemented yet.')
+def read_attributes(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
+    if reader_helper.index_col is False: reader_helper.index_col = 0
+
+    d = check_format_and_read_to_df(reader_helper)
+
+    _map_rows_and_cols_inplace(d, reader_helper)
+
+    _validate_attr_data(d)
+    return d
 
 
 def _map_rows_and_cols_inplace(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper):
@@ -54,6 +61,11 @@ def _map_rows_and_cols_inplace(d: pd.DataFrame, reader_helper: GenericReaderFile
         d.rename(reader_helper.index_map, axis="index", inplace=True)  # d.index = d.index.map(reader_helper.index_map)
     if reader_helper.columns_map is not None:
         d.rename(reader_helper.columns_map, axis="columns", inplace=True)
+
+
+def _validate_attr_data(d):
+    assert d.columns.isin(['base']).any(), ('base column must be present in the file. '
+                                            'Use columns_map to assign column names to these fields.')
 
 
 def _validate_survey_data(d):

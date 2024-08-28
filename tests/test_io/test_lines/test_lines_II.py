@@ -9,7 +9,7 @@ from subsurface.core.geological_formats.boreholes.survey import Survey
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 from subsurface.core.structs.unstructured_elements import PointSet
-from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_assay
+from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_attributes
 from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_line, init_plotter
 
 dotenv.load_dotenv()
@@ -124,7 +124,7 @@ def test_read_stratigraphy():
             active_scalar="lith_ids",
             radius=40
         )
-        clim = [0, 8] # Threshold lith_ids
+        clim = [0, 8]  # Threshold lith_ids
         s = s.threshold(clim)
 
         collar_mesh = to_pyvista_points(collar.collar_loc)
@@ -151,13 +151,27 @@ def test_read_attr_only_depth():
 
 def test_read_attr():
     reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
-        file_or_buffer=data_folder + "geology.csv",
+        file_or_buffer=data_folder + "geochem.csv",
         columns_map={
-                'HOLE-ID': 'id',
-                'FROM'   : 'top',
-                'TO'     : 'base',
-                'GEOLOGY': 'component lith'
+                'HoleId': 'id',
+                'from'  : 'top',
+                'to'    : 'base',
         }
     )
 
-    lith: pd.DataFrame = read_assay(reader)
+    attributes: pd.DataFrame = read_attributes(reader)
+
+    reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=data_folder + "survey.csv",
+        columns_map={
+                'Distance': 'md',
+                'Dip'     : 'dip',
+                'Azimuth' : 'azi'
+        },
+    )
+    df = read_survey(reader)
+
+    survey: Survey = Survey.from_df(df)
+    survey.update_survey_with_attr(attributes)
+
+    pass
