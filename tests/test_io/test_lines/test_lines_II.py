@@ -181,7 +181,10 @@ def test_read_attr_into_borehole():
         merge_option=MergeOptions.INTERSECT
     )
 
-    # borehole_set.combined_trajectory.data.to_binary()
+    if False:
+        bytes_ = borehole_set.combined_trajectory.data.to_binary()
+        new_file = open("ascii_wells.le", "wb")
+        new_file.write(bytes_)
 
     _plot(
         scalar="MnO",
