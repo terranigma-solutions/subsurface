@@ -30,6 +30,7 @@ def raw_attributes_to_dict_data_arrays(
         default_attributes_name: str, n_items: int, dims: List[str],
         raw_attributes: Union[None, pd.DataFrame, Dict[str, xr.DataArray]]) \
         -> Dict[str, xr.DataArray]:
+    
     if raw_attributes is None or type(raw_attributes) is pd.DataFrame:
         points_attributes_xarray_dict = {
                 default_attributes_name: _data_array_attributes_from_raw_data(

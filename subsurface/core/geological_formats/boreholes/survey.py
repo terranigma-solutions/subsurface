@@ -100,11 +100,12 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
     trajectory_well_id: xr.DataArray = trajectory.sel({'vertex_attr': 'well_id'})
     measured_depths: np.ndarray = trajectory.sel({'vertex_attr': 'measured_depths'}).values.astype(np.float_)
 
-    # Add any missing columns from attrs to new_attrs
+    # Start with a copy of the existing attributes DataFrame
+    new_attrs = survey.survey_trajectory.data.points_attributes.copy()
 
-    new_attrs: pd.DataFrame = survey.survey_trajectory.data.points_attributes
-    new_columns = attrs.columns.difference(new_attrs.columns)
-    new_attrs = pd.concat([new_attrs, pd.DataFrame(columns=new_columns)], axis=1)
+    # Add missing columns from attrs, preserving their dtypes
+    for col in attrs.columns.difference(new_attrs.columns):
+        new_attrs[col] = np.nan if pd.api.types.is_numeric_dtype(attrs[col]) else None
 
     # Align well IDs between attrs and trajectory, perform interpolation, and map the attributes
     # Loop dict
@@ -127,34 +128,33 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
 
         # Interpolation for each attribute column
         for col in attrs_well.columns:
-            if col not in ['top', 'base', 'well_id']:
-                # Interpolate the attribute values based on the measured depths
-                attr_to_interpolate = attrs_well[col]
-                # make sure the attr_to_interpolate is not a string
-                if attr_to_interpolate.dtype == 'O':
-                    continue
-                
-                location_values_to_interpolate = (attrs_well['top'] + attrs_well['base']) / 2
-                
-                from scipy.interpolate import interp1d
-                interp_func = interp1d(
-                    x=location_values_to_interpolate,
-                    y=attr_to_interpolate,
-                    bounds_error=False,
-                    fill_value=np.nan
-                )
+            # Interpolate the attribute values based on the measured depths
+            if col in ['top', 'base', 'well_id']:
+                continue
+            attr_to_interpolate = attrs_well[col]
+            # make sure the attr_to_interpolate is not a string
+            if attr_to_interpolate.dtype == 'O':
+                continue
 
-                interpolated_values = interp_func(well_measured_depths)
+            location_values_to_interpolate = (attrs_well['top'] + attrs_well['base']) / 2
 
-                # Assign the interpolated values to the new_attrs DataFrame
-                new_attrs.loc[trajectory_well_mask, col] = interpolated_values
+            from scipy.interpolate import interp1d
+            interp_func = interp1d(
+                x=location_values_to_interpolate,
+                y=attr_to_interpolate,
+                bounds_error=False,
+                fill_value=np.nan
+            )
+
+            # Assign the interpolated values to the new_attrs DataFrame
+            new_attrs.loc[trajectory_well_mask, col] = interp_func(well_measured_depths)
 
     return new_attrs
 
 
 def _map_attrs_to_measured_depths_(attrs: pd.DataFrame, new_attrs: pd.DataFrame, survey: Survey):
     warnings.warn("This function is obsolete. Use _map_attrs_to_measured_depths instead.", DeprecationWarning)
-    
+     
     trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
     well_ids: xr.DataArray = trajectory.sel({'vertex_attr': 'well_id'})
     measured_depths: xr.DataArray = trajectory.sel({'vertex_attr': 'measured_depths'})
