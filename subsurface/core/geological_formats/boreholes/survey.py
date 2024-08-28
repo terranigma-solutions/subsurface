@@ -1,3 +1,5 @@
+import warnings
+
 from typing import Union, Hashable
 
 import pandas as pd
@@ -49,47 +51,25 @@ class Survey:
         return self.well_id_mapper.get(well_string_id, None)
 
     def update_survey_with_lith(self, lith: pd.DataFrame):
-        unstruct: UnstructuredData = _combine_survey_and_lith(lith, self)
+        unstruct: UnstructuredData = _combine_survey_and_attrs(lith, self)
         self.survey_trajectory.data = unstruct
 
     def update_survey_with_attr(self, attrs: pd.DataFrame):
-        self.survey_trajectory.data = _combine_survey_and_lith(attrs, self)
+        self.survey_trajectory.data = _combine_survey_and_attrs(attrs, self)
 
 
 def _combine_survey_and_attr(lith: pd.DataFrame, survey: Survey) -> UnstructuredData:
     pass
 
 
-def _combine_survey_and_lith(lith: pd.DataFrame, survey: Survey) -> UnstructuredData:
+def _combine_survey_and_attrs(attrs: pd.DataFrame, survey: Survey) -> UnstructuredData:
     # Import moved to top for clarity and possibly avoiding repeated imports if called multiple times
     from ...structs.base_structures._unstructured_data_constructor import raw_attributes_to_dict_data_arrays
 
     # Accessing trajectory data more succinctly
-    trajectory = survey.survey_trajectory.data.data["vertex_attrs"]
-    well_ids = trajectory.sel({'vertex_attr': 'well_id'})
-    depths = trajectory.sel({'vertex_attr': 'depth'})
-
-    new_attrs: pd.DataFrame = survey.survey_trajectory.data.points_attributes
+    trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
     # Ensure all columns in lith exist in new_attrs, if not, add them as NaN
-    new_columns = lith.columns.difference(new_attrs.columns)
-    new_attrs = pd.concat([new_attrs, pd.DataFrame(columns=new_columns)], axis=1)
-
-    for index, row in lith.iterrows():
-        well_id = survey.get_well_id(index)
-        if well_id is None:
-            print(f'Well ID {index} not found in survey trajectory. Skipping lithology assignment.')
-
-        well_id_mask = well_ids == well_id
-
-        # TODO: Here we are going to need to interpolate
-
-        spatial_mask = ((depths <= row['top']) & (depths >= row['base']))
-        mask = well_id_mask & spatial_mask
-
-        new_attrs.loc[mask.values, lith.columns] = row.values
-        # new_attrs.loc[mask.values, 'component lith'] = row['component lith']
-        # new_attrs.loc[mask.values, :] = row
-        # Update the DataFrame where the mask is True
+    new_attrs = _map_attrs_to_measured_depths(attrs, survey)
 
     if 'component lith' in new_attrs.columns:
         # Factorize lith components directly in-place
@@ -98,7 +78,7 @@ def _combine_survey_and_lith(lith: pd.DataFrame, survey: Survey) -> Unstructured
     # Construct the final xarray dict without intermediate variable
     points_attributes_xarray_dict = raw_attributes_to_dict_data_arrays(
         default_attributes_name="vertex_attrs",
-        n_items=trajectory.shape[0],
+        n_items=trajectory.shape[0], # TODO: Can I look this on new_attrs to remove line 11?
         dims=["points", "vertex_attr"],
         raw_attributes=new_attrs
     )
@@ -115,6 +95,87 @@ def _combine_survey_and_lith(lith: pd.DataFrame, survey: Survey) -> Unstructured
         default_cells_attributes_name=survey.survey_trajectory.data.cells_attr_name,
         default_points_attributes_name=survey.survey_trajectory.data.vertex_attr_name
     )
+
+
+def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.DataFrame:
+    trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
+    trajectory_well_name: xr.DataArray = trajectory.sel({'vertex_attr': 'well_name'})
+    measured_depths: np.ndarray = trajectory.sel({'vertex_attr': 'measured_depths'}).values.astype(np.float_)
+
+    # Add any missing columns from attrs to new_attrs
+
+    new_attrs: pd.DataFrame = survey.survey_trajectory.data.points_attributes
+    new_columns = attrs.columns.difference(new_attrs.columns)
+    new_attrs = pd.concat([new_attrs, pd.DataFrame(columns=new_columns)], axis=1)
+
+    # Align well IDs between attrs and trajectory, perform interpolation, and map the attributes
+    # Loop dict
+    for survey_well_name in survey.well_id_mapper:
+        # Select rows corresponding to the current well ID
+
+        # use the well_id to get all the elements of attrs that have the well_id as index
+        if survey_well_name in attrs.index:
+            attrs_well = attrs.loc[[survey_well_name]]
+            # Proceed with processing attrs_well
+        else:
+            print(f"Well '{survey_well_name}' does not exist in the attributes DataFrame.")
+            continue
+
+        trajectory_well_mask = (trajectory_well_name == survey_well_name).values
+
+        # Apply mask to measured depths for the current well
+        well_measured_depths = measured_depths[trajectory_well_mask]
+
+        # Interpolation for each attribute column
+        for col in attrs_well.columns:
+            if col not in ['top', 'base', 'well_id']:
+                # Interpolate the attribute values based on the measured depths
+                attr_to_interpolate = attrs_well[col]
+                # make sure the attr_to_interpolate is not a string
+                if attr_to_interpolate.dtype == 'O':
+                    continue
+                
+                location_values_to_interpolate = (attrs_well['top'] + attrs_well['base']) / 2
+                
+                from scipy.interpolate import interp1d
+                interp_func = interp1d(
+                    x=location_values_to_interpolate,
+                    y=attr_to_interpolate,
+                    bounds_error=False,
+                    fill_value=np.nan
+                )
+
+                interpolated_values = interp_func(well_measured_depths)
+
+                # Assign the interpolated values to the new_attrs DataFrame
+                new_attrs.loc[trajectory_well_mask, col] = interpolated_values
+
+    return new_attrs
+
+
+def _map_attrs_to_measured_depths_(attrs: pd.DataFrame, new_attrs: pd.DataFrame, survey: Survey):
+    warnings.warn("This function is obsolete. Use _map_attrs_to_measured_depths instead.", DeprecationWarning)
+    
+    trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
+    well_ids: xr.DataArray = trajectory.sel({'vertex_attr': 'well_id'})
+    measured_depths: xr.DataArray = trajectory.sel({'vertex_attr': 'measured_depths'})
+
+    new_columns = attrs.columns.difference(new_attrs.columns)
+    new_attrs = pd.concat([new_attrs, pd.DataFrame(columns=new_columns)], axis=1)
+    for index, row in attrs.iterrows():
+        well_id = survey.get_well_id(index)
+        if well_id is None:
+            print(f'Well ID {index} not found in survey trajectory. Skipping lithology assignment.')
+
+        well_id_mask = well_ids == well_id
+
+        # TODO: Here we are going to need to interpolate
+
+        spatial_mask = ((measured_depths <= row['top']) & (measured_depths >= row['base']))
+        mask = well_id_mask & spatial_mask
+
+        new_attrs.loc[mask.values, attrs.columns] = row.values
+    return new_attrs
 
 
 def _correct_angles(df: pd.DataFrame) -> pd.DataFrame:
