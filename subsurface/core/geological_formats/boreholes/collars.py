@@ -21,3 +21,7 @@ class Collars:
             ids=df.index.to_list(),
             collar_loc=PointSet(data=unstruc)
         )
+    
+    @property
+    def data(self):
+        return self.collar_loc.data
