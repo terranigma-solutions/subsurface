@@ -1,15 +1,17 @@
 from subsurface.modules.visualization import to_pyvista_line, init_plotter, to_pyvista_points
 
 
-def _plot(scalar, trajectory, collars=None):
+def _plot(scalar, trajectory, collars=None, lut:int=100):
     s = to_pyvista_line(
         line_set=trajectory,
         active_scalar=scalar,
         radius=40
     )
+    
+    
     p = init_plotter()
     import matplotlib.pyplot as plt
-    boring_cmap = plt.get_cmap("viridis", 8)
+    boring_cmap = plt.get_cmap("viridis", lut)
     p.add_mesh(s, cmap=boring_cmap)
 
     if collars is not None:

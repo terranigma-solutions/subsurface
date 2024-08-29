@@ -123,7 +123,7 @@ def test_read_stratigraphy():
     if PLOT and True:
         trajectory = borehole_set.combined_trajectory
         scalar = "lith_ids"
-        _plot(scalar, trajectory, collar)
+        _plot(scalar, trajectory, collar, lut=8)
 
 
 def test_read_attr():

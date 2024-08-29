@@ -70,7 +70,6 @@ def _combine_survey_and_attrs(attrs: pd.DataFrame, survey: Survey) -> Unstructur
 
     new_attrs = _map_attrs_to_measured_depths(attrs, survey)
 
-
     # Construct the final xarray dict without intermediate variable
     points_attributes_xarray_dict = raw_attributes_to_dict_data_arrays(
         default_attributes_name="vertex_attrs",
@@ -136,6 +135,10 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
             # make sure the attr_to_interpolate is not a string
             if attr_to_interpolate.dtype == 'O':
                 continue
+            if col in ['lith_ids']:
+                interp_kind = 'nearest'
+            else:
+                interp_kind = 'linear'
 
             location_values_to_interpolate = (attrs_well['top'] + attrs_well['base']) / 2
 
@@ -144,7 +147,8 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
                 x=location_values_to_interpolate,
                 y=attr_to_interpolate,
                 bounds_error=False,
-                fill_value=np.nan
+                fill_value=np.nan,
+                kind = interp_kind
             )
 
             # Assign the interpolated values to the new_attrs DataFrame

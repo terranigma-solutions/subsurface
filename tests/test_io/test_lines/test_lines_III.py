@@ -1,8 +1,6 @@
-import pathlib
-
 import dotenv
-import os
 import pandas as pd
+import pathlib
 
 from subsurface import UnstructuredData
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
@@ -11,8 +9,7 @@ from subsurface.core.geological_formats.boreholes.survey import Survey
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 from subsurface.core.structs.unstructured_elements import PointSet
-from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_attributes
-from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_line, init_plotter
+from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith
 from test_io.test_lines._aux_func import _plot
 
 dotenv.load_dotenv()
@@ -80,5 +77,6 @@ def test_read_kim():
     _plot(
         scalar="lith_ids",
         trajectory=borehole_set.combined_trajectory,
-        collars=collars
+        collars=collars,
+        lut=14
     )
