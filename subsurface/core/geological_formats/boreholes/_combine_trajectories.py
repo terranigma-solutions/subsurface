@@ -52,9 +52,6 @@ class _Intersect:
     """This class is just to create a namespace for the intersection method"""
     @staticmethod
     def process_intersection(collar_df: pd.DataFrame, survey_df_vertex: pd.DataFrame, survey: Survey) -> LineSet:
-        # make sure well_id type is int in both dataframes
-        collar_df['well_id'] = collar_df['well_id'].astype(int)
-        survey_df_vertex['well_id'] = survey_df_vertex['well_id'].astype(int)
         
         combined_df_vertex = pd.merge(
             left=survey_df_vertex,

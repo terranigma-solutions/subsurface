@@ -67,11 +67,9 @@ def _combine_survey_and_attrs(attrs: pd.DataFrame, survey: Survey) -> Unstructur
     # Accessing trajectory data more succinctly
     trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
     # Ensure all columns in lith exist in new_attrs, if not, add them as NaN
+
     new_attrs = _map_attrs_to_measured_depths(attrs, survey)
 
-    if 'component lith' in new_attrs.columns:
-        # Factorize lith components directly in-place
-        new_attrs['lith_ids'], _ = pd.factorize(new_attrs['component lith'], use_na_sentinel=True)
 
     # Construct the final xarray dict without intermediate variable
     points_attributes_xarray_dict = raw_attributes_to_dict_data_arrays(
@@ -102,6 +100,9 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
 
     # Start with a copy of the existing attributes DataFrame
     new_attrs = survey.survey_trajectory.data.points_attributes.copy()
+    if 'component lith' in attrs.columns:
+        # Factorize lith components directly in-place
+        attrs['lith_ids'], _ = pd.factorize(attrs['component lith'], use_na_sentinel=True)
 
     # Add missing columns from attrs, preserving their dtypes
     for col in attrs.columns.difference(new_attrs.columns):
@@ -147,7 +148,8 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
             )
 
             # Assign the interpolated values to the new_attrs DataFrame
-            new_attrs.loc[trajectory_well_mask, col] = interp_func(well_measured_depths)
+            vals = interp_func(well_measured_depths)
+            new_attrs.loc[trajectory_well_mask, col] = vals
 
     return new_attrs
 
