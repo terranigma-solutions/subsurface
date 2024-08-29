@@ -10,7 +10,8 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 from subsurface.core.structs.unstructured_elements import PointSet
 from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_attributes
-from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_line, init_plotter
+from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_line
+from test_io.test_lines._aux_func import _plot
 
 dotenv.load_dotenv()
 
@@ -123,31 +124,6 @@ def test_read_stratigraphy():
         trajectory = borehole_set.combined_trajectory
         scalar = "lith_ids"
         _plot(scalar, trajectory, collar)
-
-
-def _plot(scalar, trajectory, collars=None):
-    s = to_pyvista_line(
-        line_set=trajectory,
-        active_scalar=scalar,
-        radius=40
-    )
-    p = init_plotter()
-    import matplotlib.pyplot as plt
-    boring_cmap = plt.get_cmap("viridis", 8)
-    p.add_mesh(s, cmap=boring_cmap)
-
-    if collars is not None:
-        collar_mesh = to_pyvista_points(collars.collar_loc)
-        p.add_mesh(collar_mesh, render_points_as_spheres=True)
-        p.add_point_labels(
-            points=collars.collar_loc.points,
-            labels=collars.ids,
-            point_size=10,
-            shape_opacity=0.5,
-            font_size=12,
-            bold=True
-        )
-    p.show()
 
 
 def test_read_attr():
