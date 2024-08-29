@@ -15,6 +15,9 @@ def read_collar(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     # Check file_or_buffer type
     data_df: pd.DataFrame = check_format_and_read_to_df(reader_helper)
     _map_rows_and_cols_inplace(data_df, reader_helper)
+    
+    # Remove duplicates
+    data_df = data_df[~data_df.index.duplicated(keep='first')]
 
     return data_df
 

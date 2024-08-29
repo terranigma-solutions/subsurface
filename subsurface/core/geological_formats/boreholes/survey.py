@@ -182,7 +182,8 @@ def _correct_angles(df: pd.DataFrame) -> pd.DataFrame:
         if inc < 0:
             inc = inc % 360  # Normalize to 0-360 range first if negative
         if 0 <= inc <= 180:
-            return inc + 0.000001
+            # add or subtract a very small number to make sure that 0 or 180 are never possible
+            return inc + 1e-10 if inc == 0 else inc - 1e-10
         elif 180 < inc < 360:
             return 360 - inc  # Reflect angles greater than 180 back into the 0-180 range
         else:
