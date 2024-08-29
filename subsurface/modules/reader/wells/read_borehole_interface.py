@@ -81,7 +81,7 @@ def _validate_survey_data(d):
     if not np.isin(['inc', 'azi'], d.columns).all():
         warnings.warn(
             'inc and/or azi columns are not present in the file. The boreholes will be straight.')
-        d['inc'] = 0
+        d['inc'] = 180
         d['azi'] = 0
 
     # Check if 'dip' column exists and convert it to 'inc'
