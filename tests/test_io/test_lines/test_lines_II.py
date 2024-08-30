@@ -22,6 +22,13 @@ data_folder = os.getenv("PATH_TO_ASCII_DRILLHOLES")
 
 def test_read_collar():
     collars = _read_collars()
+    
+    point_cloud = collars.data.vertex
+    # Find extent
+    min_x, max_x = point_cloud[:, 0].min(), point_cloud[:, 0].max()
+    min_y, max_y = point_cloud[:, 1].min(), point_cloud[:, 1].max()
+    min_z, max_z = point_cloud[:, 2].min(), point_cloud[:, 2].max()
+    
 
     if PLOT:
         s = to_pyvista_points(collars.collar_loc)
