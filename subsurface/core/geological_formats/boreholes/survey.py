@@ -42,6 +42,7 @@ class Survey:
             well_id_mapper=trajectories.data.attrs["well_id_mapper"]
         )
 
+
     def get_well_string_id(self, well_id: int) -> str:
         return self.ids[well_id]
 
