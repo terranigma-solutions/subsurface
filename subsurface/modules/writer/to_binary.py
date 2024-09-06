@@ -5,7 +5,7 @@ def base_structs_to_binary_file(path, base_struct, order='F'):
     try:
         bytearray_le, header = base_struct.default_data_array_to_binary_legacy(order=order)
     except AttributeError:
-        bytearray_le, header = base_struct.to_binary(order=order)
+        bytearray_le, header = base_struct.to_binary_legacy(order=order)
     with open(path+'.json', 'w') as outfile:
         json.dump(header, outfile)
 
