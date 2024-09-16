@@ -222,7 +222,8 @@ def _data_frame_to_unstructured_data(df: 'pd.DataFrame'):
             inc=data['inc'],
             azi=data['azi']
         )
-        depths = list(range(0, int(dev.md[-1]) + 1, STEP))
+        # depths = list(range(0, int(dev.md[-1]) + 1, STEP))
+        depths = np.linspace(0, dev.md[-1], STEP)
         pos: wp.minimum_curvature = dev.minimum_curvature().resample(depths=depths)
         vertex_count = cum_vertex.shape[0]
 

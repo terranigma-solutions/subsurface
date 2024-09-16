@@ -108,6 +108,16 @@ def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper
             col_base='base',
             col_altitude='altitude'
         )
+    elif np.isin(['base', 'component lith'], d.columns).all() and not given_top:
+        # add a top column with 0 and call add_tops_from_base_and_altitude_in_place
+        d['altitude'] = 0
+        d = add_tops_from_base_and_altitude_in_place(
+            data=d,
+            col_well_name=reader_helper.index_col,
+            col_base='base',
+            col_altitude='altitude'
+        )
+        
 
     elif not given_top and not given_altitude_and_base:
         raise ValueError('basis column must be present in the file. Use '

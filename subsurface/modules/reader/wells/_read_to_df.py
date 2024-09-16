@@ -10,6 +10,7 @@ def check_format_and_read_to_df(reader_helper: GenericReaderFilesHelper) -> pd.D
         reader = _get_reader(reader_helper.format)
         d = reader(
             filepath_or_buffer=reader_helper.file_or_buffer, 
+            sep=";",
             **reader_helper.pandas_reader_kwargs
         )
     elif reader_helper.is_bytes_string:
