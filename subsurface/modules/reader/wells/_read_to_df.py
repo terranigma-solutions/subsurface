@@ -1,3 +1,5 @@
+from typing import Callable
+
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper, SupportedFormats
 import pandas as pd
 
@@ -7,10 +9,10 @@ def check_format_and_read_to_df(reader_helper: GenericReaderFilesHelper) -> pd.D
     if reader_helper.format == ".json":
         d = pd.read_json(reader_helper.file_or_buffer, orient='split')
     elif reader_helper.is_file_in_disk:
-        reader = _get_reader(reader_helper.format)
+        reader: Callable = _get_reader(reader_helper.format)
         d = reader(
-            filepath_or_buffer=reader_helper.file_or_buffer, 
-            sep=";",
+            filepath_or_buffer=reader_helper.file_or_buffer,
+            sep=reader_helper.separator,
             **reader_helper.pandas_reader_kwargs
         )
     elif reader_helper.is_bytes_string:
@@ -41,9 +43,10 @@ def _dict_reader(dict_):
     )
 
 
-def _get_reader(file_format):
+def _get_reader(file_format) -> Callable:
     match file_format:
         case SupportedFormats.XLXS:
+            raise NotImplemented("Pandas changed the backend for reading excel files and needs to be re-implemented")
             reader = pd.read_excel
         case 'dict':
             reader = _dict_reader

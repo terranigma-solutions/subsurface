@@ -31,6 +31,7 @@ class GenericReaderFilesHelper:
     col_names: List[Union[str, int]] = None  # Give a name
     drop_cols: List[str] = None  # Drop a subset of columns
     format: SupportedFormats = None
+    separator: str = None
     index_map: Union[None, Callable, dict, pd.Series] = None
     columns_map: Union[None, Callable, dict, pd.Series] = None
     additional_reader_kwargs: dict = field(default_factory=dict)

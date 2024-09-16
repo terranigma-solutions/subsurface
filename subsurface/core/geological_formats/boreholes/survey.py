@@ -11,7 +11,7 @@ from subsurface import optional_requirements
 from ...structs.unstructured_elements import LineSet
 from ...structs.base_structures import UnstructuredData
 
-STEP = 30
+NUMBER_NODES = 30
 RADIUS = 10
 
 
@@ -96,7 +96,7 @@ def _combine_survey_and_attrs(attrs: pd.DataFrame, survey: Survey) -> Unstructur
 def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.DataFrame:
     trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
     trajectory_well_id: xr.DataArray = trajectory.sel({'vertex_attr': 'well_id'})
-    measured_depths: np.ndarray = trajectory.sel({'vertex_attr': 'measured_depths'}).values.astype(np.float_)
+    measured_depths: np.ndarray = trajectory.sel({'vertex_attr': 'measured_depths'}).values.astype(np.float64)
 
     # Start with a copy of the existing attributes DataFrame
     new_attrs = survey.survey_trajectory.data.points_attributes.copy()
@@ -211,7 +211,7 @@ def _data_frame_to_unstructured_data(df: 'pd.DataFrame'):
     wp = optional_requirements.require_wellpathpy()
     pd = optional_requirements.require_pandas()
 
-    cum_vertex: np.ndarray = np.empty((0, 3), dtype=np.float_)
+    cum_vertex: np.ndarray = np.empty((0, 3), dtype=np.float32)
     cells: np.ndarray = np.empty((0, 2), dtype=np.int_)
     cell_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'], dtype=np.float32)
     vertex_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'], dtype=np.float32)
@@ -222,8 +222,8 @@ def _data_frame_to_unstructured_data(df: 'pd.DataFrame'):
             inc=data['inc'],
             azi=data['azi']
         )
-        # depths = list(range(0, int(dev.md[-1]) + 1, STEP))
-        depths = np.linspace(0, dev.md[-1], STEP)
+        
+        depths = np.linspace(0, dev.md[-1], NUMBER_NODES)
         pos: wp.minimum_curvature = dev.minimum_curvature().resample(depths=depths)
         vertex_count = cum_vertex.shape[0]
 
