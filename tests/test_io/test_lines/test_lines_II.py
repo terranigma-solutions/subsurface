@@ -142,14 +142,14 @@ def test_read_attr():
             radius=10,
             active_scalar="Ag"
         )
-        pv_plot([s], image_2d=False)
+        pv_plot([s], image_2d=True)
 
         s = to_pyvista_line(
             line_set=survey.survey_trajectory,
             radius=10,
             active_scalar="MnO"
         )
-        pv_plot([s], image_2d=False)
+        pv_plot([s], image_2d=True)
 
     pass
 

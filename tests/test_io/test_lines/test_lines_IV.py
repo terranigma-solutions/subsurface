@@ -10,6 +10,7 @@ from subsurface.core.structs.base_structures.base_structures_enum import Special
 from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith
 import subsurface as ss
 from subsurface.modules.visualization import to_pyvista_line, init_plotter, to_pyvista_points
+from test_io.test_lines._aux_func import _plot
 
 dotenv.load_dotenv()
 
@@ -87,6 +88,11 @@ def test_read():
 
     # %%
     # Visualize boreholes with pyvista
+
+    trajectory = borehole_set.combined_trajectory
+    scalar = "lith_ids"
+    _plot(scalar, trajectory, collars, lut=14)
+    return 
     import matplotlib.pyplot as plt
 
     well_mesh = to_pyvista_line(

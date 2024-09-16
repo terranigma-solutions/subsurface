@@ -9,7 +9,7 @@ def _plot(scalar, trajectory, collars=None, lut:int=100, image_2d=True):
     )
     
     
-    p = init_plotter()
+    p = init_plotter(image_2d=image_2d)
     import matplotlib.pyplot as plt
     boring_cmap = plt.get_cmap("viridis", lut)
     p.add_mesh(s, cmap=boring_cmap)
@@ -27,5 +27,6 @@ def _plot(scalar, trajectory, collars=None, lut:int=100, image_2d=True):
         )
     if image_2d:
         f = pyvista_to_matplotlib(p)
+        p.close()
     else:
         p.show()
