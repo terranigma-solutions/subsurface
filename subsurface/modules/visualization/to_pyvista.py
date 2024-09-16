@@ -47,17 +47,22 @@ def pv_plot(meshes: list,
         p.show()
         return p
     else:
-        try:
-            import matplotlib.pyplot as plt
-        except ImportError:
-            raise ImportError('Matplotlib is necessary for generating a 2D image.')
-        img = p.show(screenshot=True)
-        img = p.last_image
-        fig = plt.imshow(img)
-        plt.axis('off')
-        plt.show(block=False)
-        p.close()
+        fig = pyvista_to_matplotlib(p)
         return fig
+
+
+def pyvista_to_matplotlib(p: pv.Plotter):
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        raise ImportError('Matplotlib is necessary for generating a 2D image.')
+    img = p.show(screenshot=True)
+    img = p.last_image
+    fig = plt.imshow(img)
+    plt.axis('off')
+    plt.show(block=False)
+    p.close()
+    return fig
 
 
 def init_plotter(

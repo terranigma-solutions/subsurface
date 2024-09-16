@@ -15,7 +15,7 @@ def read_collar(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     # Check file_or_buffer type
     data_df: pd.DataFrame = check_format_and_read_to_df(reader_helper)
     _map_rows_and_cols_inplace(data_df, reader_helper)
-    
+
     # Remove duplicates
     data_df = data_df[~data_df.index.duplicated(keep='first')]
 
@@ -100,15 +100,17 @@ def _validate_survey_data(d):
 def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     given_top = np.isin(['top', 'base', 'component lith'], d.columns).all()
     given_altitude_and_base = np.isin(['altitude', 'base', 'component lith'], d.columns).all()
-
+    given_only_base = np.isin(['base', 'component lith'], d.columns).all()
     if given_altitude_and_base and not given_top:
+        warnings.warn('top column is not present in the file. The tops will be calculated from the base and altitude')
         d = add_tops_from_base_and_altitude_in_place(
             data=d,
             col_well_name=reader_helper.index_col,
             col_base='base',
             col_altitude='altitude'
         )
-    elif np.isin(['base', 'component lith'], d.columns).all() and not given_top:
+    elif given_only_base and not given_top:
+        warnings.warn('top column is not present in the file. The tops will be calculated from the base assuming altitude=0')
         # add a top column with 0 and call add_tops_from_base_and_altitude_in_place
         d['altitude'] = 0
         d = add_tops_from_base_and_altitude_in_place(
@@ -117,7 +119,7 @@ def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper
             col_base='base',
             col_altitude='altitude'
         )
-        
+
 
     elif not given_top and not given_altitude_and_base:
         raise ValueError('basis column must be present in the file. Use '

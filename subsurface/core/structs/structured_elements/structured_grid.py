@@ -33,7 +33,7 @@ class StructuredGrid:
         grid_3d = np.meshgrid(*cart_coord, indexing='ij')
         return grid_3d
 
-    def meshgrid_2d(self, attribute_name_coord_name: str = None):
+    def meshgrid_2d(self, attribute_name_coord_name: str = None) -> list:
         """
 
         Args:
@@ -43,7 +43,8 @@ class StructuredGrid:
         Returns:
 
         """
-        grid_2d = np.meshgrid(self.coord['x'], self.coord['y'])
+        grid_2d_: tuple = np.meshgrid(self.coord['x'], self.coord['y'])
+        grid_2d = list(grid_2d_)
         if attribute_name_coord_name is not None:
             z_coord = self.ds.data[attribute_name_coord_name].values.T
             if z_coord.ndim != 2:

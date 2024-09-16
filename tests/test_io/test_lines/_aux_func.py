@@ -1,7 +1,7 @@
-from subsurface.modules.visualization import to_pyvista_line, init_plotter, to_pyvista_points
+from subsurface.modules.visualization import to_pyvista_line, init_plotter, to_pyvista_points, pyvista_to_matplotlib
 
 
-def _plot(scalar, trajectory, collars=None, lut:int=100):
+def _plot(scalar, trajectory, collars=None, lut:int=100, image_2d=True):
     s = to_pyvista_line(
         line_set=trajectory,
         active_scalar=scalar,
@@ -25,4 +25,7 @@ def _plot(scalar, trajectory, collars=None, lut:int=100):
             font_size=12,
             bold=True
         )
-    p.show()
+    if image_2d:
+        f = pyvista_to_matplotlib(p)
+    else:
+        p.show()
