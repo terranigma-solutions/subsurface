@@ -1,6 +1,6 @@
 import warnings
 
-from typing import Union, Hashable
+from typing import Union, Hashable, Optional
 
 import pandas as pd
 from dataclasses import dataclass
@@ -28,9 +28,20 @@ class Survey:
         return id_to_well_name_mapper
 
     @classmethod
-    def from_df(cls, df: 'pd.DataFrame'):
+    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: 'pd.DataFrame', number_nodes: Optional[int] = NUMBER_NODES) -> 'Survey':
+        """
+        Create a Survey object from two DataFrames containing survey and attribute data.
+
+        :param survey_df: DataFrame containing survey data.
+        :param attr_df: DataFrame containing attribute data. This is used to make sure the raw data is perfectly aligned.
+        :param number_nodes: Optional parameter specifying the number of nodes.
+        :return: A Survey object representing the input data.
+
+        """
         trajectories: UnstructuredData = _data_frame_to_unstructured_data(
-            df=_correct_angles(df)
+            survey_df=_correct_angles(survey_df),
+            attr_df=attr_df,
+            number_nodes=number_nodes
         )
         # Grab the unique ids
         unique_ids = trajectories.points_attributes["well_id"].unique()
@@ -205,26 +216,55 @@ def _correct_angles(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _data_frame_to_unstructured_data(df: 'pd.DataFrame'):
+def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', attr_df: 'pd.DataFrame', number_nodes: int):
     import numpy as np
+    import pandas as pd
 
     wp = optional_requirements.require_wellpathpy()
-    pd = optional_requirements.require_pandas()
 
     cum_vertex: np.ndarray = np.empty((0, 3), dtype=np.float32)
     cells: np.ndarray = np.empty((0, 2), dtype=np.int_)
     cell_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'], dtype=np.float32)
-    vertex_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'], dtype=np.float32)
+    vertex_attr: pd.DataFrame = pd.DataFrame()
 
-    for e, (borehole_id, data) in enumerate(df.groupby(level=0)):
-        dev: wp.deviation = wp.deviation(
-            md=data['md'],
-            inc=data['inc'],
-            azi=data['azi']
+    for e, (borehole_id, data) in enumerate(survey_df.groupby(level=0)):
+        dev = wp.deviation(
+            md=data['md'].values,
+            inc=data['inc'].values,
+            azi=data['azi'].values
         )
-        
-        depths = np.linspace(0, dev.md[-1], NUMBER_NODES)
-        pos: wp.minimum_curvature = dev.minimum_curvature().resample(depths=depths)
+
+        # Initialize attr_depths as an empty array
+        attr_depths = np.array([], dtype=float)
+
+        # Try to get 'top' and 'base' for this borehole_id from attr_df
+        try:
+            vals = attr_df.loc[borehole_id]
+            if 'top' in vals and 'base' in vals:
+                if isinstance(vals, pd.DataFrame):
+                    attr_depths = vals[['top', 'base']].values.flatten()
+                else:
+                    attr_depths = vals[['top', 'base']].values.flatten()
+                # Convert to float and remove NaNs
+                attr_depths = attr_depths.astype(float)
+                attr_depths = attr_depths[~np.isnan(attr_depths)]
+                # Clip attr_depths to be within the range of dev.md
+                md_min = dev.md.min()
+                md_max = dev.md.max()
+                attr_depths = attr_depths[(attr_depths >= md_min) & (attr_depths <= md_max)]
+        except KeyError:
+            # No attributes for this borehole_id or missing columns
+            attr_depths = np.array([], dtype=float)
+
+        # Now combine attr_depths with depths
+        md_min = dev.md.min()
+        md_max = dev.md.max()
+        depths = np.linspace(md_min, md_max, number_nodes)
+        depths = np.union1d(depths, attr_depths)
+        depths.sort()
+
+        # Resample positions at depths
+        pos = dev.minimum_curvature().resample(depths=depths)
         vertex_count = cum_vertex.shape[0]
 
         this_well_vertex = np.vstack([pos.easting, pos.northing, pos.depth]).T
@@ -234,28 +274,28 @@ def _data_frame_to_unstructured_data(df: 'pd.DataFrame'):
         n_vertex_shift_0 = np.arange(0, len(pos.depth) - 1, dtype=np.int_)
         n_vertex_shift_1 = np.arange(1, len(pos.depth), dtype=np.int_)
         cell_per_well = np.vstack([n_vertex_shift_0, n_vertex_shift_1]).T + vertex_count
-        cells = np.vstack([cells, cell_per_well], dtype=np.int_)
+        cells = np.vstack([cells, cell_per_well])
 
-        # Add the id (e), to cell_attr and vertex_attr
-        cell_attr = pd.concat([cell_attr, pd.DataFrame({'well_id': [e] * len(cell_per_well)})])
-        vertex_attr = pd.concat([vertex_attr, pd.DataFrame(
-            {
-                    'well_id'        : [e] * len(pos.depth),
-                    # 'well_name'      : borehole_id,
-                    'measured_depths': measured_depths,
-            }
-        )])
+        vertex_attr_per_well = pd.DataFrame({
+                'well_id': [e] * len(pos.depth),
+                'measured_depths': measured_depths,
+        })
+        vertex_attr = pd.concat([vertex_attr, vertex_attr_per_well], ignore_index=True)
+
+        # Add the id (e), to cell_attr
+        cell_attr = pd.concat([cell_attr, pd.DataFrame({'well_id': [e] * len(cell_per_well)})], ignore_index=True)
 
     unstruct = UnstructuredData.from_array(
         vertex=cum_vertex,
-        cells=cells,
-        vertex_attr=vertex_attr.reset_index(),
-        cells_attr=cell_attr.reset_index()
+        cells=cells.astype(int),
+        vertex_attr=vertex_attr.reset_index(drop=True),
+        cells_attr=cell_attr.reset_index(drop=True)
     )
-    
-    unstruct.data.attrs["well_id_mapper"] = {well_id: e for e, well_id in enumerate(df.index.unique(level=0))}
+
+    unstruct.data.attrs["well_id_mapper"] = {well_id: e for e, well_id in enumerate(survey_df.index.unique(level=0))}
 
     return unstruct
+
 
 
 def _calculate_distances(array_of_vertices: np.ndarray) -> np.ndarray:

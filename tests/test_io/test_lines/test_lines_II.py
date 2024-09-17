@@ -22,13 +22,12 @@ data_folder = os.getenv("PATH_TO_ASCII_DRILLHOLES")
 
 def test_read_collar():
     collars = _read_collars()
-    
+
     point_cloud = collars.data.vertex
     # Find extent
     min_x, max_x = point_cloud[:, 0].min(), point_cloud[:, 0].max()
     min_y, max_y = point_cloud[:, 1].min(), point_cloud[:, 1].max()
     min_z, max_z = point_cloud[:, 2].min(), point_cloud[:, 2].max()
-    
 
     if PLOT:
         s = to_pyvista_points(collars.collar_loc)
@@ -163,7 +162,7 @@ def test_read_attr_into_borehole():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
-    
+
     if False:
         borehole_set.to_binary("test")
 
@@ -193,7 +192,11 @@ def _read_geochem_into_survey() -> Survey:
                 'Azimuth' : 'azi'
         },
     )
-    df = read_survey(reader)
-    survey: Survey = Survey.from_df(df)
+    survey: Survey = Survey.from_df(
+        survey_df=read_survey(reader),
+        attr_df=attributes,
+        number_nodes=2
+    )
+    
     survey.update_survey_with_attr(attributes)
     return survey
