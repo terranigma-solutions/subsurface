@@ -91,32 +91,4 @@ def test_read():
 
     trajectory = borehole_set.combined_trajectory
     scalar = "lith_ids"
-    _plot(scalar, trajectory, collars, lut=14)
-    return 
-    import matplotlib.pyplot as plt
-
-    well_mesh = to_pyvista_line(
-        line_set=borehole_set.combined_trajectory,
-        active_scalar="lith_ids",
-        radius=40
-    )
-
-    p = init_plotter()
-
-    # Set colormap for lithologies
-    boring_cmap = plt.get_cmap(name="viridis", lut=14)
-    p.add_mesh(well_mesh, cmap=boring_cmap)
-
-    collar_mesh = to_pyvista_points(collars.collar_loc)
-
-    p.add_mesh(collar_mesh, render_points_as_spheres=True)
-    p.add_point_labels(
-        points=collars.collar_loc.points,
-        labels=collars.ids,
-        point_size=10,
-        shape_opacity=0.5,
-        font_size=12,
-        bold=True
-    )
-
-    p.show()
+    _plot(scalar, trajectory, collars, lut=14, image_2d=False)
