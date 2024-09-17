@@ -163,11 +163,15 @@ def test_read_attr_into_borehole():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
+    
+    if False:
+        borehole_set.to_binary("test")
 
     _plot(
         scalar="MnO",
         trajectory=borehole_set.combined_trajectory,
-        collars=collars
+        collars=collars,
+        image_2d=False
     )
 
 

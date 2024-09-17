@@ -51,6 +51,16 @@ class BoreholeSet:
         self.survey = survey
         self.combined_trajectory: LineSet = create_combined_trajectory(collars, survey, merge_option, slice_)
 
+    def to_binary(self, path: str):
+        self.survey.survey_trajectory.data.data.attrs
+        raise NotImplementedError()
+        # I need to implement the survey to and then name the files accordingly
+        bytearray_le_collars: bytes = self.collars.data.to_binary()
+        bytearray_le_trajectory: bytes = self.combined_trajectory.data.to_binary()
+        
+
+        new_file = open("wells_f.le", "wb")
+        new_file.write(bytearray_le)
 
     def get_top_coords_for_each_lith(self) -> dict[Hashable, np.ndarray]:
         merged_df = self._merge_vertex_data_arrays_to_dataframe()

@@ -73,7 +73,12 @@ class _Intersect:
         if len(combined_df_cells) != len(cell_attributes):
             raise ValueError("Cells and cell attributes have different lengths")
 
-        return _Intersect._create_line_set(combined_df_vertex, combined_df_cells, survey)
+        line_set: LineSet = _Intersect._create_line_set(combined_df_vertex, combined_df_cells, survey)
+
+        line_set.data.data.attrs.update(survey.survey_trajectory.data.data.attrs)
+        line_set.data.data.attrs.update(collar_df.attrs)
+        
+        return line_set
 
     @staticmethod
     def _add_collar_coordinates(combined_df_vertex: pd.DataFrame):
