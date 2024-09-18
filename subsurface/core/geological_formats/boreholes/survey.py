@@ -229,7 +229,6 @@ def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: in
     vertex_attr: pd.DataFrame = pd.DataFrame()
 
     for e, (borehole_id, data) in enumerate(survey_df.groupby(level=0)):
-
         dev = wp.deviation(
             md=data['md'].values,
             inc=data['inc'].values,
@@ -239,7 +238,7 @@ def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: in
         md_min = dev.md.min()
         md_max = dev.md.max()
 
-        attr_depths, attribute_values = _grab_depths_from_attr(
+        attr_depths = _grab_depths_from_attr(
             attr_df=attr_df,
             borehole_id=borehole_id,
             duplicate_attr_depths=duplicate_attr_depths,
@@ -267,12 +266,14 @@ def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: in
         cell_per_well = np.vstack([n_vertex_shift_0, n_vertex_shift_1]).T + vertex_count
         cells = np.vstack([cells, cell_per_well])
 
+        attribute_values = np.isin(depths, attr_depths)
+
         vertex_attr_per_well = pd.DataFrame({
                 'well_id'        : [e] * len(pos.depth),
                 'measured_depths': measured_depths,
                 'is_attr_point'  : attribute_values,
         })
-        
+
         vertex_attr = pd.concat([vertex_attr, vertex_attr_per_well], ignore_index=True)
 
         # Add the id (e), to cell_attr
@@ -291,17 +292,18 @@ def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: in
 
 
 def _grab_depths_from_attr(attr_df: pd.DataFrame, borehole_id: Hashable, duplicate_attr_depths: bool, md_max: float,
-                          md_min: float) -> tuple[np.ndarray, np.ndarray]:
-    
+                           md_min: float) -> np.ndarray:
     # Initialize attr_depths as an empty array
     attr_depths = np.array([], dtype=float)
     attribute_values = np.array([], dtype=bool)
 
-    if attr_df is not None and "top" in attr_df.columns and "base" in attr_df.columns:
-        return attr_depths, attribute_values
+    if attr_df is None or "top" not in attr_df.columns or "base" not in attr_df.columns:
+        return attr_depths
 
     try:
         vals: pd.DataFrame = attr_df.loc[borehole_id]
+        
+        
         if 'top' in vals and 'base' in vals:
             if isinstance(vals, pd.DataFrame):
                 tops = vals['top'].values.flatten()
@@ -320,6 +322,12 @@ def _grab_depths_from_attr(attr_df: pd.DataFrame, borehole_id: Hashable, duplica
             # Combine tops and bases into attr_depths with labels
             attr_depths = np.concatenate((tops, bases))
             attr_labels = np.array(['top'] * len(tops) + ['base'] * len(bases))
+            
+            # Drop duplicates
+            unique_indices = np.unique(attr_depths, return_index=True)[1]
+            attr_depths = attr_depths[unique_indices]
+            attr_labels = attr_labels[unique_indices]
+            
     except KeyError:
         # No attributes for this borehole_id or missing columns
         attr_depths = np.array([], dtype=float)
@@ -334,25 +342,12 @@ def _grab_depths_from_attr(attr_df: pd.DataFrame, borehole_id: Hashable, duplica
         # Ensure the duplicated depths are within the md range
         valid_indices = (duplicated_attr_depths >= md_min) & (duplicated_attr_depths <= md_max)
         duplicated_attr_depths = duplicated_attr_depths[valid_indices]
-        duplicated_attr_labels = attr_labels[valid_indices]
-        duplicated_attr_is_duplicate = np.ones(len(duplicated_attr_depths), dtype=bool)
         # Original attribute depths
         original_attr_depths = attr_depths
-        original_attr_labels = attr_labels
-        original_attr_is_duplicate = np.zeros(len(attr_depths), dtype=bool)
         # Combine originals and duplicates
         attr_depths = np.hstack([original_attr_depths, duplicated_attr_depths])
-        attr_labels = np.hstack([original_attr_labels, duplicated_attr_labels])
-        attr_is_duplicate = np.hstack([original_attr_is_duplicate, duplicated_attr_is_duplicate])
-    else:
-        original_attr_depths = attr_depths
-        duplicated_attr_depths = np.array([], dtype=float)
 
-    is_attr_point = np.isin(depths, original_attr_depths)
-    is_attr_duplicate = np.isin(depths, duplicated_attr_depths)
-    attribute_values = is_attr_point + is_attr_duplicate
-
-    return attr_depths, attribute_values
+    return attr_depths
 
 
 def _calculate_distances(array_of_vertices: np.ndarray) -> np.ndarray:

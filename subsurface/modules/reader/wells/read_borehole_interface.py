@@ -77,19 +77,19 @@ def _validate_survey_data(d):
         raise AttributeError(
             'md, inc, and azi columns must be present in the file. Use columns_map to assign column names to these fields.')
 
-    # Handle if inclination ('inc') or azimuth ('azi') columns are missing
-    if not np.isin(['inc', 'azi'], d.columns).all():
-        warnings.warn(
-            'inc and/or azi columns are not present in the file. The boreholes will be straight.')
-        d['inc'] = 180
-        d['azi'] = 0
-
     # Check if 'dip' column exists and convert it to 'inc'
     if 'dip' in d.columns:
         # Convert dip to inclination (90 - dip)
         d['inc'] = 90 - d['dip']
         # Optionally, drop the 'dip' column if it's no longer needed
         d.drop(columns=['dip'], inplace=True)
+
+    # Handle if inclination ('inc') or azimuth ('azi') columns are missing
+    if not np.isin(['inc', 'azi'], d.columns).all():
+        warnings.warn(
+            'inc and/or azi columns are not present in the file. The boreholes will be straight.')
+        d['inc'] = 180
+        d['azi'] = 0
 
     # Drop wells that contain only one value, ensuring that we keep rows only when there are duplicates
     d_no_singles = d[d.index.duplicated(keep=False)]

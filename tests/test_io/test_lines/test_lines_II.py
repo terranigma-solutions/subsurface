@@ -190,7 +190,7 @@ def _read_geochem_into_survey() -> Survey:
                 'Distance': 'md',
                 'Dip'     : 'dip',
                 'Azimuth' : 'azi'
-        },
+        },      
     )
     survey: Survey = Survey.from_df(
         survey_df=read_survey(reader),
