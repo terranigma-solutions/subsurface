@@ -28,7 +28,8 @@ class Survey:
         return id_to_well_name_mapper
 
     @classmethod
-    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: 'pd.DataFrame', number_nodes: Optional[int] = NUMBER_NODES) -> 'Survey':
+    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: 'pd.DataFrame', number_nodes: Optional[int] = NUMBER_NODES,
+                duplicate_attr_depths: bool = False) -> 'Survey':
         """
         Create a Survey object from two DataFrames containing survey and attribute data.
 
@@ -41,18 +42,17 @@ class Survey:
         trajectories: UnstructuredData = _data_frame_to_unstructured_data(
             survey_df=_correct_angles(survey_df),
             attr_df=attr_df,
-            number_nodes=number_nodes
+            number_nodes=number_nodes,
+            duplicate_attr_depths=duplicate_attr_depths
         )
         # Grab the unique ids
         unique_ids = trajectories.points_attributes["well_id"].unique()
-
 
         return cls(
             ids=unique_ids,
             survey_trajectory=LineSet(data=trajectories, radius=RADIUS),
             well_id_mapper=trajectories.data.attrs["well_id_mapper"]
         )
-
 
     def get_well_string_id(self, well_id: int) -> str:
         return self.ids[well_id]
@@ -85,7 +85,7 @@ def _combine_survey_and_attrs(attrs: pd.DataFrame, survey: Survey) -> Unstructur
     # Construct the final xarray dict without intermediate variable
     points_attributes_xarray_dict = raw_attributes_to_dict_data_arrays(
         default_attributes_name="vertex_attrs",
-        n_items=trajectory.shape[0], # TODO: Can I look this on new_attrs to remove line 11?
+        n_items=trajectory.shape[0],  # TODO: Can I look this on new_attrs to remove line 11?
         dims=["points", "vertex_attr"],
         raw_attributes=new_attrs
     )
@@ -160,7 +160,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
                 y=attr_to_interpolate,
                 bounds_error=False,
                 fill_value=np.nan,
-                kind = interp_kind
+                kind=interp_kind
             )
 
             # Assign the interpolated values to the new_attrs DataFrame
@@ -172,7 +172,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
 
 def _map_attrs_to_measured_depths_(attrs: pd.DataFrame, new_attrs: pd.DataFrame, survey: Survey):
     warnings.warn("This function is obsolete. Use _map_attrs_to_measured_depths instead.", DeprecationWarning)
-     
+
     trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
     well_ids: xr.DataArray = trajectory.sel({'vertex_attr': 'well_id'})
     measured_depths: xr.DataArray = trajectory.sel({'vertex_attr': 'measured_depths'})
@@ -216,7 +216,8 @@ def _correct_angles(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', attr_df: 'pd.DataFrame', number_nodes: int):
+def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', attr_df: 'pd.DataFrame',
+                                     number_nodes: int, duplicate_attr_depths: bool = False) -> UnstructuredData:
     import numpy as np
     import pandas as pd
 
@@ -228,34 +229,68 @@ def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', attr_df: 'pd.Dat
     vertex_attr: pd.DataFrame = pd.DataFrame()
 
     for e, (borehole_id, data) in enumerate(survey_df.groupby(level=0)):
+
         dev = wp.deviation(
             md=data['md'].values,
             inc=data['inc'].values,
             azi=data['azi'].values
         )
 
+        md_min = dev.md.min()
+        md_max = dev.md.max()
+
         # Initialize attr_depths as an empty array
         attr_depths = np.array([], dtype=float)
-
-        # Try to get 'top' and 'base' for this borehole_id from attr_df
+        
         try:
             vals = attr_df.loc[borehole_id]
             if 'top' in vals and 'base' in vals:
                 if isinstance(vals, pd.DataFrame):
-                    attr_depths = vals[['top', 'base']].values.flatten()
+                    tops = vals['top'].values.flatten()
+                    bases = vals['base'].values.flatten()
                 else:
-                    attr_depths = vals[['top', 'base']].values.flatten()
+                    tops = np.array([vals['top']])
+                    bases = np.array([vals['base']])
                 # Convert to float and remove NaNs
-                attr_depths = attr_depths.astype(float)
-                attr_depths = attr_depths[~np.isnan(attr_depths)]
-                # Clip attr_depths to be within the range of dev.md
-                md_min = dev.md.min()
-                md_max = dev.md.max()
-                attr_depths = attr_depths[(attr_depths >= md_min) & (attr_depths <= md_max)]
+                tops = tops.astype(float)
+                tops = tops[~np.isnan(tops)]
+                bases = bases.astype(float)
+                bases = bases[~np.isnan(bases)]
+                # Clip to within md range
+                tops = tops[(tops >= md_min) & (tops <= md_max)]
+                bases = bases[(bases >= md_min) & (bases <= md_max)]
+                # Combine tops and bases into attr_depths with labels
+                attr_depths = np.concatenate((tops, bases))
+                attr_labels = np.array(['top'] * len(tops) + ['base'] * len(bases))
         except KeyError:
             # No attributes for this borehole_id or missing columns
             attr_depths = np.array([], dtype=float)
-
+            attr_labels = np.array([], dtype='<U4')
+            
+        # If duplicate_attr_depths is True, duplicate attr_depths with a tiny offset
+        if duplicate_attr_depths and len(attr_depths) > 0:
+            tiny_offset = (md_max - md_min) * 1e-6  # A tiny fraction of the depth range
+            # tiny_offset = 1e-4
+            # Create offsets: +tiny_offset for 'top', -tiny_offset for 'base'
+            offsets = np.where(attr_labels == 'top', tiny_offset, -tiny_offset)
+            duplicated_attr_depths = attr_depths + offsets
+            # Ensure the duplicated depths are within the md range
+            valid_indices = (duplicated_attr_depths >= md_min) & (duplicated_attr_depths <= md_max)
+            duplicated_attr_depths = duplicated_attr_depths[valid_indices]
+            duplicated_attr_labels = attr_labels[valid_indices]
+            duplicated_attr_is_duplicate = np.ones(len(duplicated_attr_depths), dtype=bool)
+            # Original attribute depths
+            original_attr_depths = attr_depths
+            original_attr_labels = attr_labels
+            original_attr_is_duplicate = np.zeros(len(attr_depths), dtype=bool)
+            # Combine originals and duplicates
+            attr_depths = np.hstack([original_attr_depths, duplicated_attr_depths])
+            attr_labels = np.hstack([original_attr_labels, duplicated_attr_labels])
+            attr_is_duplicate = np.hstack([original_attr_is_duplicate, duplicated_attr_is_duplicate])
+        else:
+            original_attr_depths = attr_depths
+            duplicated_attr_depths = np.array([], dtype=float)
+    
         # Now combine attr_depths with depths
         md_min = dev.md.min()
         md_max = dev.md.max()
@@ -275,15 +310,19 @@ def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', attr_df: 'pd.Dat
         n_vertex_shift_1 = np.arange(1, len(pos.depth), dtype=np.int_)
         cell_per_well = np.vstack([n_vertex_shift_0, n_vertex_shift_1]).T + vertex_count
         cells = np.vstack([cells, cell_per_well])
-
+        
+        is_attr_point = np.isin(depths, original_attr_depths)
+        is_attr_duplicate = np.isin(depths, duplicated_attr_depths)
         vertex_attr_per_well = pd.DataFrame({
                 'well_id': [e] * len(pos.depth),
                 'measured_depths': measured_depths,
+                'is_attr_point': is_attr_point + is_attr_duplicate,
         })
         vertex_attr = pd.concat([vertex_attr, vertex_attr_per_well], ignore_index=True)
 
         # Add the id (e), to cell_attr
         cell_attr = pd.concat([cell_attr, pd.DataFrame({'well_id': [e] * len(cell_per_well)})], ignore_index=True)
+
 
     unstruct = UnstructuredData.from_array(
         vertex=cum_vertex,
@@ -295,7 +334,6 @@ def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', attr_df: 'pd.Dat
     unstruct.data.attrs["well_id_mapper"] = {well_id: e for e, well_id in enumerate(survey_df.index.unique(level=0))}
 
     return unstruct
-
 
 
 def _calculate_distances(array_of_vertices: np.ndarray) -> np.ndarray:

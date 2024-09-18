@@ -163,8 +163,8 @@ def test_read_attr_into_borehole():
         merge_option=MergeOptions.INTERSECT
     )
 
-    if False:
-        borehole_set.to_binary("test")
+    if True:
+        borehole_set.to_binary("ascii_wells")
 
     _plot(
         scalar="MnO",
@@ -195,7 +195,8 @@ def _read_geochem_into_survey() -> Survey:
     survey: Survey = Survey.from_df(
         survey_df=read_survey(reader),
         attr_df=attributes,
-        number_nodes=2
+        number_nodes=10,
+        duplicate_attr_depths=True
     )
     
     survey.update_survey_with_attr(attributes)
