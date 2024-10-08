@@ -60,7 +60,7 @@ def test_read_survey():
     )
     df = read_survey(reader)
 
-    survey: Survey = Survey.from_df(df)
+    survey: Survey = Survey.from_df(df, None)
 
     if PLOT and False:
         s = to_pyvista_line(
@@ -134,7 +134,7 @@ def test_read_stratigraphy():
     foo["well_name"] = foo["well_id"].map(well_id_mapper)
     
 
-    if PLOT and False:
+    if PLOT and True:
         trajectory = borehole_set.combined_trajectory
         s = to_pyvista_line(
             line_set=trajectory,

@@ -28,7 +28,7 @@ class Survey:
         return id_to_well_name_mapper
 
     @classmethod
-    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: 'pd.DataFrame', number_nodes: Optional[int] = NUMBER_NODES,
+    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: Optional['pd.DataFrame'], number_nodes: Optional[int] = NUMBER_NODES,
                 duplicate_attr_depths: bool = False) -> 'Survey':
         """
         Create a Survey object from two DataFrames containing survey and attribute data.
@@ -118,7 +118,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
     # Add missing columns from attrs, preserving their dtypes
     for col in attrs.columns.difference(new_attrs.columns):
         new_attrs[col] = np.nan if pd.api.types.is_numeric_dtype(attrs[col]) else None
-
+    
     # Align well IDs between attrs and trajectory, perform interpolation, and map the attributes
     # Loop dict
     for survey_well_name in survey.well_id_mapper:
@@ -147,7 +147,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
             # make sure the attr_to_interpolate is not a string
             if attr_to_interpolate.dtype == 'O':
                 continue
-            if col in ['lith_ids']:
+            if col in ['lith_ids', 'component lith']:
                 interp_kind = 'nearest'
             else:
                 interp_kind = 'linear'
