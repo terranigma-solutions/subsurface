@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from conftest import RequirementsLevel
+from tests.conftest import RequirementsLevel
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
 from subsurface.core.structs import TriSurf

@@ -2,7 +2,7 @@
 import pyvista as pv
 from dotenv import dotenv_values
 
-from conftest import RequirementsLevel
+from tests.conftest import RequirementsLevel
 
 config = dotenv_values()
 path_to_obj = config.get('PATH_TO_OBJ')

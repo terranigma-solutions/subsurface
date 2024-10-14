@@ -40,6 +40,7 @@ def test_read_gocad():
 
 
 @pytest.mark.skipif(os.getenv("TERRA_PATH_DEVOPS") is None, reason="Need to set the TERRA_PATH_DEVOPS")
+@pytest.mark.liquid_earth
 def test_read_gocad_from_file():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
     unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(os.getenv("PATH_TO_MX"))

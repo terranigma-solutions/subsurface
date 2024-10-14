@@ -1,5 +1,5 @@
 import pytest
-from conftest import RequirementsLevel
+from tests.conftest import RequirementsLevel
 
 from subsurface import PointSet
 from subsurface.reader.readers_data import ReaderFilesHelper

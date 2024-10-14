@@ -2,7 +2,7 @@
 from dotenv import dotenv_values
 
 import subsurface
-from conftest import RequirementsLevel
+from tests.conftest import RequirementsLevel
 from subsurface import LineSet, UnstructuredData, PointSet, optional_requirements
 from subsurface.modules.visualization import pv_plot, to_pyvista_line, to_pyvista_points, PyvistaScalarType
 from subsurface.modules.writer import base_structs_to_binary_file
