@@ -16,6 +16,18 @@ class GOCADMesh:
     metadata: dict = field(default_factory=dict)
 
     @property
+    def vectorized_edges(self):
+        # Create index mapping from original to zero-based indices
+        idx_map = {old_idx: new_idx for new_idx, old_idx in enumerate(self.vertex_indices)}
+        # Map triangle indices
+        try:
+            triangles_mapped = np.vectorize(idx_map.get)(self.edges)
+        except TypeError as e:
+            raise f"Error mapping indices for mesh: {e}"
+        
+        return triangles_mapped
+
+    @property
     def color(self):
         """Try to get the color from the metadata. Can be in the form of:
         *solid*color: #87ceeb or *solid*color: 0 0 1 1 (rgba).
@@ -47,4 +59,3 @@ class GOCADMesh:
 
         # Fallback: if none of the formats match, return None
         return None
-

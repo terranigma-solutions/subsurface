@@ -18,7 +18,7 @@ def mx_to_unstruct_from_file(filename: str) -> UnstructuredData:
     with open(filename, 'r') as f:
         content: str = f.read()
     goCAD_meshes = _parse_lines(content)
-    unstruct_data = _meshes_to_unstruct(goCAD_meshes)
+    unstruct_data = _meshes_to_unstruct(goCAD_meshes[0:3:1])
 
     return unstruct_data
 
@@ -45,14 +45,14 @@ def _meshes_to_unstruct(meshes: list[GOCADMesh]) -> UnstructuredData:
     n_meshes = len(meshes)
 
     vertex_array = np.concatenate([meshes[i].vertices for i in range(n_meshes)])
-    simplex_array = np.concatenate([meshes[i].edges for i in range(n_meshes)])
+    simplex_array = np.concatenate([meshes[i].vectorized_edges for i in range(n_meshes)])
     unc, count = np.unique(simplex_array, axis=0, return_counts=True)
 
     # * Prepare the simplex array
-    simplex_array = meshes[0].edges
+    simplex_array = meshes[0].vectorized_edges
     for i in range(1, n_meshes):
-        adder = np.max(meshes[i - 1].edges) + 1
-        add_mesh = meshes[i].edges + adder
+        adder = np.max(meshes[i - 1].vectorized_edges) + 1
+        add_mesh = meshes[i].vectorized_edges + adder
         simplex_array = np.append(simplex_array, add_mesh, axis=0)
 
     # * Prepare the cells_attr array
@@ -60,7 +60,7 @@ def _meshes_to_unstruct(meshes: list[GOCADMesh]) -> UnstructuredData:
     l0 = 0
     id = 1
     for mesh in meshes:
-        l1 = l0 + mesh.edges.shape[0]
+        l1 = l0 + mesh.vectorized_edges.shape[0]
         ids_array[l0:l1] = id
         l0 = l1
         id += 1
