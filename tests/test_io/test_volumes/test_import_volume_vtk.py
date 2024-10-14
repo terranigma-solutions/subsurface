@@ -19,17 +19,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def generate_vtk_unstruct():
-    """ Use this function only to generate vtk files for testing purposes """
-
-    grid: pyvista.UnstructuredGrid = examples.load_hexbeam()
-    grid.cell_data['Cell Number'] = range(grid.n_cells)
-    grid.plot(scalars='Cell Number')
-
-    # Write vtk
-    grid.save("test_unstruct.vtk")
-
-
 def generate_vtk_struct():
     """ Use this function only to generate vtk files for testing purposes """
 
@@ -50,6 +39,7 @@ pf = pathlib.Path(__file__).parent.absolute()
 data_path = pf.joinpath('../../data/volume/')
 
 
+@pytest.mark.liquid_earth
 def test_vtk_file_to_structured_data() -> subsurface.StructuredData:
     # read vtk file with pyvista
     pyvista_obj: pv.UnstructuredGrid = pv.read(data_path.joinpath('test_structured.vtk'))

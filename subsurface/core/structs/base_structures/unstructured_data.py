@@ -143,6 +143,46 @@ class UnstructuredData:
 
         return cls(ds, default_cells_attributes_name, default_points_attributes_name)
 
+    @classmethod
+    def from_binary_le(cls, path: str):
+        from ._liquid_earth_mesh import LiquidEarthMesh
+        with open(path, 'rb') as f:
+            bytes_data = f.read()
+        mesh = LiquidEarthMesh.from_binary(bytes_data)
+        unstruct = cls.from_array(
+            vertex=mesh.vertex,
+            cells=mesh.cells,
+            cells_attr=mesh.attributes,
+            vertex_attr=mesh.points_attributes,
+            xarray_attributes=None
+        )
+        return unstruct
+
+    @classmethod
+    def from_binary_le_legacy(cls, path_to_binary: str, path_to_json: str):
+        import json
+        from ._liquid_earth_mesh import LiquidEarthMesh
+
+        with open(path_to_binary, 'rb') as f:
+            body_ = f.read()
+        with open(path_to_json, 'r') as f:
+            header_ = json.load(f)
+
+        header_json = json.dumps(header_)
+        header_json_bytes = header_json.encode('utf-8')
+        header_json_length = len(header_json_bytes)
+        header_json_length_bytes = header_json_length.to_bytes(4, byteorder='little')
+        file = header_json_length_bytes + header_json_bytes + body_
+        mesh = LiquidEarthMesh.from_binary(file)
+        unstruct = cls.from_array(
+            vertex=mesh.vertex,
+            cells=mesh.cells,
+            cells_attr=mesh.attributes,
+            vertex_attr=mesh.points_attributes,
+            xarray_attributes=None
+        )
+        return unstruct
+
     @property
     def vertex(self) -> np.ndarray:
         return self.data['vertex'].values

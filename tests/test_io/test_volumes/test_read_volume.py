@@ -47,6 +47,7 @@ def test_volumetric_mesh_to_subsurface():
     return ud, mesh
 
 
+@pytest.mark.liquid_earth
 def test_interpolate_ud_to_sd():
     ud, ud_mesh = test_volumetric_mesh_to_subsurface()
     sd: subsurface.StructuredData  = interpolate_unstructured_data_to_structured_data(

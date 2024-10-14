@@ -1,15 +1,13 @@
 import os
 
 import dotenv
-import numpy as np
 import pytest
 
 import subsurface
+import subsurface.modules.visualization as sb_viz
 from subsurface import TriSurf
 from subsurface.modules.reader.mesh._GOCAD_mesh import GOCADMesh
 from subsurface.modules.visualization import init_plotter
-import subsurface.modules.visualization as sb_viz
-
 from tests.conftest import RequirementsLevel
 
 dotenv.load_dotenv()
