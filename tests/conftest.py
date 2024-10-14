@@ -35,6 +35,12 @@ def check_requirements(minimum_level: RequirementsLevel):
     return RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST().value < minimum_level.value
 
 
+def pytest_configure(config):
+    config.addinivalue_line("markers", "unit: mark a test as a unit test")
+    config.addinivalue_line("markers", "performance: mark a test as a performance test")
+    config.addinivalue_line("markers", "liquid_earth: mark a test as used by LiquidEarth test")
+
+
 @pytest.fixture(scope='session')
 def data_path():
     return os.path.abspath(os.path.dirname(__file__) + '/data')

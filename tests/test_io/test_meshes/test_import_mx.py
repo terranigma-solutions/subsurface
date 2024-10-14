@@ -4,7 +4,10 @@ import dotenv
 import numpy as np
 import pytest
 
+import subsurface
+from subsurface import TriSurf
 from subsurface.modules.visualization import init_plotter
+import subsurface.modules.visualization as sb_viz
 
 from tests.conftest import RequirementsLevel
 
@@ -30,9 +33,18 @@ def test_read_gocad():
     pyvista_meshes = _meshes_to_pyvista(meshes)
     for pv_mesh in pyvista_meshes:
         # Add random colors
-        p.add_mesh(pv_mesh, color= pv_mesh.color, show_scalar_bar=False)
+        p.add_mesh(pv_mesh, color=pv_mesh.color, show_scalar_bar=False)
 
     p.show()
+
+
+def test_read_gocad_from_file():
+    from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
+    unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(os.getenv("PATH_TO_MX"))
+    ts = TriSurf(mesh=unstruct)
+    s = sb_viz.to_pyvista_mesh(ts)
+    sb_viz.pv_plot([s], image_2d=False)
+
 
 def _meshes_to_pyvista(meshes):
     pyvista_meshes = []
