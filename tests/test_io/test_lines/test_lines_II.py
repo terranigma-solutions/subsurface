@@ -134,6 +134,7 @@ def test_read_stratigraphy():
         _plot(scalar, trajectory, collar, lut=8, image_2d=False)
 
 
+@pytest.mark.liquid_earth
 def test_read_geophys_attr():
     collars = _read_collars()
     survey = _read_point_attr_into_survey("geophysics.csv", )
