@@ -137,6 +137,13 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
 
         # Apply mask to measured depths for the current well
         well_measured_depths = measured_depths[trajectory_well_mask]
+        
+        if "base" not in attrs_well.columns:
+            raise ValueError(f"Base column must be present in the file for well '{survey_well_name}'.")
+        elif "top" not in attrs_well.columns:
+            location_values_to_interpolate = attrs_well['base']
+        else:
+            location_values_to_interpolate = (attrs_well['top'] + attrs_well['base']) / 2
 
         # Interpolation for each attribute column
         for col in attrs_well.columns:
@@ -151,8 +158,6 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
                 interp_kind = 'nearest'
             else:
                 interp_kind = 'linear'
-
-            location_values_to_interpolate = (attrs_well['top'] + attrs_well['base']) / 2
 
             from scipy.interpolate import interp1d
             interp_func = interp1d(

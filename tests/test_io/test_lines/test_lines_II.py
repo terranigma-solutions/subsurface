@@ -135,7 +135,14 @@ def test_read_stratigraphy():
 
 
 def test_read_geophys_attr():
+    collars = _read_collars()
     survey = _read_point_attr_into_survey("geophysics.csv", )
+
+    borehole_set = BoreholeSet(
+        collars=collars,
+        survey=survey,
+        merge_option=MergeOptions.INTERSECT
+    )
 
     if PLOT and True:
         s = to_pyvista_line(
@@ -143,15 +150,22 @@ def test_read_geophys_attr():
             radius=10,
             active_scalar="Gamma_TC"
         )
-        pv_plot([s], image_2d=True)
+        pv_plot([s], image_2d=False)
 
         s = to_pyvista_line(
             line_set=survey.survey_trajectory,
             radius=10,
             active_scalar="eU"
         )
-        pv_plot([s], image_2d=True)
+        pv_plot([s], image_2d=False)
 
+
+    _plot(
+        scalar="Gamma_TC",
+        trajectory=borehole_set.combined_trajectory,
+        collars=collars,
+        image_2d=False
+    )
 
 def test_read_geochem_attr():
     survey = _read_segment_attr_into_survey("geochem.csv", )
@@ -199,7 +213,7 @@ def _read_point_attr_into_survey(attr_file) -> Survey:
         file_or_buffer=data_folder + attr_file,
         columns_map={
                 'HoleId'  : 'id',
-                'Distance': 'top'
+                'Distance': 'base'
         }
     )
     attributes: pd.DataFrame = read_attributes(reader)
