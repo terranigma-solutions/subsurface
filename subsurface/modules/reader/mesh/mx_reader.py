@@ -1,91 +1,83 @@
 import re
 import warnings
-from dataclasses import dataclass, field
-from typing import Optional
-
+from typing import Optional, TextIO
 import numpy as np
-import pyvista as pv
+from subsurface.core.structs import UnstructuredData
+from ._GOCAD_mesh import GOCADMesh
 
 
-@dataclass
-class Mesh:
-    header: dict = field(default_factory=dict)
-    coordinate_system: dict = field(default_factory=dict)
-    property_class_headers: list = field(default_factory=list)
-    vertices: np.ndarray = field(default_factory=lambda: np.empty((0, 3)))
-    vertex_indices: np.ndarray = field(default_factory=lambda: np.array([]))
-    triangles: np.ndarray = field(default_factory=lambda: np.empty((0, 3), dtype=int))
-    bstones: list = field(default_factory=list)
-    borders: list = field(default_factory=list)
-    metadata: dict = field(default_factory=dict)
+def mx_to_unstruc_from_binary(stream: TextIO) -> UnstructuredData:
+    content = stream.read()
+    goCADMeshes = _parse_lines(content)
+    unstruct_data = _meshes_to_unstruct(goCADMeshes)
+    return unstruct_data
 
 
-    @property
-    def color(self):
-        """Try to get the color from the metadata. Can be in the form of:
-        *solid*color: #87ceeb or *solid*color: 0 0 1 1 (rgba).
-        Returns a color in the format acceptable by PyVista.
-        """
-        color = None
-
-        # First try to find a color value from the header
-        for key, value in self.header.items():
-            if 'color' in key.lower():
-                color = value.strip()
-                break
-
-        # If no color was found, return None
-        if not color:
-            return None
-
-        # Handle hexadecimal color string (e.g., #87ceeb)
-        if color.startswith('#') and len(color) == 7:
-            return color  # already valid as a hex string
-
-        # Handle space-separated RGBA or RGB values (e.g., "0 0 1 1")
-        if ' ' in color:
-            color_vals = [float(c) for c in color.split()]
-            if len(color_vals) == 4:  # RGBA
-                return color_vals[:3]  # ignore the alpha channel for now, as PyVista handles RGB
-            elif len(color_vals) == 3:  # RGB
-                return color_vals  # already in the right format
-
-        # Fallback: if none of the formats match, return None
-        return None
-
-
-def parse_gocad_mx_file(filename):
-    meshes = []
-    current_mesh = None
-    in_header = False
-    in_coord_sys = False
-    in_property_class_header = False
-    in_tface = False
-
+def mx_to_unstruct_from_file(filename: str) -> UnstructuredData:
     # Split the file into meshes
     with open(filename, 'r') as f:
-        content = f.read()
+        content: str = f.read()
+    goCAD_meshes = _parse_lines(content)
+    unstruct_data = _meshes_to_unstruct(goCAD_meshes)
 
+    return unstruct_data
+
+
+def _parse_lines(content: str) -> list[GOCADMesh]:
+    meshes = []
     mesh_blocks = re.split(r'(?=GOCAD TSurf 1)', content)
-
     # Remove any empty strings from the list
-    mesh_blocks = [block for block in mesh_blocks if block.strip()]
 
+    mesh_blocks = [block for block in mesh_blocks if block.strip()]
     # Use multiprocessing Pool to parse meshes in parallel
     # with Pool(processes=cpu_count()) as pool:
     #     meshes = pool.map(process_mesh, mesh_blocks)
-
     for mesh_block in mesh_blocks:
         mesh_lines = mesh_block.split('\n')
-        mesh = process_mesh(mesh_lines)
+        mesh = _process_mesh(mesh_lines)
         if mesh:
             meshes.append(mesh)
-
     return meshes
 
 
-def process_mesh(mesh_lines) -> Optional[Mesh]:
-    mesh = Mesh()
+def _meshes_to_unstruct(meshes: list[GOCADMesh]) -> UnstructuredData:
+    # ? I added this function to the Solutions class
+    n_meshes = len(meshes)
+
+    vertex_array = np.concatenate([meshes[i].vertices for i in range(n_meshes)])
+    simplex_array = np.concatenate([meshes[i].edges for i in range(n_meshes)])
+    unc, count = np.unique(simplex_array, axis=0, return_counts=True)
+
+    # * Prepare the simplex array
+    simplex_array = meshes[0].edges
+    for i in range(1, n_meshes):
+        adder = np.max(meshes[i - 1].edges) + 1
+        add_mesh = meshes[i].edges + adder
+        simplex_array = np.append(simplex_array, add_mesh, axis=0)
+
+    # * Prepare the cells_attr array
+    ids_array = np.ones(simplex_array.shape[0])
+    l0 = 0
+    id = 1
+    for mesh in meshes:
+        l1 = l0 + mesh.edges.shape[0]
+        ids_array[l0:l1] = id
+        l0 = l1
+        id += 1
+
+    # * Create the unstructured data
+    import pandas as pd
+    unstructured_data = UnstructuredData.from_array(
+        vertex=vertex_array,
+        cells=simplex_array,
+        cells_attr=pd.DataFrame(ids_array, columns=['id'])  # TODO: We have to create an array with the shape of simplex array with the id of each simplex
+    )
+
+    return unstructured_data
+
+
+def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
+    mesh = GOCADMesh()
     in_header = False
     in_coord_sys = False
     in_property_class_header = False
@@ -214,31 +206,8 @@ def process_mesh(mesh_lines) -> Optional[Mesh]:
         # Convert lists to NumPy arrays
     mesh.vertices = np.array(vertex_list)
     mesh.vertex_indices = np.array(vertex_indices)
-    mesh.triangles = np.array(triangle_list)
+    mesh.edges = np.array(triangle_list)
 
     # Check the number of vertices, the indices and the triangles max value to avoid errors
 
     return mesh
-
-
-def meshes_to_pyvista(meshes):
-    pyvista_meshes = []
-    for mesh in meshes:
-        # Create index mapping from original to zero-based indices
-        idx_map = {old_idx: new_idx for new_idx, old_idx in enumerate(mesh.vertex_indices)}
-
-        # Map triangle indices
-        try:
-            triangles_mapped = np.vectorize(idx_map.get)(mesh.triangles)
-        except TypeError as e:
-            print(f"Error mapping indices for mesh: {e}")
-            continue
-
-        # Create faces array for PyVista
-        faces = np.hstack([np.full((triangles_mapped.shape[0], 1), 3), triangles_mapped]).flatten()
-
-        # Create PyVista mesh
-        pv_mesh = pv.PolyData(mesh.vertices, faces)
-        pv_mesh.color = mesh.color
-        pyvista_meshes.append(pv_mesh)
-    return pyvista_meshes
