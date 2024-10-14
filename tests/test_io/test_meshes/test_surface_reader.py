@@ -115,6 +115,7 @@ def test_plot_attributes_pyvista(get_unstructured_data_with_attribute):
     pv_plot([s], image_2d=True)
 
 
+@pytest.mark.liquid_earth
 def test_read_from_multiple_files():
     reader_vertex_args = GenericReaderFilesHelper(input_path + '/kim_vertices.csv', col_names=['x', 'y', 'z'])
     reader_edges_args = GenericReaderFilesHelper(input_path + '/kim_cells.csv', col_names=['e1', 'e2', 'e3'])

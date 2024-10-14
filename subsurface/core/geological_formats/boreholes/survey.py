@@ -28,7 +28,7 @@ class Survey:
         return id_to_well_name_mapper
 
     @classmethod
-    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: Optional['pd.DataFrame'], number_nodes: Optional[int] = NUMBER_NODES,
+    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: Optional['pd.DataFrame'] = None, number_nodes: Optional[int] = NUMBER_NODES,
                 duplicate_attr_depths: bool = False) -> 'Survey':
         """
         Create a Survey object from two DataFrames containing survey and attribute data.
@@ -118,7 +118,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
     # Add missing columns from attrs, preserving their dtypes
     for col in attrs.columns.difference(new_attrs.columns):
         new_attrs[col] = np.nan if pd.api.types.is_numeric_dtype(attrs[col]) else None
-    
+
     # Align well IDs between attrs and trajectory, perform interpolation, and map the attributes
     # Loop dict
     for survey_well_name in survey.well_id_mapper:
@@ -302,8 +302,7 @@ def _grab_depths_from_attr(attr_df: pd.DataFrame, borehole_id: Hashable, duplica
 
     try:
         vals: pd.DataFrame = attr_df.loc[borehole_id]
-        
-        
+
         if 'top' in vals and 'base' in vals:
             if isinstance(vals, pd.DataFrame):
                 tops = vals['top'].values.flatten()
@@ -322,12 +321,12 @@ def _grab_depths_from_attr(attr_df: pd.DataFrame, borehole_id: Hashable, duplica
             # Combine tops and bases into attr_depths with labels
             attr_depths = np.concatenate((tops, bases))
             attr_labels = np.array(['top'] * len(tops) + ['base'] * len(bases))
-            
+
             # Drop duplicates
             unique_indices = np.unique(attr_depths, return_index=True)[1]
             attr_depths = attr_depths[unique_indices]
             attr_labels = attr_labels[unique_indices]
-            
+
     except KeyError:
         # No attributes for this borehole_id or missing columns
         attr_depths = np.array([], dtype=float)

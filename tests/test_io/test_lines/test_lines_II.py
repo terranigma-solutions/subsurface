@@ -1,6 +1,7 @@
 import dotenv
 import os
 import pandas as pd
+import pytest
 
 from subsurface import UnstructuredData
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
@@ -84,6 +85,7 @@ def test_read_survey():
     return survey
 
 
+@pytest.mark.liquid_earth
 def test_read_stratigraphy():
     reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
         file_or_buffer=data_folder + "geology.csv",
@@ -129,11 +131,30 @@ def test_read_stratigraphy():
     if PLOT and True:
         trajectory = borehole_set.combined_trajectory
         scalar = "lith_ids"
-        _plot(scalar, trajectory, collar, lut=8)
+        _plot(scalar, trajectory, collar, lut=8, image_2d=False)
 
 
-def test_read_attr():
-    survey = _read_geochem_into_survey()
+def test_read_geophys_attr():
+    survey = _read_point_attr_into_survey("geophysics.csv", )
+
+    if PLOT and True:
+        s = to_pyvista_line(
+            line_set=survey.survey_trajectory,
+            radius=10,
+            active_scalar="Gamma_TC"
+        )
+        pv_plot([s], image_2d=True)
+
+        s = to_pyvista_line(
+            line_set=survey.survey_trajectory,
+            radius=10,
+            active_scalar="eU"
+        )
+        pv_plot([s], image_2d=True)
+
+
+def test_read_geochem_attr():
+    survey = _read_segment_attr_into_survey("geochem.csv", )
 
     if PLOT and True:
         s = to_pyvista_line(
@@ -150,12 +171,11 @@ def test_read_attr():
         )
         pv_plot([s], image_2d=True)
 
-    pass
 
-
+@pytest.mark.liquid_earth
 def test_read_attr_into_borehole():
     collars = _read_collars()
-    survey = _read_geochem_into_survey()
+    survey = _read_segment_attr_into_survey("geochem.csv", )
 
     borehole_set = BoreholeSet(
         collars=collars,
@@ -174,9 +194,37 @@ def test_read_attr_into_borehole():
     )
 
 
-def _read_geochem_into_survey() -> Survey:
+def _read_point_attr_into_survey(attr_file) -> Survey:
     reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
-        file_or_buffer=data_folder + "geochem.csv",
+        file_or_buffer=data_folder + attr_file,
+        columns_map={
+                'HoleId'  : 'id',
+                'Distance': 'top'
+        }
+    )
+    attributes: pd.DataFrame = read_attributes(reader)
+    reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=data_folder + "survey.csv",
+        columns_map={
+                'Distance': 'md',
+                'Dip'     : 'dip',
+                'Azimuth' : 'azi'
+        },
+    )
+    survey: Survey = Survey.from_df(
+        survey_df=read_survey(reader),
+        attr_df=attributes,
+        number_nodes=10,
+        duplicate_attr_depths=True
+    )
+
+    survey.update_survey_with_attr(attributes)
+    return survey
+
+
+def _read_segment_attr_into_survey(attr_file) -> Survey:
+    reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=data_folder + attr_file,
         columns_map={
                 'HoleId': 'id',
                 'from'  : 'top',
@@ -190,7 +238,7 @@ def _read_geochem_into_survey() -> Survey:
                 'Distance': 'md',
                 'Dip'     : 'dip',
                 'Azimuth' : 'azi'
-        },      
+        },
     )
     survey: Survey = Survey.from_df(
         survey_df=read_survey(reader),
@@ -198,6 +246,6 @@ def _read_geochem_into_survey() -> Survey:
         number_nodes=10,
         duplicate_attr_depths=True
     )
-    
+
     survey.update_survey_with_attr(attributes)
     return survey

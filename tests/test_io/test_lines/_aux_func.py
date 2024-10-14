@@ -5,7 +5,7 @@ def _plot(scalar, trajectory, collars=None, lut:int=100, image_2d=True):
     s = to_pyvista_line(
         line_set=trajectory,
         active_scalar=scalar,
-        radius=40
+        radius=10
     )
     
     
