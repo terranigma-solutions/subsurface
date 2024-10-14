@@ -11,7 +11,7 @@ from subsurface.core.structs.base_structures.base_structures_enum import Special
 from subsurface.core.structs.unstructured_elements import PointSet
 from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_attributes
 from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_line
-from test_io.test_lines._aux_func import _plot
+from tests.test_io.test_lines._aux_func import _plot
 
 dotenv.load_dotenv()
 

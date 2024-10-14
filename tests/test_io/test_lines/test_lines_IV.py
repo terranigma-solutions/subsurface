@@ -9,8 +9,7 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith
 import subsurface as ss
-from subsurface.modules.visualization import to_pyvista_line, init_plotter, to_pyvista_points
-from test_io.test_lines._aux_func import _plot
+from tests.test_io.test_lines._aux_func import _plot
 
 dotenv.load_dotenv()
 
