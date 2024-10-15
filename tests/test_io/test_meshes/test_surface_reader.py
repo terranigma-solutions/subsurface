@@ -17,6 +17,7 @@ pytestmark = pytest.mark.skipif(
     reason="Need to set the READ_MESH"
 )
 
+
 @pytest.fixture(scope="module")
 def get_less_unstructured_data() -> UnstructuredData:
     fp = input_path + "/less_land_surface_vertices.csv"
@@ -33,9 +34,9 @@ def get_unstructured_data_with_cells() -> UnstructuredData:
             reader_cells_args=GenericReaderFilesHelper(
                 fp, usecols=['0', '1', '2'],
                 columns_map={
-                    '0': 'e1',
-                    '1': 'e2',
-                    '2': 'e3'
+                        '0': 'e1',
+                        '1': 'e2',
+                        '2': 'e3'
                 }
             )
         )
@@ -117,10 +118,22 @@ def test_plot_attributes_pyvista(get_unstructured_data_with_attribute):
 
 @pytest.mark.liquid_earth
 def test_read_from_multiple_files():
-    reader_vertex_args = GenericReaderFilesHelper(input_path + '/kim_vertices.csv', col_names=['x', 'y', 'z'])
-    reader_edges_args = GenericReaderFilesHelper(input_path + '/kim_cells.csv', col_names=['e1', 'e2', 'e3'])
-    reader_cells_attrs_args = GenericReaderFilesHelper(input_path + '/kim_cell_attributes.csv', col_names=['lith'])
-    reader_vertex_attrs_args = GenericReaderFilesHelper(input_path + '/kim_point_attributes.csv', col_names=['lith_vertex'])
+    reader_vertex_args = GenericReaderFilesHelper(
+        file_or_buffer=input_path + '/kim_vertices.csv',
+        col_names=['x', 'y', 'z']
+    )
+    reader_edges_args = GenericReaderFilesHelper(
+        file_or_buffer=input_path + '/kim_cells.csv',
+        col_names=['e1', 'e2', 'e3']
+    )
+    reader_cells_attrs_args = GenericReaderFilesHelper(
+        file_or_buffer=input_path + '/kim_cell_attributes.csv',
+        col_names=['lith']
+    )
+    reader_vertex_attrs_args = GenericReaderFilesHelper(
+        file_or_buffer=input_path + '/kim_point_attributes.csv',
+        col_names=['lith_vertex']
+    )
 
     reader_unstruc = ReaderUnstructuredHelper(reader_vertex_args, reader_edges_args,
                                               reader_vertex_attrs_args, reader_cells_attrs_args)

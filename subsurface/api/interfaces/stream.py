@@ -2,6 +2,10 @@ from io import BytesIO
 from typing import TextIO
 
 import pandas
+from subsurface.modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
+
+from subsurface.core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
+
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 
 from subsurface.core.geological_formats import BoreholeSet
@@ -34,15 +38,25 @@ def CSV_wells_stream_to_unstruc(
         surveys_reader: GenericReaderFilesHelper,
         attrs_reader: GenericReaderFilesHelper
 ) -> list[UnstructuredData]:
-    
     borehole_set: BoreholeSet = read_wells(
-        collars_reader= collars_reader,
-        surveys_reader= surveys_reader,
-        attrs_reader= attrs_reader
+        collars_reader=collars_reader,
+        surveys_reader=surveys_reader,
+        attrs_reader=attrs_reader
     )
-    
+
     list_unstruct: list[UnstructuredData] = [
             borehole_set.collars.data,
             borehole_set.combined_trajectory.data
     ]
     return list_unstruct
+
+
+def CSV_mesh_stream_to_unstruc(
+        vertex_reader: GenericReaderFilesHelper,
+        edges_reader: GenericReaderFilesHelper,
+        cells_attrs_reader: GenericReaderFilesHelper,
+        vertex_attrs_reader: GenericReaderFilesHelper
+) -> list[UnstructuredData]:
+    reader_unstruc = ReaderUnstructuredHelper(vertex_reader, edges_reader, vertex_attrs_reader, cells_attrs_reader)
+    ud = read_2d_mesh_to_unstruct(reader_unstruc)
+    return [ud]
