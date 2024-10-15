@@ -2,9 +2,13 @@ from io import BytesIO
 from typing import TextIO
 
 import pandas
+from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
+
+from subsurface.core.geological_formats import BoreholeSet
 
 from ...core.structs.base_structures import UnstructuredData
 from ...modules import reader
+from ..reader.read_wells import read_wells
 
 
 def DXF_stream_to_unstruc(stream: TextIO) -> UnstructuredData:
@@ -25,6 +29,21 @@ def OMF_stream_to_unstruc(stream: BytesIO) -> list[UnstructuredData]:
     return list_unstruct
 
 
-def CSV_wells_stream_to_unstruc(stream: TextIO) -> list[UnstructuredData]:
-    list_unstruct: list[UnstructuredData] = reader.csv_wells_stream_to_unstructs(stream)
+def CSV_wells_stream_to_unstruc(
+        stream: TextIO,
+        collars_reader: GenericReaderFilesHelper,
+        surveys_reader: GenericReaderFilesHelper,
+        attrs_reader: GenericReaderFilesHelper
+) -> list[UnstructuredData]:
+    
+    borehole_set: BoreholeSet = read_wells(
+        collars_reader= collars_reader,
+        surveys_reader= surveys_reader,
+        attrs_reader= attrs_reader
+    )
+    
+    list_unstruct: list[UnstructuredData] = [
+            borehole_set.collars.data,
+            borehole_set.combined_trajectory.data
+    ]
     return list_unstruct
