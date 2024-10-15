@@ -37,7 +37,7 @@ def read_lith(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     return read_attributes(reader_helper, is_lith=True)
 
 
-def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool) -> pd.DataFrame:
+def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool = False) -> pd.DataFrame:
     if reader_helper.index_col is False: reader_helper.index_col = 0
 
     d = check_format_and_read_to_df(reader_helper)
@@ -89,9 +89,15 @@ def _validate_attr_data(d):
 
 
 def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
-    given_top = np.isin(['top', 'base', 'component lith'], d.columns).all()
-    given_altitude_and_base = np.isin(['altitude', 'base', 'component lith'], d.columns).all()
-    given_only_base = np.isin(['base', 'component lith'], d.columns).all()
+    # Check component lith in column
+    if 'component lith' not in d.columns:
+        raise AttributeError('component lith column must be present in the file. '
+                             'Use columns_map to assign column names to these fields. Maybe you are marking as lithology'
+                             'the wrong file?')
+
+    given_top = np.isin(['top', 'base'], d.columns).all()
+    given_altitude_and_base = np.isin(['altitude', 'base'], d.columns).all()
+    given_only_base = np.isin(['base'], d.columns).all()
     if given_altitude_and_base and not given_top:
         warnings.warn('top column is not present in the file. The tops will be calculated from the base and altitude')
         d = add_tops_from_base_and_altitude_in_place(
@@ -113,8 +119,10 @@ def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper
 
 
     elif not given_top and not given_altitude_and_base:
-        raise ValueError('basis column must be present in the file. Use '
-                         'columns_map to assign column names to these fields.')
+        raise ValueError('top column or base and altitude columns must be present in the file. '
+                         'Use columns_map to assign column names to these fields. Maybe you are marking as lithology'
+                         'the wrong file?')
+
     lith_df = d[['top', 'base', 'component lith']]
 
     # * Make sure values are positive
