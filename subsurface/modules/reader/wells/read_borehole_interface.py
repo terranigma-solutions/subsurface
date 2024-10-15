@@ -34,28 +34,19 @@ def read_survey(reader_helper: GenericReaderFilesHelper):
 
 
 def read_lith(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
-    """Columns MUST contain:
-        - top
-        - base
-        - component lith
-    """
-    if reader_helper.index_col is False: reader_helper.index_col = 0
-
-    d = check_format_and_read_to_df(reader_helper)
-    _map_rows_and_cols_inplace(d, reader_helper)
-    lith_df = _validate_lith_data(d, reader_helper)
-
-    return lith_df
+    return read_attributes(reader_helper, is_lith=True)
 
 
-def read_attributes(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
+def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool) -> pd.DataFrame:
     if reader_helper.index_col is False: reader_helper.index_col = 0
 
     d = check_format_and_read_to_df(reader_helper)
 
     _map_rows_and_cols_inplace(d, reader_helper)
-
-    _validate_attr_data(d)
+    if is_lith:
+        d = _validate_lith_data(d, reader_helper)
+    else:
+        _validate_attr_data(d)
     return d
 
 
@@ -64,11 +55,6 @@ def _map_rows_and_cols_inplace(d: pd.DataFrame, reader_helper: GenericReaderFile
         d.rename(reader_helper.index_map, axis="index", inplace=True)  # d.index = d.index.map(reader_helper.index_map)
     if reader_helper.columns_map is not None:
         d.rename(reader_helper.columns_map, axis="columns", inplace=True)
-
-
-def _validate_attr_data(d):
-    assert d.columns.isin(['base']).any(), ('base column must be present in the file. '
-                                            'Use columns_map to assign column names to these fields.')
 
 
 def _validate_survey_data(d):
@@ -95,6 +81,11 @@ def _validate_survey_data(d):
     d_no_singles = d[d.index.duplicated(keep=False)]
 
     return d_no_singles
+
+
+def _validate_attr_data(d):
+    assert d.columns.isin(['base']).any(), ('base column must be present in the file. '
+                                            'Use columns_map to assign column names to these fields.')
 
 
 def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:

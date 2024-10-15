@@ -5,7 +5,7 @@ from subsurface.core.structs.base_structures.base_structures_enum import Special
 from subsurface.core.structs import UnstructuredData, PointSet
 
 from subsurface import optional_requirements
-from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith
+from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_attributes
 
 from subsurface.core.geological_formats import BoreholeSet, Collars, Survey
 
@@ -15,7 +15,8 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 def read_wells(
         collars_reader: GenericReaderFilesHelper,
         surveys_reader: GenericReaderFilesHelper,
-        attrs_reader: GenericReaderFilesHelper
+        attrs_reader: GenericReaderFilesHelper,
+        is_lith_attr: bool
 ) -> BoreholeSet:
     # ! FIGUROUT IF WE NEED LITH
     
@@ -37,7 +38,8 @@ def read_wells(
 
     survey: Survey = Survey.from_df(survey_df)
 
-    lith: pd.DataFrame = read_lith(attrs_reader)
+    # Check if component lith is in columns or columns_map
+    lith: pd.DataFrame = read_attributes(attrs_reader, is_lith=is_lith_attr)
 
     survey.update_survey_with_lith(lith)
 

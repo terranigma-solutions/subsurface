@@ -38,12 +38,15 @@ def OMF_stream_to_unstruc(stream: BytesIO) -> list[UnstructuredData]:
 def CSV_wells_stream_to_unstruc(
         collars_reader: GenericReaderFilesHelper,
         surveys_reader: GenericReaderFilesHelper,
-        attrs_reader: GenericReaderFilesHelper
+        attrs_reader: GenericReaderFilesHelper,
+        is_lith_attr: bool
 ) -> list[UnstructuredData]:
+    
     borehole_set: BoreholeSet = read_wells(
         collars_reader=collars_reader,
         surveys_reader=surveys_reader,
-        attrs_reader=attrs_reader
+        attrs_reader=attrs_reader,
+        is_lith_attr=is_lith_attr
     )
 
     list_unstruct: list[UnstructuredData] = [
