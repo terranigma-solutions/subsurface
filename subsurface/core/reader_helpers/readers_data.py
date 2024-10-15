@@ -16,13 +16,6 @@ elif pd.__version__ >= '1.4.0':
     fb = Union[FilePath, ReadCsvBuffer[bytes], ReadCsvBuffer[str]]
 
 
-class SupportedFormats(str, enum.Enum):
-    DXF = "dxf"
-    DXFStream = "dxfstream"
-    CSV = "csv"
-    JSON = "json"
-    XLXS = "xlsx"
-
 
 # 
 # @dataclass
@@ -85,6 +78,13 @@ from typing import Union, List, Optional, Any
 import pathlib
 import io
 
+class SupportedFormats(str, enum.Enum):
+    DXF = "dxf"
+    DXFStream = "dxfstream"
+    CSV = "csv"
+    JSON = "json"
+    XLXS = "xlsx"
+
 
 class GenericReaderFilesHelper(BaseModel):
     file_or_buffer: Union[str, bytes, pathlib.Path, dict]
@@ -138,15 +138,3 @@ class GenericReaderFilesHelper(BaseModel):
                 "encoding" : self.encoding,
         }
         return {**attr_dict, **self.additional_reader_kwargs}
-
-    @property
-    def is_file_in_disk(self):
-        return isinstance(self.file_or_buffer, (str, pathlib.Path))
-
-    @property
-    def is_bytes_string(self):
-        return isinstance(self.file_or_buffer, (bytes, io.BytesIO, io.StringIO))
-
-    @property
-    def is_python_dict(self):
-        return isinstance(self.file_or_buffer, dict)
