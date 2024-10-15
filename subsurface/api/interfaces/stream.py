@@ -23,3 +23,8 @@ def DXF_stream_to_unstruc(stream: TextIO) -> UnstructuredData:
 def OMF_stream_to_unstruc(stream: BytesIO) -> list[UnstructuredData]:
     list_unstruct: list[UnstructuredData] = reader.omf_stream_to_unstructs(stream)
     return list_unstruct
+
+
+def CSV_wells_stream_to_unstruc(stream: TextIO) -> list[UnstructuredData]:
+    list_unstruct: list[UnstructuredData] = reader.csv_wells_stream_to_unstructs(stream)
+    return list_unstruct
