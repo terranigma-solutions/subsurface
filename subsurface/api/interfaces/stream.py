@@ -2,6 +2,8 @@ from io import BytesIO
 from typing import TextIO
 
 import pandas
+from subsurface.modules.reader.volume.read_volume import read_volumetric_mesh_to_subsurface
+
 from subsurface.modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
 
 from subsurface.core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
@@ -59,4 +61,15 @@ def CSV_mesh_stream_to_unstruc(
 ) -> list[UnstructuredData]:
     reader_unstruc = ReaderUnstructuredHelper(vertex_reader, edges_reader, vertex_attrs_reader, cells_attrs_reader)
     ud = read_2d_mesh_to_unstruct(reader_unstruc)
+    return [ud]
+
+
+def CSV_volume_stream_to_unstruc(
+        coord_reader: GenericReaderFilesHelper,
+        attrs_reader: GenericReaderFilesHelper
+) -> list[UnstructuredData]:
+    ud = read_volumetric_mesh_to_subsurface(
+        reader_helper_coord=coord_reader,
+        reader_helper_attr=attrs_reader
+    )
     return [ud]
