@@ -8,17 +8,17 @@ import pandas as pd
 
 def check_format_and_read_to_df(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     # ? This swithch is veeery confusing
-    match reader_helper.file_or_buffer, reader_helper.format:
+    match (reader_helper.file_or_buffer, reader_helper.format):
         case _, SupportedFormats.JSON | ".json":
             d = pd.read_json(reader_helper.file_or_buffer, orient='split')
-        case str() | pathlib.Path, _:
+        case str() | pathlib.Path(), _:
             reader: Callable = _get_reader(reader_helper.format)
             d = reader(
                 filepath_or_buffer=reader_helper.file_or_buffer,
                 sep=reader_helper.separator,
                 **reader_helper.pandas_reader_kwargs
             )
-        case bytes() | io.BytesIO | io.StringIO | io.TextIOWrapper, _:
+        case (bytes() | io.BytesIO() | io.StringIO() | io.TextIOWrapper()), _:
             reader = _get_reader(reader_helper.format)
             d = reader(reader_helper.file_or_buffer, **reader_helper.pandas_reader_kwargs)
         case dict(), _:
