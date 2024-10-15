@@ -30,7 +30,6 @@ def OMF_stream_to_unstruc(stream: BytesIO) -> list[UnstructuredData]:
 
 
 def CSV_wells_stream_to_unstruc(
-        stream: TextIO,
         collars_reader: GenericReaderFilesHelper,
         surveys_reader: GenericReaderFilesHelper,
         attrs_reader: GenericReaderFilesHelper
