@@ -1,12 +1,12 @@
 import enum
 import pathlib
-import io
-from dataclasses import dataclass, field
-from typing import Union, List, Callable, Any
+from typing import Union
 
 import pandas as pd
 
 from subsurface.core.utils.utils_core import get_extension
+from pydantic import BaseModel, Field, model_validator
+from typing import Union, List, Optional
 
 if pd.__version__ < '1.4.0':
     pass
@@ -15,68 +15,6 @@ elif pd.__version__ >= '1.4.0':
 
     fb = Union[FilePath, ReadCsvBuffer[bytes], ReadCsvBuffer[str]]
 
-
-
-# 
-# @dataclass
-# class GenericReaderFilesHelper_:
-#     file_or_buffer: fb
-#     usecols: Union[List[str], List[int]] = None  # Use a subset of columns
-#     col_names: List[Union[str, int]] = None  # Give a name
-#     drop_cols: List[str] = None  # Drop a subset of columns
-#     format: SupportedFormats = None
-#     separator: str = None
-#     index_map: Union[None, Callable, dict, pd.Series] = None
-#     columns_map: Union[None, Callable, dict, pd.Series] = None
-#     additional_reader_kwargs: dict = field(default_factory=dict)
-#     file_or_buffer_type: Any = field(init=False)
-#     encoding: str = "ISO-8859-1"
-# 
-#     index_col: Union[int, str] = False
-#     header: Union[None, int, List[int]] = 0
-# 
-#     def __post_init__(self):
-#         if self.format is None:
-#             extension: str = get_extension(self.file_or_buffer)
-#             if extension == ".dxf":
-#                 self.format = SupportedFormats.DXF
-#             elif extension == ".csv":
-#                 self.format = SupportedFormats.CSV
-#             elif extension == ".json":
-#                 self.format = SupportedFormats.JSON
-#             elif extension == ".xlsx":
-#                 self.format = SupportedFormats.XLXS
-# 
-#         self.file_or_buffer_type = type(self.file_or_buffer)
-# 
-#     @property
-#     def pandas_reader_kwargs(self):
-#         attr_dict = {
-#                 "names"    : self.col_names,
-#                 "header"   : self.header,
-#                 "index_col": self.index_col,
-#                 "usecols"  : self.usecols,
-#                 "encoding" : self.encoding
-#         }
-#         return {**attr_dict, **self.additional_reader_kwargs}
-# 
-#     @property
-#     def is_file_in_disk(self):
-#         return self.file_or_buffer_type == str or isinstance(self.file_or_buffer, pathlib.PurePath)
-# 
-#     @property
-#     def is_bytes_string(self):
-#         return self.file_or_buffer_type == io.BytesIO or self.file_or_buffer_type == io.StringIO
-# 
-#     @property
-#     def is_python_dict(self):
-#         return self.file_or_buffer_type == dict
-
-
-from pydantic import BaseModel, Field, root_validator, model_validator, field_validator
-from typing import Union, List, Optional, Any
-import pathlib
-import io
 
 class SupportedFormats(str, enum.Enum):
     DXF = "dxf"
@@ -97,7 +35,7 @@ class GenericReaderFilesHelper(BaseModel):
     columns_map: Optional[dict] = None  # Adjusted for serialization
     additional_reader_kwargs: dict = Field(default_factory=dict)
     encoding: str = "ISO-8859-1"
-    index_col: Union[int, str, bool] = False
+    index_col: Optional[Union[int, str, bool]] = None
     header: Union[None, int, List[int]] = 0
 
     # Computed fields
@@ -125,6 +63,20 @@ class GenericReaderFilesHelper(BaseModel):
             values['file_or_buffer_type'] = type(file_or_buffer).__name__
         else:
             values['file_or_buffer_type'] = None
+
+        return values
+
+        # Custom validation for index_col to explicitly handle None
+    @model_validator(mode="before")
+    def validate_index_col(cls, values):
+        index_col = values.get('index_col')
+        # Allow None explicitly
+        if index_col is None:
+            values['index_col'] = None
+        else:
+            # Ensure index_col is either int, str, or bool
+            if not isinstance(index_col, (int, str, bool)):
+                raise ValueError(f"Invalid value for index_col: {index_col}. Must be int, str, bool, or None.")
 
         return values
 
