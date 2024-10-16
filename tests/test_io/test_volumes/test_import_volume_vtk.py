@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pathlib
+from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pytest
@@ -42,7 +43,11 @@ data_path = pf.joinpath('../../data/volume/')
 @pytest.mark.liquid_earth
 def test_vtk_file_to_structured_data() -> subsurface.StructuredData:
     # read vtk file with pyvista
-    pyvista_obj: pv.UnstructuredGrid = pv.read(data_path.joinpath('test_structured.vtk'))
+    NamedTemporaryFile()
+    
+    joinpath = data_path.joinpath('test_structured.vtk')
+    pyvista_obj: pv.DataSet = pv.read(joinpath)
+    pv.examples.download_angular_sector()
     try:
         pyvista_struct: pv.ExplicitStructuredGrid = pyvista_obj.cast_to_explicit_structured_grid()
     except Exception as e:

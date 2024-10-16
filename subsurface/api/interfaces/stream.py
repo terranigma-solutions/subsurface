@@ -2,18 +2,16 @@ from io import BytesIO
 from typing import TextIO
 
 import pandas
-from subsurface.modules.reader.volume.read_volume import read_volumetric_mesh_to_subsurface
 
-from subsurface.modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
+from ...core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
+from ...core.reader_helpers.readers_data import GenericReaderFilesHelper
+from ...core.geological_formats import BoreholeSet
+from ...core.structs.base_structures import UnstructuredData, StructuredData
 
-from subsurface.core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
-
-from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
-
-from subsurface.core.geological_formats import BoreholeSet
-
-from ...core.structs.base_structures import UnstructuredData
 from ...modules import reader
+from ...modules.reader.volume.read_volume import read_volumetric_mesh_to_subsurface, read_VTK_structured_grid
+from ...modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
+
 from ..reader.read_wells import read_wells
 
 
@@ -35,13 +33,17 @@ def OMF_stream_to_unstruc(stream: BytesIO) -> list[UnstructuredData]:
     return list_unstruct
 
 
+def VTK_stream_to_struct(stream: BytesIO) -> list[StructuredData]:
+    struct = read_VTK_structured_grid(stream)
+    return [struct]
+
+
 def CSV_wells_stream_to_unstruc(
         collars_reader: GenericReaderFilesHelper,
         surveys_reader: GenericReaderFilesHelper,
         attrs_reader: GenericReaderFilesHelper,
         is_lith_attr: bool
 ) -> list[UnstructuredData]:
-    
     borehole_set: BoreholeSet = read_wells(
         collars_reader=collars_reader,
         surveys_reader=surveys_reader,

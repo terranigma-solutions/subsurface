@@ -1,6 +1,38 @@
+from io import BytesIO
+from typing import Union
+
+from subsurface.core.structs import StructuredData
+
+from .... import optional_requirements
 from ....core.structs import UnstructuredData
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 import pandas as pd
+
+
+def read_VTK_structured_grid(file_or_buffer: Union[str, BytesIO]) -> StructuredData:
+    pv = optional_requirements.require_pyvista()
+
+    reader = pv.get_reader("vtk")
+    pyvista_obj: pv.DataSet = pv.read(file_or_buffer)
+
+
+    try:
+        pyvista_struct: pv.ExplicitStructuredGrid = pyvista_obj.cast_to_explicit_structured_grid()
+    except Exception as e:
+        raise f"The file is not a structured grid: {e}"
+
+    active_scalars = "Cell Number"
+
+    if PLOT := False:
+        pyvista_struct.set_active_scalars(active_scalars)
+        pyvista_struct.plot()
+
+    struct: StructuredData = StructuredData.from_pyvista_structured_grid(
+        grid=pyvista_struct,
+        data_array_name=active_scalars
+    )
+
+    return struct
 
 
 def read_volumetric_mesh_to_subsurface(reader_helper_coord: GenericReaderFilesHelper,
@@ -26,7 +58,7 @@ def read_volumetric_mesh_coord_file(reader_helper: GenericReaderFilesHelper) -> 
             axis="columns",
             inplace=True
         )
-        
+
     df.dropna(axis=0, inplace=True)
 
     df.x = df.x.astype(float)
