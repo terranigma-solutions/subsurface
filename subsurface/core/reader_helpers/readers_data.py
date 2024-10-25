@@ -1,6 +1,7 @@
 import enum
 import pathlib
-from typing import Union
+from dataclasses import dataclass, field
+from typing import Union, Callable, Any
 
 import pandas as pd
 
@@ -35,7 +36,7 @@ class GenericReaderFilesHelper(BaseModel):
     columns_map: Optional[dict] = None  # Adjusted for serialization
     additional_reader_kwargs: dict = Field(default_factory=dict)
     encoding: str = "ISO-8859-1"
-    index_col: Optional[Union[int, str, bool]] = None
+    index_col: Optional[Union[int, str, bool]] = False
     header: Union[None, int, List[int]] = 0
 
     # Computed fields
@@ -72,7 +73,7 @@ class GenericReaderFilesHelper(BaseModel):
         index_col = values.get('index_col')
         # Allow None explicitly
         if index_col is None:
-            values['index_col'] = None
+            values['index_col'] = False
         else:
             # Ensure index_col is either int, str, or bool
             if not isinstance(index_col, (int, str, bool)):

@@ -58,16 +58,8 @@ def test_read_kim():
 
     survey: Survey = Survey.from_df(survey_df)
 
-    lith: pd.DataFrame = read_lith(
-        GenericReaderFilesHelper(
-            file_or_buffer=data_path.joinpath('kim_ready.csv'),
-            usecols=['name', 'top', 'base', 'formation'],
-            columns_map={'top'      : 'top',
-                         'base'     : 'base',
-                         'formation': 'component lith',
-                         }
-        )
-    )
+    lith_reader = GenericReaderFilesHelper(file_or_buffer=data_path.joinpath('kim_ready.csv'), usecols=['name', 'top', 'base', 'formation'], columns_map={'top': 'top', 'base': 'base', 'formation': 'component lith', })
+    lith: pd.DataFrame = read_lith( lith_reader )
 
     survey.update_survey_with_lith(lith)
 
@@ -81,5 +73,6 @@ def test_read_kim():
         scalar="lith_ids",
         trajectory=borehole_set.combined_trajectory,
         collars=collars,
-        lut=14
+        lut=14,
+        image_2d=False
     )
