@@ -70,6 +70,18 @@ class GenericReaderFilesHelper(BaseModel):
         # Custom validation for index_col to explicitly handle None
 
     @model_validator(mode="before")
+    def validate_additional_reader_kwargs(cls, values):
+        additional_reader_kwargs = values.get('additional_reader_kwargs')
+        # Make sure that if any of the values is a regex expression that it is properly parsed like "delimiter":"\\\\s{2,}" to delimiter="\s{2,}"
+        if additional_reader_kwargs is not None:
+            for key, value in additional_reader_kwargs.items():
+                if isinstance(value, str):
+                    additional_reader_kwargs[key] = value.replace("\\\\", "\\")
+        
+        return values
+    
+    
+    @model_validator(mode="before")
     def validate_index_col(cls, values):
         index_col = values.get('index_col')
         # Allow None explicitly
