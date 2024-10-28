@@ -4,5 +4,6 @@ from .interfaces.stream import (
     CSV_wells_stream_to_unstruc,
     CSV_mesh_stream_to_unstruc,
     CSV_volume_stream_to_unstruc,
+    CSV_volume_stream_to_struct,
     VTK_stream_to_struct,  
 )

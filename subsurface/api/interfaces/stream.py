@@ -2,6 +2,7 @@ from io import BytesIO
 from typing import TextIO
 
 import pandas
+from subsurface.modules.reader.volume.volume_utils import interpolate_unstructured_data_to_structured_data
 
 from ...core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
 from ...core.reader_helpers.readers_data import GenericReaderFilesHelper
@@ -78,3 +79,23 @@ def CSV_volume_stream_to_unstruc(
         reader_helper_attr=attrs_reader
     )
     return [ud]
+
+
+def CSV_volume_stream_to_struct(
+        coord_reader: GenericReaderFilesHelper,
+        attrs_reader: GenericReaderFilesHelper,
+        attr_name: str,
+        resolution: list[int]
+) -> list[StructuredData]:
+    ud = read_volumetric_mesh_to_subsurface(
+        reader_helper_coord=coord_reader,
+        reader_helper_attr=attrs_reader
+    )
+
+    sd: StructuredData  = interpolate_unstructured_data_to_structured_data(
+        ud=ud,
+        attr_name=attr_name,
+        resolution=resolution
+    )
+
+    return [sd]
