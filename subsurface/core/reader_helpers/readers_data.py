@@ -68,6 +68,7 @@ class GenericReaderFilesHelper(BaseModel):
         return values
 
         # Custom validation for index_col to explicitly handle None
+
     @model_validator(mode="before")
     def validate_index_col(cls, values):
         index_col = values.get('index_col')
@@ -79,6 +80,16 @@ class GenericReaderFilesHelper(BaseModel):
             if not isinstance(index_col, (int, str, bool)):
                 raise ValueError(f"Invalid value for index_col: {index_col}. Must be int, str, bool, or None.")
 
+        return values
+
+    # Validator to handle negative header values. If -1 is the same as null, other raise an error
+    @model_validator(mode="before")
+    def validate_header(cls, values):
+        header = values.get('header')
+        if header == -1:
+            values['header'] = None
+        if header is not None and header < 0:
+            raise ValueError(f"Invalid value for header: {header}. Must be None, 0, or positive integer.")
         return values
 
     @property

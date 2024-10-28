@@ -28,7 +28,7 @@ def read_2d_mesh_to_unstruct(
         warnings.warn("No arguments to compute cell")
         cells = SpecialCellCase.POINTS
     if reader_args.reader_cells_attr_args is not None:
-        cells_attr = read_mesh_file_to_attr(reader_args.reader_cells_attr_args)
+        cells_attr: pd.DataFrame = read_mesh_file_to_attr(reader_args.reader_cells_attr_args)
     if reader_args.reader_vertex_attr_args is not None:
         vertex_attr = read_mesh_file_to_attr(reader_args.reader_vertex_attr_args)
 

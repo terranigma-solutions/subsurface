@@ -135,10 +135,14 @@ def test_read_from_multiple_files():
         col_names=['lith_vertex']
     )
 
-    reader_unstruc = ReaderUnstructuredHelper(reader_vertex_args, reader_edges_args,
-                                              reader_vertex_attrs_args, reader_cells_attrs_args)
+    reader_unstruc = ReaderUnstructuredHelper(
+        reader_vertex_args,
+        reader_edges_args,
+        reader_vertex_attrs_args,
+        reader_cells_attrs_args
+    )
 
     ud = read_2d_mesh_to_unstruct(reader_unstruc)
     ts = TriSurf(ud)
     s = to_pyvista_mesh(ts)
-    pv_plot([s], image_2d=True)
+    pv_plot([s], image_2d=False, ve=10)
