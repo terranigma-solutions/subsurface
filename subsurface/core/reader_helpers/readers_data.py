@@ -88,6 +88,7 @@ class GenericReaderFilesHelper(BaseModel):
         header = values.get('header')
         if header == -1:
             values['header'] = None
+            header = None
         if header is not None and header < 0:
             raise ValueError(f"Invalid value for header: {header}. Must be None, 0, or positive integer.")
         return values
@@ -102,3 +103,4 @@ class GenericReaderFilesHelper(BaseModel):
                 "encoding" : self.encoding,
         }
         return {**attr_dict, **self.additional_reader_kwargs}
+   
