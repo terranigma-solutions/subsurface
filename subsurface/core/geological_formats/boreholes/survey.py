@@ -19,7 +19,7 @@ RADIUS = 10
 class Survey:
     ids: list[str]
     survey_trajectory: LineSet
-    well_id_mapper: dict[str, int] = None
+    well_id_mapper: dict[str, int] = None  #: This is following the order of the survey csv that can be different that the collars
 
     @property
     def id_to_well_id(self):

@@ -47,9 +47,23 @@ class BoreholeSet:
     combined_trajectory: LineSet
 
     def __init__(self, collars: Collars, survey: Survey, merge_option: MergeOptions, slice_=slice(None)):
-        self.collars = collars
+
+        new_collars = self._remap_collars_with_survey(collars, survey)
+
+        self.collars = new_collars
         self.survey = survey
         self.combined_trajectory: LineSet = create_combined_trajectory(collars, survey, merge_option, slice_)
+
+    @staticmethod
+    def _remap_collars_with_survey(collars, survey):
+        import pandas as pd
+        # Create a DataFrame from your first list
+        df1 = pd.DataFrame({'name': collars.ids, 'x': collars.data.vertex[:, 0], 'y': collars.data.vertex[:, 1], 'z': collars.data.vertex[:, 2]})
+        df1 = df1.set_index('name')
+        # Reindex to match the second list of names
+        df_reindexed = df1.reindex(survey.well_id_mapper.keys())
+        new_collars = Collars.from_df(df_reindexed)
+        return new_collars
 
     def to_binary(self, path: str) -> bool:
         # I need to implement the survey to and then name the files accordingly

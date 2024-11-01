@@ -13,6 +13,7 @@ def _plot(scalar, trajectory, collars=None, lut:int=100, image_2d=True):
     import matplotlib.pyplot as plt
     boring_cmap = plt.get_cmap("viridis", lut)
     p.add_mesh(s, cmap=boring_cmap)
+    p.add_axes()
 
     if collars is not None:
         collar_mesh = to_pyvista_points(collars.collar_loc)

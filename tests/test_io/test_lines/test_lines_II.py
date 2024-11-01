@@ -2,7 +2,7 @@ import dotenv
 import os
 import pandas as pd
 import pytest
-
+import numpy as np
 from subsurface import UnstructuredData
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
 from subsurface.core.geological_formats.boreholes.collars import Collars
@@ -160,13 +160,13 @@ def test_read_geophys_attr():
         )
         pv_plot([s], image_2d=False)
 
-
     _plot(
         scalar="Gamma_TC",
         trajectory=borehole_set.combined_trajectory,
         collars=collars,
         image_2d=False
     )
+
 
 def test_read_geochem_attr():
     survey = _read_segment_attr_into_survey("geochem.csv", )
@@ -189,8 +189,8 @@ def test_read_geochem_attr():
 
 @pytest.mark.liquid_earth
 def test_read_attr_into_borehole():
-    collars = _read_collars()
-    survey = _read_segment_attr_into_survey("geochem.csv", )
+    collars: Collars = _read_collars()
+    survey: Survey = _read_segment_attr_into_survey("geochem.csv", )
 
     borehole_set = BoreholeSet(
         collars=collars,
@@ -201,10 +201,14 @@ def test_read_attr_into_borehole():
     if True:
         borehole_set.to_binary("ascii_wells")
 
+    # Assert shape is 17378, 3
+    np.testing.assert_array_equal(borehole_set.combined_trajectory.data.vertex.shape, (17378, 3))
+    np.testing.assert_array_equal(borehole_set.collars.data.vertex.shape, (263, 3))
+
     _plot(
         scalar="MnO",
         trajectory=borehole_set.combined_trajectory,
-        collars=collars,
+        collars=borehole_set.collars,
         image_2d=False
     )
 
