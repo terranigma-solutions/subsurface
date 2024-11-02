@@ -223,8 +223,6 @@ def _correct_angles(df: pd.DataFrame) -> pd.DataFrame:
 
 def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int, attr_df: Optional['pd.DataFrame'] = None,
                                      duplicate_attr_depths: bool = False) -> UnstructuredData:
-    import numpy as np
-    import pandas as pd
 
     wp = optional_requirements.require_wellpathpy()
 

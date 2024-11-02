@@ -43,13 +43,19 @@ def CSV_wells_stream_to_unstruc(
         collars_reader: GenericReaderFilesHelper,
         surveys_reader: GenericReaderFilesHelper,
         attrs_reader: GenericReaderFilesHelper,
-        is_lith_attr: bool
+        is_lith_attr: bool,
+        number_nodes: int,
+        add_attrs_as_nodes: bool,
+        duplicate_attr_depths: bool
 ) -> list[UnstructuredData]:
     borehole_set: BoreholeSet = read_wells(
         collars_reader=collars_reader,
         surveys_reader=surveys_reader,
         attrs_reader=attrs_reader,
-        is_lith_attr=is_lith_attr
+        is_lith_attr=is_lith_attr,
+        number_nodes=number_nodes,
+        add_attrs_as_nodes=add_attrs_as_nodes,
+        duplicate_attr_depths=duplicate_attr_depths
     )
 
     list_unstruct: list[UnstructuredData] = [

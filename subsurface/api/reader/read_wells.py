@@ -16,7 +16,10 @@ def read_wells(
         collars_reader: GenericReaderFilesHelper,
         surveys_reader: GenericReaderFilesHelper,
         attrs_reader: GenericReaderFilesHelper,
-        is_lith_attr: bool
+        is_lith_attr: bool,
+        number_nodes: int = 10,
+        add_attrs_as_nodes: bool = False,
+        duplicate_attr_depths: bool = False 
 ) -> BoreholeSet:
     # ! FIGUROUT IF WE NEED LITH
     
@@ -36,12 +39,22 @@ def read_wells(
 
     survey_df: pd.DataFrame = read_survey(surveys_reader)
 
-    survey: Survey = Survey.from_df(survey_df)
+    attrs: pd.DataFrame = read_attributes(attrs_reader, is_lith=is_lith_attr)
+    if add_attrs_as_nodes:
+        attr_df = attrs
+    else:
+        attr_df = None
+
+    survey: Survey = Survey.from_df(
+        survey_df=survey_df,
+        attr_df=attr_df,
+        number_nodes=number_nodes,
+        duplicate_attr_depths=duplicate_attr_depths
+    )
 
     # Check if component lith is in columns or columns_map
-    lith: pd.DataFrame = read_attributes(attrs_reader, is_lith=is_lith_attr)
 
-    survey.update_survey_with_lith(lith)
+    survey.update_survey_with_lith(attrs)
 
     borehole_set = BoreholeSet(
         collars=collars,
