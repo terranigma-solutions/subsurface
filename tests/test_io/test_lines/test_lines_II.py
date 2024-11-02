@@ -21,6 +21,127 @@ PLOT = True
 data_folder = os.getenv("PATH_TO_ASCII_DRILLHOLES")
 
 
+@pytest.mark.liquid_earth
+def test_read_attr_into_borehole():
+    collars: Collars = _read_collars()
+    survey: Survey = _read_segment_attr_into_survey("geochem.csv", )
+
+    borehole_set = BoreholeSet(
+        collars=collars,
+        survey=survey,
+        merge_option=MergeOptions.INTERSECT
+    )
+
+    if True:
+        borehole_set.to_binary("ascii_wells")
+
+    # Assert shape is 17378, 3
+    np.testing.assert_array_equal(borehole_set.combined_trajectory.data.vertex.shape, (17378, 3))
+    np.testing.assert_array_equal(borehole_set.collars.data.vertex.shape, (263, 3))
+
+    _plot(
+        scalar="MnO",
+        trajectory=borehole_set.combined_trajectory,
+        collars=borehole_set.collars,
+        image_2d=False
+    )
+
+
+@pytest.mark.liquid_earth
+def test_read_geophys_attr():
+    collars = _read_collars()
+    survey = _read_point_attr_into_survey("geophysics.csv", )
+
+    borehole_set = BoreholeSet(
+        collars=collars,
+        survey=survey,
+        merge_option=MergeOptions.INTERSECT
+    )
+
+    if PLOT and True:
+        s = to_pyvista_line(
+            line_set=survey.survey_trajectory,
+            radius=10,
+            active_scalar="Gamma_TC"
+        )
+        pv_plot([s], image_2d=False)
+
+        s = to_pyvista_line(
+            line_set=survey.survey_trajectory,
+            radius=10,
+            active_scalar="eU"
+        )
+        pv_plot([s], image_2d=False)
+
+    _plot(
+        scalar="Gamma_TC",
+        trajectory=borehole_set.combined_trajectory,
+        collars=collars,
+        image_2d=False
+    )
+
+
+@pytest.mark.liquid_earth
+def test_read_stratigraphy():
+    reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=data_folder + "geology.csv",
+        columns_map={
+                'HOLE-ID': 'id',
+                'FROM'   : 'top',
+                'TO'     : 'base',
+                'GEOLOGY': 'component lith'
+        }
+    )
+
+    lith: pd.DataFrame = read_lith(reader)
+    survey_reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=data_folder + "survey.csv",
+        columns_map={
+                'Distance': 'md',
+                'Dip'     : 'dip',
+                'Azimuth' : 'azi'
+        },
+    )
+    survey: Survey = Survey.from_df(
+        survey_df=read_survey(survey_reader),
+        attr_df=lith,
+        number_nodes=10,
+        duplicate_attr_depths=True
+    )
+    survey.update_survey_with_lith(lith)
+
+    reader_collar: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=data_folder + "collars.csv",
+        header=0,
+        usecols=[0, 1, 2, 3],
+        columns_map={
+                "HOLE_ID": "id",  # ? Index name is not mapped
+                "X"      : "x",
+                "Y"      : "y",
+                "Z"      : "z"
+        }
+    )
+    df_collar = read_collar(reader_collar)
+    collar = Collars.from_df(df_collar)
+
+    borehole_set = BoreholeSet(
+        collars=collar,
+        survey=survey,
+        merge_option=MergeOptions.INTERSECT
+    )
+    borehole_set.get_bottom_coords_for_each_lith()
+
+    # ? Not sure what was this for
+    foo = borehole_set._merge_vertex_data_arrays_to_dataframe()
+    well_id_mapper: dict[str, int] = borehole_set.survey.id_to_well_id
+    foo["well_name"] = foo["well_id"].map(well_id_mapper)
+
+    if PLOT and True:
+        trajectory = borehole_set.combined_trajectory
+        scalar = "lith_ids"
+        _plot(scalar, trajectory, collar, lut=8, image_2d=False)
+
+
 def test_read_collar():
     collars = _read_collars()
 
@@ -85,89 +206,6 @@ def test_read_survey():
     return survey
 
 
-@pytest.mark.liquid_earth
-def test_read_stratigraphy():
-    reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
-        file_or_buffer=data_folder + "geology.csv",
-        columns_map={
-                'HOLE-ID': 'id',
-                'FROM'   : 'top',
-                'TO'     : 'base',
-                'GEOLOGY': 'component lith'
-        }
-    )
-
-    lith: pd.DataFrame = read_lith(reader)
-    survey: Survey = test_read_survey()
-
-    survey.update_survey_with_lith(lith)
-
-    reader_collar: GenericReaderFilesHelper = GenericReaderFilesHelper(
-        file_or_buffer=data_folder + "collars.csv",
-        header=0,
-        usecols=[0, 1, 2, 3],
-        columns_map={
-                "HOLE_ID": "id",  # ? Index name is not mapped
-                "X"      : "x",
-                "Y"      : "y",
-                "Z"      : "z"
-        }
-    )
-    df_collar = read_collar(reader_collar)
-    collar = Collars.from_df(df_collar)
-
-    borehole_set = BoreholeSet(
-        collars=collar,
-        survey=survey,
-        merge_option=MergeOptions.INTERSECT
-    )
-    borehole_set.get_bottom_coords_for_each_lith()
-
-    foo = borehole_set._merge_vertex_data_arrays_to_dataframe()
-    well_id_mapper: dict[str, int] = borehole_set.survey.id_to_well_id
-    # mapp well_id column to well_name
-    foo["well_name"] = foo["well_id"].map(well_id_mapper)
-
-    if PLOT and True:
-        trajectory = borehole_set.combined_trajectory
-        scalar = "lith_ids"
-        _plot(scalar, trajectory, collar, lut=8, image_2d=False)
-
-
-@pytest.mark.liquid_earth
-def test_read_geophys_attr():
-    collars = _read_collars()
-    survey = _read_point_attr_into_survey("geophysics.csv", )
-
-    borehole_set = BoreholeSet(
-        collars=collars,
-        survey=survey,
-        merge_option=MergeOptions.INTERSECT
-    )
-
-    if PLOT and True:
-        s = to_pyvista_line(
-            line_set=survey.survey_trajectory,
-            radius=10,
-            active_scalar="Gamma_TC"
-        )
-        pv_plot([s], image_2d=False)
-
-        s = to_pyvista_line(
-            line_set=survey.survey_trajectory,
-            radius=10,
-            active_scalar="eU"
-        )
-        pv_plot([s], image_2d=False)
-
-    _plot(
-        scalar="Gamma_TC",
-        trajectory=borehole_set.combined_trajectory,
-        collars=collars,
-        image_2d=False
-    )
-
-
 def test_read_geochem_attr():
     survey = _read_segment_attr_into_survey("geochem.csv", )
 
@@ -185,32 +223,6 @@ def test_read_geochem_attr():
             active_scalar="MnO"
         )
         pv_plot([s], image_2d=True)
-
-
-@pytest.mark.liquid_earth
-def test_read_attr_into_borehole():
-    collars: Collars = _read_collars()
-    survey: Survey = _read_segment_attr_into_survey("geochem.csv", )
-
-    borehole_set = BoreholeSet(
-        collars=collars,
-        survey=survey,
-        merge_option=MergeOptions.INTERSECT
-    )
-
-    if True:
-        borehole_set.to_binary("ascii_wells")
-
-    # Assert shape is 17378, 3
-    np.testing.assert_array_equal(borehole_set.combined_trajectory.data.vertex.shape, (17378, 3))
-    np.testing.assert_array_equal(borehole_set.collars.data.vertex.shape, (263, 3))
-
-    _plot(
-        scalar="MnO",
-        trajectory=borehole_set.combined_trajectory,
-        collars=borehole_set.collars,
-        image_2d=False
-    )
 
 
 def _read_point_attr_into_survey(attr_file) -> Survey:
