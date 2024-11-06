@@ -79,6 +79,10 @@ def read_volumetric_mesh_coord_file(reader_helper: GenericReaderFilesHelper) -> 
     df.x = df.x.astype(float)
     df.y = df.y.astype(float)
     df.z = df.z.astype(float)
+    # Throw error if empty
+    if df.empty:
+        raise ValueError("The file is empty")
+    
     return df
 
 
