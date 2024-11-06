@@ -84,5 +84,5 @@ def read_volumetric_mesh_coord_file(reader_helper: GenericReaderFilesHelper) -> 
 
 def read_volumetric_mesh_attr_file(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     df = pd.read_table(reader_helper.file_or_buffer, **reader_helper.pandas_reader_kwargs)
-    df.columns = df.columns.str.strip()
+    df.columns = df.columns.astype(str).str.strip()
     return df

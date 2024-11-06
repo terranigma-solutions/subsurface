@@ -58,6 +58,10 @@ def test_read_geophys_attr():
         merge_option=MergeOptions.INTERSECT
     )
 
+    if True:
+        borehole_set.to_binary("ascii_wells_geophysics")
+
+    _4Q83 = borehole_set.combined_trajectory.data.vertex[13487:48000, :]
     if PLOT and True:
         s = to_pyvista_line(
             line_set=survey.survey_trajectory,
