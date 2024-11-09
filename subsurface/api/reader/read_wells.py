@@ -25,36 +25,48 @@ def read_wells(
     
     
     pd = optional_requirements.require_pandas()
-    collar_df: pd.DataFrame = read_collar(collars_reader)
-    # TODO: df to unstruct
-    unstruc: UnstructuredData = UnstructuredData.from_array(
-        vertex=collar_df[["x", "y", "z"]].values,
-        cells=SpecialCellCase.POINTS
-    )
-    points = PointSet(data=unstruc)
-    collars: Collars = Collars(
-        ids=collar_df.index.to_list(),
-        collar_loc=points
-    )
+    try:
+        collar_df: pd.DataFrame = read_collar(collars_reader)
+        unstruc: UnstructuredData = UnstructuredData.from_array(
+            vertex=collar_df[["x", "y", "z"]].values,
+            cells=SpecialCellCase.POINTS
+        )
+        points = PointSet(data=unstruc)
+        collars: Collars = Collars(
+            ids=collar_df.index.to_list(),
+            collar_loc=points
+        )
+    except Exception as e:
+        raise ValueError(f"Error while reading collars: {e}")   
 
-    survey_df: pd.DataFrame = read_survey(surveys_reader)
+    
+    try:
+        survey_df: pd.DataFrame = read_survey(surveys_reader)
+    except Exception as e:
+        raise ValueError(f"Error while reading surveys: {e}")
+    
+    try:
+        attrs: pd.DataFrame = read_attributes(attrs_reader, is_lith=is_lith_attr)
+    except Exception as e:
+        raise ValueError(f"Error while reading attributes: {e}")
+    
+    try:
+        if add_attrs_as_nodes:
+            attr_df = attrs
+        else:
+            attr_df = None
 
-    attrs: pd.DataFrame = read_attributes(attrs_reader, is_lith=is_lith_attr)
-    if add_attrs_as_nodes:
-        attr_df = attrs
-    else:
-        attr_df = None
+        survey: Survey = Survey.from_df(
+            survey_df=survey_df,
+            attr_df=attr_df,
+            number_nodes=number_nodes,
+            duplicate_attr_depths=duplicate_attr_depths
+        )
 
-    survey: Survey = Survey.from_df(
-        survey_df=survey_df,
-        attr_df=attr_df,
-        number_nodes=number_nodes,
-        duplicate_attr_depths=duplicate_attr_depths
-    )
-
-    # Check if component lith is in columns or columns_map
-
-    survey.update_survey_with_lith(attrs)
+        # Check if component lith is in columns or columns_map
+        survey.update_survey_with_lith(attrs)
+    except Exception as e:
+        raise ValueError(f"Error while creating survey: {e}")
 
     borehole_set = BoreholeSet(
         collars=collars,
