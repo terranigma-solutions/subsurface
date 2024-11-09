@@ -36,9 +36,10 @@ def read_wells(
             ids=collar_df.index.to_list(),
             collar_loc=points
         )
+    except KeyError as e:
+        raise ValueError(f"Error while reading collars: {e}. Check if the columns are named x, y, z or use Columns Map.")
     except Exception as e:
         raise ValueError(f"Error while reading collars: {e}")   
-
     
     try:
         survey_df: pd.DataFrame = read_survey(surveys_reader)
