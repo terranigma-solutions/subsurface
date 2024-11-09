@@ -91,7 +91,7 @@ def _validate_attr_data(d):
 def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     # Check component lith in column
     if 'component lith' not in d.columns:
-        raise AttributeError('component lith column must be present in the file. '
+        raise AttributeError('If wells attributes represent lithology, `component lith` column must be present in the file. '
                              'Use columns_map to assign column names to these fields. Maybe you are marking as lithology'
                              'the wrong file?')
 

@@ -53,7 +53,18 @@ def read_VTK_structured_grid(file_or_buffer: Union[str, BytesIO]) -> StructuredD
 def read_volumetric_mesh_to_subsurface(reader_helper_coord: GenericReaderFilesHelper,
                                        reader_helper_attr: GenericReaderFilesHelper) -> UnstructuredData:
     df_coord = read_volumetric_mesh_coord_file(reader_helper_coord)
+    if len(df_coord.columns) == 1:
+        raise ValueError(
+            "The attributes file has only one column, probably the columns are not being separated correctly. Use 'sep' in Additional Reader Arguments"
+        )
+
     df_attr = read_volumetric_mesh_attr_file(reader_helper_attr)
+    # Check if there are more than one column and if it is only one raise an error that probably the columns have not been properly separated. Use "sep" in Additional Reader Arguments
+    if len(df_attr.columns) == 1:
+        raise ValueError(
+            "The attributes file has only one column, probably the columns are not being separated correctly. Use 'sep' in Additional Reader Arguments"
+        )
+    
     combined_df = df_coord.merge(df_attr, left_index=True, right_index=True)
     ud = UnstructuredData.from_array(
         vertex=combined_df[['x', 'y', 'z']], cells="points",
