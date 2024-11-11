@@ -34,8 +34,8 @@ def OMF_stream_to_unstruc(stream: BytesIO) -> list[UnstructuredData]:
     return list_unstruct
 
 
-def VTK_stream_to_struct(stream: BytesIO) -> list[StructuredData]:
-    struct = read_VTK_structured_grid(stream)
+def VTK_stream_to_struct(stream: BytesIO, attribute_name: str) -> list[StructuredData]:
+    struct = read_VTK_structured_grid(stream, attribute_name)
     return [struct]
 
 

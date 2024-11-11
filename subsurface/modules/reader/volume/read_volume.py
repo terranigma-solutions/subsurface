@@ -10,7 +10,7 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 import pandas as pd
 
 
-def read_VTK_structured_grid(file_or_buffer: Union[str, BytesIO]) -> StructuredData:
+def read_VTK_structured_grid(file_or_buffer: Union[str, BytesIO], active_scalars: str) -> StructuredData:
     pv = optional_requirements.require_pyvista()
 
     if isinstance(file_or_buffer, BytesIO):
@@ -35,8 +35,6 @@ def read_VTK_structured_grid(file_or_buffer: Union[str, BytesIO]) -> StructuredD
         pyvista_struct: pv.ExplicitStructuredGrid = pyvista_obj.cast_to_explicit_structured_grid()
     except Exception as e:
         raise f"The file is not a structured grid: {e}"
-
-    active_scalars = "Cell Number"
 
     if PLOT := False:
         pyvista_struct.set_active_scalars(active_scalars)
