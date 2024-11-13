@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import RequirementsLevel, check_requirements
+from tests.conftest import RequirementsLevel, check_requirements
 from subsurface import TriSurf, StructuredGrid
 from subsurface.modules.reader.read_netcdf import read_unstruct, read_struct
 from subsurface.modules.reader.topography.topo_core import read_structured_topography

@@ -1,6 +1,6 @@
 import pytest
 
-from conftest import RequirementsLevel
+from tests.conftest import RequirementsLevel
 from subsurface import UnstructuredData, TriSurf, StructuredData, optional_requirements
 from subsurface.modules.reader.profiles.profiles_core import create_mesh_from_trace, \
     create_tri_surf_from_traces_texture, lineset_from_trace

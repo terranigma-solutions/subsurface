@@ -23,7 +23,7 @@ pytestmark = pytest.mark.skipif(
 def test_volumetric_mesh_to_subsurface():
     ud = read_volumetric_mesh_to_subsurface(
         reader_helper_coord=GenericReaderFilesHelper(
-            data_path.joinpath('mesh'),
+            file_or_buffer=data_path.joinpath('mesh'),
             header=None,
             index_col=False,
             col_names=['elem', '_2', '_3', 'x', 'y', 'z'],
@@ -35,7 +35,7 @@ def test_volumetric_mesh_to_subsurface():
             }
         ),
         reader_helper_attr=GenericReaderFilesHelper(
-            data_path.joinpath('out_all00'),
+            file_or_buffer=data_path.joinpath('out_all00'),
             index_col=False,
             additional_reader_kwargs={"sep": ","}
         )
@@ -47,6 +47,7 @@ def test_volumetric_mesh_to_subsurface():
     return ud, mesh
 
 
+@pytest.mark.liquid_earth
 def test_interpolate_ud_to_sd():
     ud, ud_mesh = test_volumetric_mesh_to_subsurface()
     sd: subsurface.StructuredData  = interpolate_unstructured_data_to_structured_data(
@@ -58,7 +59,7 @@ def test_interpolate_ud_to_sd():
     sg = StructuredGrid(sd)
 
     mesh = to_pyvista_grid(sg)
-    pv_plot([mesh, ud_mesh], image_2d=True )
+    pv_plot([mesh, ud_mesh], image_2d=False)
 
 
 def test_read_volumetric_mesh():

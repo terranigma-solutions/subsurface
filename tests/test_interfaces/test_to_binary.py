@@ -1,6 +1,6 @@
 import json
 
-from conftest import RequirementsLevel, check_requirements
+from tests.conftest import RequirementsLevel, check_requirements
 
 import pytest
 import numpy as np

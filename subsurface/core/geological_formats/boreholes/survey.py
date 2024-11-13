@@ -19,7 +19,7 @@ RADIUS = 10
 class Survey:
     ids: list[str]
     survey_trajectory: LineSet
-    well_id_mapper: dict[str, int] = None
+    well_id_mapper: dict[str, int] = None  #: This is following the order of the survey csv that can be different that the collars
 
     @property
     def id_to_well_id(self):
@@ -28,7 +28,7 @@ class Survey:
         return id_to_well_name_mapper
 
     @classmethod
-    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: Optional['pd.DataFrame'], number_nodes: Optional[int] = NUMBER_NODES,
+    def from_df(cls, survey_df: 'pd.DataFrame', attr_df: Optional['pd.DataFrame'] = None, number_nodes: Optional[int] = NUMBER_NODES,
                 duplicate_attr_depths: bool = False) -> 'Survey':
         """
         Create a Survey object from two DataFrames containing survey and attribute data.
@@ -118,7 +118,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
     # Add missing columns from attrs, preserving their dtypes
     for col in attrs.columns.difference(new_attrs.columns):
         new_attrs[col] = np.nan if pd.api.types.is_numeric_dtype(attrs[col]) else None
-    
+
     # Align well IDs between attrs and trajectory, perform interpolation, and map the attributes
     # Loop dict
     for survey_well_name in survey.well_id_mapper:
@@ -138,6 +138,13 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
         # Apply mask to measured depths for the current well
         well_measured_depths = measured_depths[trajectory_well_mask]
 
+        if "base" not in attrs_well.columns:
+            raise ValueError(f"Base column must be present in the file for well '{survey_well_name}'.")
+        elif "top" not in attrs_well.columns:
+            location_values_to_interpolate = attrs_well['base']
+        else:
+            location_values_to_interpolate = (attrs_well['top'] + attrs_well['base']) / 2
+
         # Interpolation for each attribute column
         for col in attrs_well.columns:
             # Interpolate the attribute values based on the measured depths
@@ -151,8 +158,6 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
                 interp_kind = 'nearest'
             else:
                 interp_kind = 'linear'
-
-            location_values_to_interpolate = (attrs_well['top'] + attrs_well['base']) / 2
 
             from scipy.interpolate import interp1d
             interp_func = interp1d(
@@ -218,8 +223,6 @@ def _correct_angles(df: pd.DataFrame) -> pd.DataFrame:
 
 def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int, attr_df: Optional['pd.DataFrame'] = None,
                                      duplicate_attr_depths: bool = False) -> UnstructuredData:
-    import numpy as np
-    import pandas as pd
 
     wp = optional_requirements.require_wellpathpy()
 
@@ -291,51 +294,65 @@ def _data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: in
     return unstruct
 
 
-def _grab_depths_from_attr(attr_df: pd.DataFrame, borehole_id: Hashable, duplicate_attr_depths: bool, md_max: float,
-                           md_min: float) -> np.ndarray:
-    # Initialize attr_depths as an empty array
+def _grab_depths_from_attr(
+        attr_df: pd.DataFrame,
+        borehole_id: Hashable,
+        duplicate_attr_depths: bool,
+        md_max: float,
+        md_min: float
+) -> np.ndarray:
+    # Initialize attr_depths and attr_labels as empty arrays
     attr_depths = np.array([], dtype=float)
-    attribute_values = np.array([], dtype=bool)
+    attr_labels = np.array([], dtype='<U4')  # Initialize labels for 'top' and 'base'
 
-    if attr_df is None or "top" not in attr_df.columns or "base" not in attr_df.columns:
+    if attr_df is None or ("top" not in attr_df.columns and "base" not in attr_df.columns):
         return attr_depths
 
     try:
-        vals: pd.DataFrame = attr_df.loc[borehole_id]
-        
-        
-        if 'top' in vals and 'base' in vals:
+        vals = attr_df.loc[borehole_id]
+
+        tops = np.array([], dtype=float)
+        bases = np.array([], dtype=float)
+
+        if 'top' in vals:
             if isinstance(vals, pd.DataFrame):
                 tops = vals['top'].values.flatten()
-                bases = vals['base'].values.flatten()
             else:
                 tops = np.array([vals['top']])
-                bases = np.array([vals['base']])
             # Convert to float and remove NaNs
             tops = tops.astype(float)
             tops = tops[~np.isnan(tops)]
+            # Clip to within md range
+            tops = tops[(tops >= md_min) & (tops <= md_max)]
+
+        if 'base' in vals:
+            if isinstance(vals, pd.DataFrame):
+                bases = vals['base'].values.flatten()
+            else:
+                bases = np.array([vals['base']])
+            # Convert to float and remove NaNs
             bases = bases.astype(float)
             bases = bases[~np.isnan(bases)]
             # Clip to within md range
-            tops = tops[(tops >= md_min) & (tops <= md_max)]
             bases = bases[(bases >= md_min) & (bases <= md_max)]
-            # Combine tops and bases into attr_depths with labels
-            attr_depths = np.concatenate((tops, bases))
-            attr_labels = np.array(['top'] * len(tops) + ['base'] * len(bases))
-            
-            # Drop duplicates
-            unique_indices = np.unique(attr_depths, return_index=True)[1]
-            attr_depths = attr_depths[unique_indices]
-            attr_labels = attr_labels[unique_indices]
-            
+
+        # Combine tops and bases into attr_depths with labels
+        attr_depths = np.concatenate((tops, bases))
+        attr_labels = np.array(['top'] * len(tops) + ['base'] * len(bases))
+
+        # Drop duplicates while preserving order
+        _, unique_indices = np.unique(attr_depths, return_index=True)
+        attr_depths = attr_depths[unique_indices]
+        attr_labels = attr_labels[unique_indices]
+
     except KeyError:
         # No attributes for this borehole_id or missing columns
         attr_depths = np.array([], dtype=float)
         attr_labels = np.array([], dtype='<U4')
+
     # If duplicate_attr_depths is True, duplicate attr_depths with a tiny offset
     if duplicate_attr_depths and len(attr_depths) > 0:
         tiny_offset = (md_max - md_min) * 1e-6  # A tiny fraction of the depth range
-        # tiny_offset = 1e-4
         # Create offsets: +tiny_offset for 'top', -tiny_offset for 'base'
         offsets = np.where(attr_labels == 'top', tiny_offset, -tiny_offset)
         duplicated_attr_depths = attr_depths + offsets

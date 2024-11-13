@@ -5,7 +5,6 @@ from typing import List
 import pytest
 import os
 
-from conftest import RequirementsLevel
 from subsurface import TriSurf, optional_requirements
 from subsurface.core.structs.base_structures import StructuredData, UnstructuredData
 import matplotlib.pyplot as plt
@@ -13,7 +12,7 @@ import numpy as np
 
 from subsurface.modules.reader.volume import segy_reader
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
-
+from tests.conftest import RequirementsLevel
 
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_VOLUME) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
