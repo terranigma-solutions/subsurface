@@ -1,8 +1,5 @@
 import enum
 import pathlib
-from dataclasses import dataclass, field
-from typing import Union, Callable, Any
-
 import pandas as pd
 
 from subsurface.core.utils.utils_core import get_extension
