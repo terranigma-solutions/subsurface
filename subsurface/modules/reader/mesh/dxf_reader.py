@@ -38,7 +38,10 @@ def dxf_file_to_unstruct_input(file: Union[str, pathlib.Path]):
     ezdxf = optional_requirements.require_ezdxf()
     dataset = ezdxf.readfile(file)
     cell_attr_int, cell_attr_map, cells, vertex = _dxf_dataset_to_unstruct_input(dataset)
-
+    # Check if empty and raise error
+    if vertex.size == 0:
+        raise ValueError("The dxf file does not contain any 3DFACE entities.")
+    
     return vertex, cells, cell_attr_int, cell_attr_map
 
 
@@ -55,6 +58,8 @@ def _dxf_dataset_to_unstruct_input(dataset):
     cell_attr = []
     entity = dataset.modelspace()
     for e in entity:
+        if e.dxftype() != "3DFACE":
+            continue
         vertex.append(e[0])
         vertex.append(e[1])
         vertex.append(e[2])
