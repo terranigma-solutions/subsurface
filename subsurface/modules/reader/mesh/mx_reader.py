@@ -83,11 +83,11 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
     in_coord_sys = False
     in_property_class_header = False
     in_tface = False
-    in_atom = False
     current_property_class_header = {}
     vertex_list = []
     vertex_indices = []
     triangle_list = []
+    vid_to_index = {}  # Map from vertex id to index in vertex_list
 
     for line in mesh_lines:
         line = line.strip()
@@ -156,18 +156,34 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
             in_tface = True
             continue
 
-        if line.startswith("ATOM"):
-            in_atom = True
-            continue
-
         if in_tface:
             if line.startswith('VRTX'):
                 # Parse vertex line
                 parts = line.split()
                 if len(parts) >= 5:
                     _, vid, x, y, z = parts[:5]
-                    vertex_indices.append(int(vid))
-                    vertex_list.append([float(x), float(y), float(z)])
+                    vid = int(vid)
+                    x, y, z = float(x), float(y), float(z)
+                    vertex_indices.append(vid)
+                    vertex_list.append([x, y, z])
+                    vid_to_index[vid] = len(vertex_list) - 1
+                continue
+            elif line.startswith('ATOM'):
+                # Parse ATOM line
+                parts = line.split()
+                if len(parts) == 3:
+                    _, vid, ref_vid = parts
+                    vid = int(vid)
+                    ref_vid = int(ref_vid)
+                    if ref_vid in vid_to_index:
+                        ref_index = vid_to_index[ref_vid]
+                        coord = vertex_list[ref_index]
+                        vertex_indices.append(vid)
+                        vertex_list.append(coord)
+                        vid_to_index[vid] = len(vertex_list) - 1
+                    else:
+                        warnings.warn(f"Reference vertex {ref_vid} not found for ATOM {vid}")
+                continue
             elif line.startswith('TRGL'):
                 # Parse triangle line
                 parts = line.split()
@@ -178,16 +194,20 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
                 else:
                     continue
                 triangle_list.append([int(v1), int(v2), int(v3)])
+                continue
             elif line.startswith('BSTONE'):
                 _, value = line.split()
                 mesh.bstones.append(int(value))
+                continue
             elif line.startswith('BORDER'):
                 parts = line.split()
                 if len(parts) >= 4:
                     _, bid, v1, v2 = parts[:4]
                     mesh.borders.append({'id': int(bid), 'v1': int(v1), 'v2': int(v2)})
+                continue
             elif line == 'END':
                 in_tface = False
+                continue
             else:
                 pass
             continue
@@ -200,15 +220,12 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
                 mesh.metadata[key.strip()] = value.strip()
             else:
                 pass
-        if in_atom:
-            warnings.warn("ATOM not implemented yet")
-            return None
 
-        # Convert lists to NumPy arrays
+    # Convert lists to NumPy arrays
     mesh.vertices = np.array(vertex_list)
     mesh.vertex_indices = np.array(vertex_indices)
     mesh.edges = np.array(triangle_list)
 
-    # Check the number of vertices, the indices and the triangles max value to avoid errors
+    # Check the number of vertices, indices, and triangles to avoid errors (optional)
 
     return mesh

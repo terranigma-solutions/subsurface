@@ -23,8 +23,9 @@ class GOCADMesh:
         try:
             triangles_mapped = np.vectorize(idx_map.get)(self.edges)
         except TypeError as e:
+            self._verbose_debugging()
             raise f"Error mapping indices for mesh: {e}"
-        
+
         return triangles_mapped
 
     @property
@@ -59,3 +60,23 @@ class GOCADMesh:
 
         # Fallback: if none of the formats match, return None
         return None
+
+    def _verbose_debugging(self):
+        # Create index mapping from original to zero-based indices
+        idx_map = {old_idx: new_idx for new_idx, old_idx in enumerate(self.vertex_indices)}
+
+        # Check for missing indices
+        unique_edge_indices = np.unique(self.edges)
+        missing_indices = set(unique_edge_indices) - set(idx_map.keys())
+        if missing_indices:
+            raise ValueError(f"Edges contain indices not found in vertex_indices: {missing_indices}")
+
+        # Map triangle indices using a list comprehension
+        try:
+            edges_flat = self.edges.flatten()
+            mapped_flat = [idx_map[idx] for idx in edges_flat]
+            triangles_mapped = np.array(mapped_flat).reshape(self.edges.shape)
+        except Exception as e:
+            raise Exception(f"Error mapping indices for mesh: {e}")
+
+        return triangles_mapped
