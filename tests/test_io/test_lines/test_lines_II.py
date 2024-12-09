@@ -32,7 +32,7 @@ def test_read_attr_into_borehole():
         merge_option=MergeOptions.INTERSECT
     )
 
-    if True:
+    if False:
         borehole_set.to_binary("ascii_wells")
 
     # Assert shape is 17378, 3
@@ -43,7 +43,7 @@ def test_read_attr_into_borehole():
         scalar="MnO",
         trajectory=borehole_set.combined_trajectory,
         collars=borehole_set.collars,
-        image_2d=False
+        image_2d=True
     )
 
 
@@ -68,20 +68,20 @@ def test_read_geophys_attr():
             radius=10,
             active_scalar="Gamma_TC"
         )
-        pv_plot([s], image_2d=False)
+        pv_plot([s], image_2d=True)
 
         s = to_pyvista_line(
             line_set=survey.survey_trajectory,
             radius=10,
             active_scalar="eU"
         )
-        pv_plot([s], image_2d=False)
+        pv_plot([s], image_2d=True)
 
     _plot(
         scalar="Gamma_TC",
         trajectory=borehole_set.combined_trajectory,
         collars=collars,
-        image_2d=False
+        image_2d=True
     )
 
 
@@ -143,7 +143,7 @@ def test_read_stratigraphy():
     if PLOT and True:
         trajectory = borehole_set.combined_trajectory
         scalar = "lith_ids"
-        _plot(scalar, trajectory, collar, lut=8, image_2d=False)
+        _plot(scalar, trajectory, collar, lut=8, image_2d=True)
 
 
 def test_read_collar():

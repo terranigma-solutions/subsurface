@@ -145,4 +145,4 @@ def test_read_from_multiple_files():
     ud = read_2d_mesh_to_unstruct(reader_unstruc)
     ts = TriSurf(ud)
     s = to_pyvista_mesh(ts)
-    pv_plot([s], image_2d=False, ve=10)
+    pv_plot([s], image_2d=True, ve=10)

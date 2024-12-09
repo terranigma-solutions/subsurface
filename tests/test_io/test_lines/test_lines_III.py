@@ -74,5 +74,5 @@ def test_read_kim():
         trajectory=borehole_set.combined_trajectory,
         collars=collars,
         lut=14,
-        image_2d=False
+        image_2d=True
     )
