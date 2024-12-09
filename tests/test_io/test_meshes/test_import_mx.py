@@ -20,23 +20,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-# Skip if TERRA_PATH_DEVOPS not in .env due to lack of input data
-@pytest.mark.skipif(os.getenv("TERRA_PATH_DEVOPS") is None, reason="Need to set the TERRA_PATH_DEVOPS")
-def test_read_gocad():
-    from subsurface.modules.reader.mesh.mx_reader import parse_gocad_mx_file
-    # Parse the .mx file
-    meshes = parse_gocad_mx_file(os.getenv("PATH_TO_MX"))
-
-    p = init_plotter(image_2d=False)
-    # Convert each mesh to PyVista and visualize
-    pyvista_meshes = _meshes_to_pyvista(meshes)
-    for pv_mesh in pyvista_meshes:
-        # Add random colors
-        p.add_mesh(pv_mesh, color=pv_mesh.color, show_scalar_bar=False)
-
-    p.show()
-
-
 @pytest.mark.skipif(os.getenv("TERRA_PATH_DEVOPS") is None, reason="Need to set the TERRA_PATH_DEVOPS")
 @pytest.mark.liquid_earth
 def test_read_gocad_from_file():

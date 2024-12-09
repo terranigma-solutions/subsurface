@@ -21,7 +21,7 @@ class TestReadDxfAndPlot:
     def test_read_dxf_only_vertex(self, data_path):
         path = data_path + '/surfaces/shafts_small.dxf'
 
-        foo = ReaderUnstructuredHelper(GenericReaderFilesHelper(path))
+        foo = ReaderUnstructuredHelper(GenericReaderFilesHelper(file_or_buffer=path))
 
         unstruct = read_2d_mesh_to_unstruct(foo, delaunay=False)
 

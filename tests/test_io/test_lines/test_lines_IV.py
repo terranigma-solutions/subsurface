@@ -90,4 +90,4 @@ def test_read():
 
     trajectory = borehole_set.combined_trajectory
     scalar = "lith_ids"
-    _plot(scalar, trajectory, collars, lut=14, image_2d=False)
+    _plot(scalar, trajectory, collars, lut=14, image_2d=True)

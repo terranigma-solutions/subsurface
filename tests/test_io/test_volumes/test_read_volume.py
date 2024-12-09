@@ -65,7 +65,7 @@ def test_interpolate_ud_to_sd():
 def test_read_volumetric_mesh():
     vol_mesh_coord_df = read_volumetric_mesh_coord_file(
         GenericReaderFilesHelper(
-            data_path.joinpath('mesh'),
+            file_or_buffer=data_path.joinpath('mesh'),
             header=None,
             index_col=False,
             col_names=['elem', '_2', '_3', 'x', 'y', 'z'],
@@ -82,7 +82,7 @@ def test_read_volumetric_mesh():
 
     vol_mesh_attr_df = read_volumetric_mesh_attr_file(
         GenericReaderFilesHelper(
-            data_path.joinpath('out_all00'),
+            file_or_buffer=data_path.joinpath('out_all00'),
             index_col=False,
             additional_reader_kwargs={"sep": ","}
         )

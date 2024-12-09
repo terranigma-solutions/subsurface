@@ -20,7 +20,7 @@ def test_le_mesh_v1_topo():
 
     ts = TriSurf(mesh=unstruct)
     s = sb_viz.to_pyvista_mesh(ts)
-    sb_viz.pv_plot([s], image_2d=False)
+    sb_viz.pv_plot([s], image_2d=True)
 
 
 @pytest.mark.liquid_earth
@@ -32,4 +32,4 @@ def test_le_mesh_v1():
 
     ts = TriSurf(mesh=unstruct)
     s = sb_viz.to_pyvista_mesh(ts)
-    sb_viz.pv_plot([s], image_2d=False)
+    sb_viz.pv_plot([s], image_2d=True)

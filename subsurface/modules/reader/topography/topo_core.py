@@ -63,7 +63,9 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
 
 
 def read_unstructured_topography(path) -> UnstructuredData:
-    return read_2d_mesh_to_unstruct(ReaderUnstructuredHelper(GenericReaderFilesHelper(path)))
+    return read_2d_mesh_to_unstruct(ReaderUnstructuredHelper(GenericReaderFilesHelper(
+        file_or_buffer=path
+    )))
 
 
 def topography_to_unstructured_data(structured_data: StructuredData) -> UnstructuredData:

@@ -21,7 +21,9 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 def get_less_unstructured_data() -> UnstructuredData:
     fp = input_path + "/less_land_surface_vertices.csv"
-    ud_less = read_2d_mesh_to_unstruct(ReaderUnstructuredHelper(GenericReaderFilesHelper(fp)))
+    ud_less = read_2d_mesh_to_unstruct(ReaderUnstructuredHelper(GenericReaderFilesHelper(
+        file_or_buffer=fp
+    )))
     return ud_less
 
 
@@ -30,9 +32,13 @@ def get_unstructured_data_with_cells() -> UnstructuredData:
     fp = input_path + "/vertices_and_edges.csv"
     ud_cells = read_2d_mesh_to_unstruct(
         ReaderUnstructuredHelper(
-            reader_vertex_args=GenericReaderFilesHelper(fp, usecols=['x', 'y', 'z']),
+            reader_vertex_args=GenericReaderFilesHelper(
+                file_or_buffer=fp,
+                usecols=['x', 'y', 'z']
+            ),
             reader_cells_args=GenericReaderFilesHelper(
-                fp, usecols=['0', '1', '2'],
+                file_or_buffer=fp,
+                usecols=['0', '1', '2'],
                 columns_map={
                         '0': 'e1',
                         '1': 'e2',
@@ -48,8 +54,14 @@ def get_unstructured_data_with_cells() -> UnstructuredData:
 def get_unstructured_data_with_attribute() -> UnstructuredData:
     fp = input_path + "/well_based_temperature.csv"
     reader_unstruc = ReaderUnstructuredHelper(
-        reader_vertex_args=GenericReaderFilesHelper(fp, usecols=['x', 'y', 'z']),
-        reader_vertex_attr_args=GenericReaderFilesHelper(fp, usecols=['T'])
+        reader_vertex_args=GenericReaderFilesHelper(
+            file_or_buffer=fp,
+            usecols=['x', 'y', 'z']
+        ),
+        reader_vertex_attr_args=GenericReaderFilesHelper(
+            file_or_buffer=fp,
+            usecols=['T']
+        )
     )
 
     ud_attribute = read_2d_mesh_to_unstruct(reader_unstruc)
@@ -60,7 +72,10 @@ def test_read_surface2():
     # Try reading a column with no index
     with pytest.raises(KeyError):
         fp = input_path + "/less_land_surface_vertices_no_col.csv"
-        reader_unstruc = ReaderUnstructuredHelper(reader_vertex_args=GenericReaderFilesHelper(fp))
+        reader_unstruc = ReaderUnstructuredHelper(reader_vertex_args=GenericReaderFilesHelper(
+            file_or_buffer=fp
+        )
+        )
 
         ud = read_2d_mesh_to_unstruct(reader_unstruc)
         print(ud)
@@ -68,7 +83,11 @@ def test_read_surface2():
     # Say pandas that there is no header and the name of the columns
     fp = input_path + "/less_land_surface_vertices_no_col.csv"
     reader_unstruc = ReaderUnstructuredHelper(
-        reader_vertex_args=GenericReaderFilesHelper(fp, header=0, col_names=['x', 'y', 'z'])
+        reader_vertex_args=GenericReaderFilesHelper(
+            file_or_buffer=fp,
+            header=0,
+            col_names=['x', 'y', 'z']
+        )
     )
     ud = read_2d_mesh_to_unstruct(reader_unstruc)
     print(ud)
@@ -76,7 +95,10 @@ def test_read_surface2():
     # Remap column names to fit the requirements
     fp = input_path + "/less_land_surface_vertices_wrong_col.csv"
     reader_unstruc = ReaderUnstructuredHelper(
-        reader_vertex_args=GenericReaderFilesHelper(fp, columns_map={'foo': 'x', 'bar': 'y', 'baz': 'z'})
+        reader_vertex_args=GenericReaderFilesHelper(
+            file_or_buffer=fp,
+            columns_map={'foo': 'x', 'bar': 'y', 'baz': 'z'}
+        )
     )
 
     ud = read_2d_mesh_to_unstruct(reader_unstruc)
