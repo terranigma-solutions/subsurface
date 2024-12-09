@@ -1,3 +1,4 @@
+import numpy as np
 import pyvista
 from dotenv import dotenv_values
 
@@ -70,16 +71,55 @@ def test_omf_to_unstruct_all_surfaces(load_omf):
     pv_plot(list_of_polydata, image_2d=True)
 
 
+
+def test_omf_to_unstruct_all_surfaces_to_one_unstructured_data(load_omf):
+    omf = load_omf
+    list_of_polydata: list[pyvista.PolyData] = []
+    all_vertex = []
+    all_cells = []
+    cell_attr = []
+    _last_cell: int = 0
+    
+    for i in range(omf.n_blocks):
+        block: pyvista.PolyData = omf[i]
+        cell_type = block.get_cell(0).type
+
+        if cell_type == pyvista.CellType.TRIANGLE:
+            pyvista_unstructured_grid: pyvista.UnstructuredGrid = block.cast_to_unstructured_grid()
+            all_vertex.append(pyvista_unstructured_grid.points)
+            cells: np.ndarray = pyvista_unstructured_grid.cells.reshape(-1, 4)[:, 1:]
+            if len(all_cells) > 0:
+                cells = cells + _last_cell
+
+            all_cells.append(cells)
+            cell_attr.append(np.ones(len(all_cells[-1])) * i)
+            _last_cell = cells.max() + 1
+
+
+    # * Create the unstructured data
+    import pandas as pd
+    unstructured_data = subsurface.UnstructuredData.from_array(
+        vertex=np.vstack(all_vertex),
+        cells=np.vstack(all_cells),
+        cells_attr=pd.DataFrame(np.hstack(cell_attr), columns=["Block id"]),
+    )
+
+    # * Convert subsurface object to pyvista again for plotting
+    ts: subsurface.TriSurf = TriSurf(mesh=unstructured_data)
+    s: pyvista.PolyData = to_pyvista_mesh(ts)
+
+    list_of_polydata.append(s)
+    pv_plot(list_of_polydata, image_2d=True)
+
+
 def test_omf_from_stream_to_unstruct_all_surfaces():
     config = dotenv_values()
     path = config.get('PATH_TO_OMF')
     with open(path, "rb") as stream:
-        list_unstructs = subsurface.modules.reader.omf_stream_to_unstructs(stream)
+        from subsurface.modules.reader import omf_stream_to_unstructs
+        unstruct = omf_stream_to_unstructs(stream)
 
-    list_of_polydata: list[pyvista.PolyData] = []
-    for unstruct in list_unstructs:
-        ts: subsurface.TriSurf = TriSurf(mesh=unstruct)
-        s: pyvista.PolyData = to_pyvista_mesh(ts)
-        list_of_polydata.append(s)
+    ts: subsurface.TriSurf = TriSurf(mesh=unstruct)
+    s: pyvista.PolyData = to_pyvista_mesh(ts)
 
-    pv_plot(list_of_polydata, image_2d=True)
+    pv_plot([s], image_2d=True)
