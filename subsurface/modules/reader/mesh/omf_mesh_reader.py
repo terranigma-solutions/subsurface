@@ -7,12 +7,10 @@ from ....optional_requirements import require_omf, require_pyvista
 from ....core.structs.base_structures import UnstructuredData
 
 
-def omf_stream_to_unstructs(stream: io.BytesIO) -> UnstructuredData:
+def omf_stream_to_unstructs(stream: io.BytesIO) -> list[UnstructuredData]:
     pyvista = require_pyvista()
     omfvista = require_omf()
     omf = omfvista.load_project(stream)
-    list_of_polydata: list[pyvista.PolyData] = []
-
 
     all_vertex = []
     all_cells = []
@@ -42,4 +40,4 @@ def omf_stream_to_unstructs(stream: io.BytesIO) -> UnstructuredData:
         cells=np.vstack(all_cells),
         cells_attr=pd.DataFrame(np.hstack(cell_attr), columns=["Block id"]),
     )
-    return unstructured_data
+    return [unstructured_data]
