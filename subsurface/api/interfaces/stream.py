@@ -34,6 +34,11 @@ def OMF_stream_to_unstruc(stream: BytesIO) -> list[UnstructuredData]:
     return list_unstruct
 
 
+def MX_stream_to_unstruc(stream: TextIO) -> list[UnstructuredData]:
+    list_unstruct: list[UnstructuredData] = [reader.mx_to_unstruc_from_binary(stream)]
+    return list_unstruct
+
+
 def VTK_stream_to_struct(stream: BytesIO, attribute_name: str) -> list[StructuredData]:
     struct = read_VTK_structured_grid(stream, attribute_name)
     return [struct]
@@ -98,7 +103,7 @@ def CSV_volume_stream_to_struct(
         reader_helper_attr=attrs_reader
     )
 
-    sd: StructuredData  = interpolate_unstructured_data_to_structured_data(
+    sd: StructuredData = interpolate_unstructured_data_to_structured_data(
         ud=ud,
         attr_name=attr_name,
         resolution=resolution
