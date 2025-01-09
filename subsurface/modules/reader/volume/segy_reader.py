@@ -5,21 +5,10 @@ from ....core.structs.base_structures import StructuredData
 import numpy as np
 
 
-def read_in_segy(filepath: str, coords=None) -> StructuredData:
-    """Reader for seismic data stored in sgy/segy files
-
-    Args:
-        filepath (str): the path of the sgy/segy file
-        coords (dict): If data is a numpy array coords provides the values for
-         the xarray dimension. These dimensions are 'x', 'y' and 'z'
-
-    Returns: a StructuredData object with data, the traces with samples written into an xr.Dataset, optionally with
-     labels defined by coords
-
-    """
+def read_in_segy(filepath: str, coords=None, ignore_geometry=True ) -> StructuredData:
 
     segyio = optional_requirements.require_segyio()
-    segyfile = segyio.open(filepath, ignore_geometry=True)
+    segyfile = segyio.open(filepath, ignore_geometry=ignore_geometry)
 
     data = np.asarray([np.copy(tr) for tr in segyfile.trace[:]])
 
