@@ -61,10 +61,14 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
     return structured_data
 
 
-def read_unstructured_topography(path) -> UnstructuredData:
+def read_unstructured_topography(path, additional_reader_kwargs: Optional[dict]=None) -> UnstructuredData:
     """For example, a dxf file"""
     
-    helper = GenericReaderFilesHelper(file_or_buffer=path)
+    additional_reader_kwargs = additional_reader_kwargs or {}
+    helper = GenericReaderFilesHelper(
+        file_or_buffer=path,
+        additional_reader_kwargs=additional_reader_kwargs or {}
+    )
     unstructured_helper = ReaderUnstructuredHelper(helper)
     unstruct: UnstructuredData = read_2d_mesh_to_unstruct(unstructured_helper)
     return unstruct
