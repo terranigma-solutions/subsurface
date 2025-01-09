@@ -12,6 +12,8 @@ def dxf_from_file_to_vertex(file_path: str):
     vertex = []
     entity = dataset.modelspace()
     for e in entity:
+        if e.dxftype() != "3DFACE":
+            continue
         vertex.append(e[0])
         vertex.append(e[1])
         vertex.append(e[2])
@@ -26,6 +28,8 @@ def dxf_from_stream_to_vertex(stream: TextIO):
     vertex = []
     entity = dataset.modelspace()
     for e in entity:
+        if e.dxftype() != "3DFACE":
+            continue
         vertex.append(e[0])
         vertex.append(e[1])
         vertex.append(e[2])
