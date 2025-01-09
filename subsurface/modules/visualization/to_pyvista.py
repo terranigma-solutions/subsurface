@@ -40,11 +40,15 @@ def pv_plot(meshes: list,
 
     for m in meshes:
         # Check if m has texture data
+        texture = None
+        if hasattr(m, '_textures') and isinstance(m._textures, dict):
+            texture = m._textures.get(0, None)
+        
         p.add_mesh(
             mesh=m,
             cmap=cmap,
             categories=True,
-            texture=m._textures.get(0, None),
+            texture=texture,
             **add_mesh_kwargs
         )
 
