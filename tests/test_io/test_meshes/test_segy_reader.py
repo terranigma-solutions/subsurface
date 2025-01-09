@@ -36,7 +36,7 @@ def _read_segy_file(file_path) -> dict:
 
 
 input_path = os.path.dirname(__file__) + '/../../data/segy'
-files = ['/E5_MIG_DMO_FINAL.sgy', '/E5_MIG_DMO_FINAL_DEPTH.sgy', '/E5_STACK_DMO_FINAL.sgy', '/test.segy']
+files = ['/E5_MIG_DMO_FINAL.sgy', '/E5_MIG_DMO_FINAL_DEPTH.sgy', '/E5_STACK_DMO_FINAL.sgy', '/test.segy', '/Linie01.segy']
 images = ['/myplot_cropped.png', '/myplot2_cropped.png', '/myplot3_cropped.png', '/myplot4_cropped.png']
 coords = _read_segy_file(input_path + '/E5_CMP_COORDS.txt')
 
@@ -70,7 +70,7 @@ def test_pyvista_grid(get_structured_data, get_images):
         x2, y2 = np.meshgrid(x, y)
         print(x2, y2)
         tex = pv.read_texture(t)
-        z = np.zeros((len(y),len(x)))
+        z = np.zeros((len(y), len(x)))
         # z.reshape(z, (-1, 1101))
         print(x2.shape, y2.shape, z.shape)
 
@@ -79,7 +79,7 @@ def test_pyvista_grid(get_structured_data, get_images):
         print(surf)
 
         surf.texture_map_to_plane(inplace=True)
-        if False: # Taking screenshots of pyvista is not handle well by pycharm
+        if False:  # Taking screenshots of pyvista is not handle well by pycharm
             pv_plot([surf], image_2d=True)
             time.sleep(2)
         # use Trisurf with Structured Data for texture and UnstructuredData for geometry
@@ -102,20 +102,23 @@ def test_read_segy_to_struct_data_imageio(get_structured_data, get_images):
 
         s = to_pyvista_mesh(ts)
 
-        if False: # Taking screenshots of pyvista is not handle well by pycharm
+        if False:  # Taking screenshots of pyvista is not handle well by pycharm
             pv_plot([s], image_2d=True)
             time.sleep(2)
 
 
 def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_images):
     imageio = optional_requirements.require_imageio()
+    s = []
+    i = 0
     for x, image in zip(get_structured_data, get_images):
-        zmin = -6000.0
+        zmin = -6000.0 
         zmax = 0.0
         v, e = segy_reader.create_mesh_from_coords(coords, zmin, zmax)
+        v[:, 0] =+ i * 1000
 
         struct = StructuredData.from_numpy(np.array(imageio.imread(image)))
-        print(struct) # normalize to number of samples
+        print(struct)  # normalize to number of samples
         unstruct = UnstructuredData.from_array(v, e)
 
         origin = [float(coords['x'][0]), float(coords['y'][0]), zmin]
@@ -129,8 +132,18 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
             texture_point_v=point_v
         )
 
-        s = to_pyvista_mesh(ts)
+        s.append(to_pyvista_mesh(ts))
+        i += 1
 
-        if True: # Taking screenshots of pyvista is not handle well by pycharm
-            pv_plot([s], image_2d=True)
-            time.sleep(2)
+    if True:  # Taking screenshots of pyvista is not handle well by pycharm
+        pv_plot(meshes=s, image_2d=False)
+        time.sleep(2)
+
+
+def test_seismic_profile():
+    segyio = optional_requirements.require_segyio()
+    filepath = os.getenv("PATH_TO_SEISMIC")
+    sd_array = segy_reader.read_in_segy(filepath, ignore_geometry=True)
+
+    sd_array.active_data_array.plot()
+    plt.show(block=False)
