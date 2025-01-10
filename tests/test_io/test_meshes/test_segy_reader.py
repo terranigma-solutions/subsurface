@@ -10,6 +10,7 @@ from subsurface.core.structs.base_structures import StructuredData, Unstructured
 import matplotlib.pyplot as plt
 import numpy as np
 
+from subsurface.modules.reader.profiles.profiles_core import create_vertical_mesh
 from subsurface.modules.reader.volume import segy_reader
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 from tests.conftest import RequirementsLevel
@@ -112,10 +113,10 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
     s = []
     i = 0
     for x, image in zip(get_structured_data, get_images):
-        zmin = -6000.0 
+        zmin = -6000.0
         zmax = 0.0
         v, e = segy_reader.create_mesh_from_coords(coords, zmin, zmax)
-        v[:, 0] =+ i * 1000
+        v[:, 0] = + i * 1000
 
         struct = StructuredData.from_numpy(np.array(imageio.imread(image)))
         print(struct)  # normalize to number of samples
@@ -141,9 +142,44 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
 
 
 def test_seismic_profile():
-    segyio = optional_requirements.require_segyio()
     filepath = os.getenv("PATH_TO_SEISMIC")
-    sd_array = segy_reader.read_in_segy(filepath, ignore_geometry=True)
+    sd_array: StructuredData = segy_reader.read_in_segy(filepath, ignore_geometry=True)
 
     sd_array.active_data_array.plot()
     plt.show(block=False)
+
+
+def test_seismic_profile_3D():
+    filepath = os.getenv("PATH_TO_SEISMIC")
+    texture: StructuredData = segy_reader.read_in_segy(filepath, ignore_geometry=True)
+
+    # region coords
+    import pandas as pd
+    file_path = os.getenv("PATH_TO_SECTION")
+    df = pd.read_csv(
+        filepath_or_buffer=file_path,
+        skiprows=4,  # Skip the header lines above 'CDP'
+        delim_whitespace=True,  # Treat consecutive spaces as separators
+        names=["CDP", "X_COORD", "Y_COORD"]  # Assign column names
+    )
+
+    coords = df[["X_COORD", "Y_COORD"]].to_numpy()
+    # endregion
+
+    zmin = -450
+    zmax = 140
+    vertices, faces = create_vertical_mesh(coords, zmin, zmax)
+    geometry: UnstructuredData = UnstructuredData.from_array(vertices, faces)
+
+    ts = TriSurf(
+        mesh=geometry,
+        texture=texture,
+        texture_origin=[coords[0][0], coords[0][1], zmin],
+        texture_point_u=[coords[-1][0], coords[-1][1], zmin],
+        texture_point_v=[coords[0][0], coords[0][1], zmax]
+    )
+
+    pv_plot(
+        meshes=[to_pyvista_mesh(ts)],
+        image_2d=False
+    )
