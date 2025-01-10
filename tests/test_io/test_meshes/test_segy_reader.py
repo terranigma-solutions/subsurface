@@ -12,6 +12,7 @@ import numpy as np
 
 from subsurface.modules.reader.profiles.profiles_core import create_vertical_mesh
 from subsurface.modules.reader.volume import segy_reader
+from subsurface.modules.reader.volume.segy_reader import apply_colormap_to_texture
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 from tests.conftest import RequirementsLevel
 
@@ -142,8 +143,12 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
 
 
 def test_seismic_profile():
-    filepath = os.getenv("PATH_TO_SEISMIC")
-    sd_array: StructuredData = segy_reader.read_in_segy(filepath, ignore_geometry=True)
+    # filepath = os.getenv("PATH_TO_SEISMIC")
+    sd_array: StructuredData = segy_reader.read_in_segy(
+        filepath=(os.getenv("PATH_TO_SEISMIC_FINAL")),
+        ignore_geometry=True,
+        flip_y_axis=True
+    )
 
     sd_array.active_data_array.plot()
     plt.show(block=False)
@@ -171,6 +176,7 @@ def test_seismic_profile_3D():
     vertices, faces = create_vertical_mesh(coords, zmin, zmax)
     geometry: UnstructuredData = UnstructuredData.from_array(vertices, faces)
 
+    texture = apply_colormap_to_texture(texture, cmap_name="bwr")
     ts = TriSurf(
         mesh=geometry,
         texture=texture,

@@ -127,7 +127,7 @@ class StructuredData:
         return cls(dataset, data_array_name)
 
     @property
-    def values(self):
+    def values(self) -> np.ndarray:
         return self.data[self.active_data_array_name].values
 
     @property
