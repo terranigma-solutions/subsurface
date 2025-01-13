@@ -273,7 +273,7 @@ def test_segy_3d_segy_seg() -> None:
     # default just needs the file name
     scan = segy_header_scan(os.getenv("PATH_TO_SEISMIC_3D"))
     scan
-    
+
     V3D = xr.open_dataset(
         filename_or_obj=os.getenv("PATH_TO_SEISMIC_3D"),
         dim_byte_fields={"iline": 189, "xline": 193},
@@ -282,9 +282,9 @@ def test_segy_3d_segy_seg() -> None:
     fig, ax1 = plt.subplots(ncols=1, figsize=(15, 8))
     iline_sel = 10093
     V3D.data.transpose(
-        "samples", "iline", "xline", 
+        "samples", "iline", "xline",
         transpose_coords=True
-    ).sel( 
+    ).sel(
         iline=iline_sel,
         method="nearest"
     ).plot(yincrease=False, cmap="seismic_r")
@@ -323,8 +323,8 @@ def test_segy_3d_segy_segsak_II() -> None:
     V3D.data.transpose("samples", "iline", "xline", transpose_coords=True).sel(
         iline=iline_sel,
         method="nearest"
-    ).plot( yincrease=False, cmap="seismic_r"
-    )
+    ).plot(yincrease=False, cmap="seismic_r"
+           )
     plt.grid("grey")
     plt.ylabel("TWT (samples)")
     plt.xlabel("XLINE")
@@ -333,7 +333,7 @@ def test_segy_3d_segy_segsak_II() -> None:
 
     # Optionally save as NetCDF
     # V3D.to_netcdf("data/V3D.nc")
-    
+
     # Step II
 
     # Ensure the order is (samples, iline, xline)
@@ -368,8 +368,8 @@ def test_segy_3d_segy_segsak_II() -> None:
     plotter.add_volume(grid, cmap="seismic", opacity="sigmoid")
     plotter.show_grid()
     plotter.show()
-    
-    
+
+
 def test_segy_3d_segy_segsak_III() -> None:
     import os
     import xarray as xr
@@ -391,10 +391,10 @@ def test_segy_3d_segy_segsak_III() -> None:
     V3D_coarse = V3D.coarsen(
         samples=coarsen_factor,
         iline=coarsen_factor,
-        xline=coarsen_factor, 
+        xline=coarsen_factor,
         boundary="trim"
     ).mean()
-    
+
     V3D.close()
     V3D = V3D_coarse
 
@@ -408,7 +408,6 @@ def test_segy_3d_segy_segsak_III() -> None:
     )
     plt.title(f"Inline = {inline_example}")
     plt.show()
-
 
     import numpy as np
 
@@ -425,100 +424,55 @@ def test_segy_3d_segy_segsak_III() -> None:
     # Extract cdp_x, cdp_y (2D arrays for each (iline, xline))
     cdp_x_2d = V3D.cdp_x.values  # shape: (ny, nx)
     cdp_y_2d = V3D.cdp_y.values  # shape: (ny, nx)
+    struct = StructuredData.from_numpy(
+        array=data_3d,  # data_3d is shape (nz, ny, nx)
+        coords={
+                'z': np.linspace(
+                    start=samples_1d.min(),
+                    stop=samples_1d.max(),
+                    num=nz
+                ),
+                'y': np.linspace(
+                    start=cdp_y_2d.min(),
+                    stop=cdp_y_2d.max(),
+                    num=ny
+                ),
+                'x': np.linspace(
+                    start=cdp_x_2d.min(),
+                    stop=cdp_x_2d.max(),
+                    num=nx
+                ),
+        },
+        dim_names=["z", "y", "x"]  # IMPORTANT: match the shape (nz, ny, nx)
+    )
 
-    # Create full 3D coordinates:
-    #   - X_3d, Y_3d are repeated in the Z dimension
-    #   - Z_3d is repeated over X and Y
-    Z_3d = np.broadcast_to(samples_1d[:, None, None], (nz, ny, nx))
-    X_3d = np.broadcast_to(cdp_x_2d[None, :, :], (nz, ny, nx))
-    Y_3d = np.broadcast_to(cdp_y_2d[None, :, :], (nz, ny, nx))
-
-    # Flatten everything in a consistent order (Fortran order often works best)
-    X = X_3d.ravel(order="F")
-    Y = Y_3d.ravel(order="F")
-    Z = Z_3d.ravel(order="F")
-    values = data_3d.ravel(order="F")
-
-    struct = StructuredData.from_numpy(values)
     struct.to_netcdf("data/3D_seismic.nc")
-
-    import pyvista as pv
-
-    # Create the StructuredGrid
-    grid = pv.StructuredGrid()
-    # PyVista needs dimensions in the order (nx, ny, nz)
-    # Right now our array is (nz, ny, nx). We can specify:
-    grid.dimensions = (nx, ny, nz)
-
-    # Assign the flattened points
-    # Each row is [X[i], Y[i], Z[i]]
-    # points = np.column_stack((X, Y, Z))
-    # grid.points = points
-    # 
-    # # Attach seismic amplitude as point data
-    # grid["Amplitude"] = values
-    # 
-    # # Volume render
-    # plotter = pv.Plotter()
-    # plotter.add_volume(
-    #     grid,
-    #     cmap="seismic",
-    #     opacity="sigmoid",  # or "linear", "exp", etc.
-    #     shade=False,         # sometimes turning shading off is clearer for seismic
-    # )
-    # plotter.show_grid()
-    # plotter.show()
     pass
+
 
 def test_segy_3d_segy_viz() -> None:
     import subsurface
     struct = StructuredData.from_netcdf("data/3D_seismic.nc")
     sg: subsurface.StructuredGrid = subsurface.StructuredGrid(struct)
-    mesh = to_pyvista_grid(sg)
-    pv_plot([mesh], image_2d=True)
+    grid = to_pyvista_grid(sg)
 
-    pass
-    
-
-def test_segy_3d():
-    segyio = optional_requirements.require_segyio()
-    segyfile = segyio.open(
-        filename=(os.getenv("PATH_TO_SEISMIC_3D")),
-        ignore_geometry=False
-    )
-    # Read the 3D seismic data as a numpy array
-    # Assuming the data is arranged as inline x crossline x samples (time/depth)
-    data_shape = (segyfile.ilines.size, segyfile.xlines.size, segyfile.trace.shape[1])
-    data = np.zeros(data_shape, dtype=np.float32)
-
-    # Populate the 3D array
-    for i, iline in enumerate(segyfile.ilines):
-        for j, xline in enumerate(segyfile.xlines):
-            data[i, j, :] = segyfile.trace[segyfile.index((iline, xline))]
-
-    # Define the grid for PyVista
-    # Inline, crossline, and depth axes
-    inline = np.arange(data.shape[0])
-    crossline = np.arange(data.shape[1])
-    depth = np.arange(data.shape[2])
-
-    # Create the mesh grid (coordinates for the data points)
-    x, y, z = np.meshgrid(crossline, inline, depth, indexing="ij")
-
-    # Flatten the grid and data for PyVista
-    points = np.c_[x.ravel(), y.ravel(), z.ravel()]
-    values = data.ravel()
-
-    # Create a PyVista UnstructuredGrid
-    grid = pv.UnstructuredGrid()
-    grid.points = points
-
-    # Add the scalar data (seismic amplitudes)
-    grid["Amplitude"] = values
-
-    # Create a 3D volume plot
     plotter = pv.Plotter()
-    volume = grid.cast_to_structured_grid()
-    plotter.add_volume(volume, cmap="seismic", opacity="sigmoid")
-    plotter.show_grid()
-    plotter.show()
+
+    plotter.add_volume(
+        grid,
+        cmap="seismic",
+        opacity="sigmoid_20",  # or "linear", "exp", etc.
+        shade=False,         # sometimes turning shading off is clearer for seismic
+        # Add min max to 50 -50
+        clim=(-50, 50)
+    )
+    
+    p = plotter
+
+    if image_2d := True is False:
+        p.show()
+        return p
+    else:
+        from subsurface.modules.visualization import to_pyvista
+        fig = to_pyvista.pyvista_to_matplotlib(p)
+        return fig
