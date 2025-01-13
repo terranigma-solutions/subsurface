@@ -208,3 +208,57 @@ class StructuredData:
         else:
             dim_names = ['dim' + str(i) for i in range(n_dims)]
         return dim_names
+
+    def to_netcdf(self, path: str, **to_netcdf_kwargs):
+        """
+        Serializes the current StructuredData instance to a NetCDF file.
+
+        Args:
+            path (str): The path (including file name) where the NetCDF file will be saved.
+            **to_netcdf_kwargs: Additional keyword arguments forwarded to xarray's `to_netcdf`.
+        """
+        # Copy the dataset (shallow copy of the data structure, no copying of the underlying arrays)
+        ds = self.data.copy(deep=False)
+
+        # Store relevant metadata as global attributes:
+        ds.attrs["active_data_array_name"] = self._active_data_array_name
+        ds.attrs["structured_data_type"] = self.type.name  # e.g., "REGULAR_AXIS_ALIGNED"
+        ds.attrs["dtype"] = self.dtype  # e.g., "float32"
+
+        # Use xarray's to_netcdf
+        ds.to_netcdf(path, **to_netcdf_kwargs)
+
+    @classmethod
+    def from_netcdf(cls, path: str, **from_netcdf_kwargs):
+        """
+        Deserializes a NetCDF file into a StructuredData instance.
+
+        Args:
+            path (str): The path to the NetCDF file to read.
+            **from_netcdf_kwargs: Additional keyword arguments forwarded to xarray's `open_dataset`.
+
+        Returns:
+            StructuredData: A new instance of StructuredData loaded from the file.
+        """
+        ds = xr.open_dataset(path, **from_netcdf_kwargs)
+
+        # Retrieve what was stored in attrs (with defaults if missing)
+        data_array_name = ds.attrs.get("active_data_array_name", "data_array")
+        dtype_str: str = ds.attrs.get("dtype", "float32")
+        if dtype_str not in ["float32", "float64"]:
+            raise ValueError(f"Unsupported dtype: {dtype_str}")
+        
+        sdt_str = ds.attrs.get("structured_data_type", "REGULAR_AXIS_ALIGNED")
+
+        # Convert strings back to your enum or any other type
+        # (assuming StructuredDataType is an Enum where name matches sdt_str)
+        if sdt_str not in StructuredDataType.__members__:
+            raise ValueError(f"Unsupported structured_data_type: {sdt_str}")
+        structured_data_type: StructuredDataType = StructuredDataType[sdt_str]
+
+        return cls(
+            data=ds,
+            _active_data_array_name=data_array_name,
+            type=structured_data_type,
+            dtype=dtype_str
+        )
