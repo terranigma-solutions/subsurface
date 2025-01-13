@@ -59,7 +59,8 @@ class StructuredData:
         # if they are more than 3 we do not know the dimension name but it should valid:
 
         dataset: xr.Dataset = xr.Dataset(
-            data_vars={
+            data_vars=
+            {
                     data_array_name: (dim_names, array)
             },
             coords=coords
@@ -135,7 +136,7 @@ class StructuredData:
         array_: xr.DataArray = self.data[self.active_data_array_name]
         bounds = self._get_bounds(array_)
         return bounds
-    
+
     @property
     def shape(self):
         return self.active_data_array.shape
@@ -163,7 +164,7 @@ class StructuredData:
         Notes: 
             Only the active data array is converted to binary for now 
         """
-        
+
         body_ = self._to_bytearray(order)
         header = self._set_binary_header()
 
@@ -247,7 +248,7 @@ class StructuredData:
         dtype_str: str = ds.attrs.get("dtype", "float32")
         if dtype_str not in ["float32", "float64"]:
             raise ValueError(f"Unsupported dtype: {dtype_str}")
-        
+
         sdt_str = ds.attrs.get("structured_data_type", "REGULAR_AXIS_ALIGNED")
 
         # Convert strings back to your enum or any other type
