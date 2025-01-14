@@ -159,7 +159,7 @@ class TestSeismicsProfiles:
         plt.ylabel("Height (pixels)")
         plt.show()
 
-    def test_seismic_profile_3D_from_interpreted_tiff(self):
+    def test_seismic_profile_from_interpreted_tiff(self):
         filepath = os.getenv("PATH_TO_INTERPRETATION")
 
         import tifffile as tiff  # Install with pip install tifffile
