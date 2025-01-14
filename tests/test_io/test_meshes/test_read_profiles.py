@@ -288,7 +288,6 @@ class TestMagneticProfiles:
     def test_magnetic_interpretation_and_geometry(self):
         filepath = os.getenv("PATH_TO_MAGNETIC_INTERPRETATION")
 
-        import matplotlib.pyplot as plt
         from pdf2image import convert_from_path
         
         # Convert PDF to image
@@ -345,14 +344,11 @@ class TestMagneticProfiles:
         # endregion
         
         # Calculate distance from the first point to the last
-        dist = np.linalg.norm(coords[-1] - coords[0])
-        
         zmin = -2500
         zmax = 500
         vertices, faces = create_vertical_mesh(coords, zmin, zmax)
         geometry: UnstructuredData = UnstructuredData.from_array(vertices, faces)
 
-        # texture = apply_colormap_to_texture(texture, cmap_name="bwr")
         ts = TriSurf(
             mesh=geometry,
             texture=texture,
