@@ -159,7 +159,7 @@ class TestSeismicsProfiles:
         plt.ylabel("Height (pixels)")
         plt.show()
 
-    def test_seismic_profile_3D_from_interpreted_tiff():
+    def test_seismic_profile_3D_from_interpreted_tiff(self):
         filepath = os.getenv("PATH_TO_INTERPRETATION")
 
         import tifffile as tiff  # Install with pip install tifffile
@@ -207,7 +207,7 @@ class TestSeismicsProfiles:
             image_2d=False
         )
 
-    def test_seismic_profile():
+    def test_seismic_profile(self):
         # filepath = os.getenv("PATH_TO_SEISMIC")
         sd_array: StructuredData = segy_reader.read_in_segy(
             filepath=(os.getenv("PATH_TO_SEISMIC_FINAL")),
@@ -218,7 +218,7 @@ class TestSeismicsProfiles:
         sd_array.active_data_array.plot()
         plt.show(block=False)
 
-    def test_seismic_profile_3D_from_segy():
+    def test_seismic_profile_3D_from_segy(self):
         filepath = os.getenv("PATH_TO_SEISMIC")
         texture: StructuredData = segy_reader.read_in_segy(filepath, ignore_geometry=True)
 
