@@ -164,7 +164,7 @@ def _traces_texture_to_sub_structs(path_to_trace, path_to_texture, idx, uv=None)
         if uv is not None:
             uv_item = pd.DataFrame(uv[n], columns=['u', 'v'])
         else:
-            uv_item = _get_uv_from_pyvista(tri_surf)
+            uv_item = get_uv_from_pyvista(tri_surf)
         tri_surf.mesh.points_attributes = uv_item
         
         textured_mesh.append(tri_surf)
@@ -173,7 +173,7 @@ def _traces_texture_to_sub_structs(path_to_trace, path_to_texture, idx, uv=None)
     return textured_mesh
 
 
-def _get_uv_from_pyvista(tri_surf: TriSurf) -> pd.DataFrame:
+def get_uv_from_pyvista(tri_surf: TriSurf) -> pd.DataFrame:
     pyvista = optional_requirements.require_pyvista()
     _mesh = to_pyvista_mesh(tri_surf)
     if tri_surf.texture is None:
