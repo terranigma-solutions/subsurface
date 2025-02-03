@@ -101,6 +101,14 @@ class GenericReaderFilesHelper(BaseModel):
         if header is not None and header < 0:
             raise ValueError(f"Invalid value for header: {header}. Must be None, 0, or positive integer.")
         return values
+    
+    # If col names is null or empy list it should be None
+    @model_validator(mode="before")
+    def validate_col_names(cls, values):
+        col_names = values.get('col_names')
+        if col_names is None or col_names == []:
+            values['col_names'] = None
+        return values
 
     @property
     def pandas_reader_kwargs(self):
