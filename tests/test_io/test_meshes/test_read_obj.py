@@ -1,12 +1,14 @@
-﻿import pytest
-from dotenv import dotenv_values
+﻿import os
+
+import pytest
+import dotenv
 
 from subsurface import optional_requirements
 from tests.conftest import RequirementsLevel
 
-config = dotenv_values()
-path_to_obj = config.get('PATH_TO_OBJ')
-path_to_mtl = config.get('PATH_TO_MTL')
+dotenv.load_dotenv()
+path_to_obj = os.getenv("PATH_TO_OBJ")
+path_to_mtl = os.getenv("PATH_TO_MTL")
 
 pytestmark = pytest.mark.read_mesh
 

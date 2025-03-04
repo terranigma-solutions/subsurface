@@ -8,4 +8,5 @@ imageio
 omfvista
 tifffile
 pdf2image
+imagecodecs
 segyio

@@ -19,9 +19,11 @@ class RequirementsLevel(enum.Flag):
     WELLS = 2**5
     TRACES = 2**6
     VOL = 2**7
+    PDF = 2**8
     DEV = 2**31
     READ_WELL = PLOT | WELLS  # Reading and plotting
     READ_MESH = PLOT | MESH
+    READ_MESH_PDF = PLOT | MESH | PDF
     READ_VOLUME = PLOT | VOL
     READ_PROFILES = PLOT | MESH | TRACES
     READ_GEOSPATIAL = PLOT | GEOSPATIAL
