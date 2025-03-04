@@ -62,7 +62,7 @@ def pv_plot(meshes: list,
         return fig
 
 
-def pyvista_to_matplotlib(p: pv.Plotter):
+def pyvista_to_matplotlib(p: "pv.Plotter"):
     try:
         import matplotlib.pyplot as plt
     except ImportError:
