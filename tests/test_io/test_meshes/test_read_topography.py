@@ -6,6 +6,7 @@ from subsurface.modules.reader import read_structured_topography, read_unstructu
 from subsurface.core.utils.utils_core import replace_outliers
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot, to_pyvista_grid
 
+pytestmark = pytest.mark.read_mesh
 
 @pytest.mark.skipif(
     condition=(RequirementsLevel.MESH | RequirementsLevel.PLOT) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),

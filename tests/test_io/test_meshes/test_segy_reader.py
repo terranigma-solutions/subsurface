@@ -12,6 +12,8 @@ from subsurface.modules.reader.volume import segy_reader
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot, to_pyvista_grid
 from tests.conftest import RequirementsLevel
 
+pytestmark = pytest.mark.read_mesh
+
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_VOLUME) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set READ_VOLUME"
@@ -134,7 +136,7 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
         i += 1
 
     if True:  # Taking screenshots of pyvista is not handle well by pycharm
-        pv_plot(meshes=s, image_2d=False)
+        pv_plot(meshes=s, image_2d=True)
         time.sleep(2)
 
 

@@ -12,7 +12,6 @@ pytestmark = pytest.mark.skipif(
     reason="Need to set READ_MESH"
 )
 
-pyvista = optional_requirements.require_pyvista()
 
 
 @pytest.fixture(scope="module")
@@ -62,6 +61,7 @@ def test_omf_to_cylinders(load_omf):
 
 def _polydata_to_unstruct(polydata_obj: 'pyvista.PolyData') -> LineSet:
     pd = optional_requirements.require_pandas()
+    pyvista = optional_requirements.require_pyvista()
     unstruct_pyvista: pyvista.UnstructuredGrid = polydata_obj.cast_to_unstructured_grid()
     cells_pyvista = unstruct_pyvista.cells.reshape(-1, 4)[:, 1:]
     grid = unstruct_pyvista

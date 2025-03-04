@@ -1,5 +1,4 @@
 import numpy as np
-import pyvista
 from dotenv import dotenv_values
 
 import subsurface
@@ -7,7 +6,6 @@ from tests.conftest import RequirementsLevel
 from subsurface import optional_requirements, TriSurf
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 from subsurface.modules.writer import base_structs_to_binary_file
-
 
 import pytest
 
@@ -28,7 +26,7 @@ def load_omf():
 
 def test_omf_to_unstruct_single_block(load_omf):
     omf = load_omf
-
+    pyvista = optional_requirements.require_pyvista()
     block_name = omf.get_block_name(4)
     polydata_obj: pyvista.PolyData = omf[block_name]
     unstruct_pyvista: pyvista.UnstructuredGrid = polydata_obj.cast_to_unstructured_grid()
@@ -47,6 +45,7 @@ def test_omf_to_unstruct_single_block(load_omf):
 
 
 def test_omf_to_unstruct_all_surfaces(load_omf):
+    pyvista = optional_requirements.require_pyvista()
     omf = load_omf
     list_of_polydata: list[pyvista.PolyData] = []
     for i in range(omf.n_blocks):
@@ -71,15 +70,16 @@ def test_omf_to_unstruct_all_surfaces(load_omf):
     pv_plot(list_of_polydata, image_2d=True)
 
 
-
 def test_omf_to_unstruct_all_surfaces_to_one_unstructured_data(load_omf):
+    pyvista = optional_requirements.require_pyvista()
+
     omf = load_omf
     list_of_polydata: list[pyvista.PolyData] = []
     all_vertex = []
     all_cells = []
     cell_attr = []
     _last_cell: int = 0
-    
+
     for i in range(omf.n_blocks):
         block: pyvista.PolyData = omf[i]
         cell_type = block.get_cell(0).type
@@ -94,7 +94,6 @@ def test_omf_to_unstruct_all_surfaces_to_one_unstructured_data(load_omf):
             all_cells.append(cells)
             cell_attr.append(np.ones(len(all_cells[-1])) * i)
             _last_cell = cells.max() + 1
-
 
     # * Create the unstructured data
     import pandas as pd
@@ -113,6 +112,8 @@ def test_omf_to_unstruct_all_surfaces_to_one_unstructured_data(load_omf):
 
 
 def test_omf_from_stream_to_unstruct_all_surfaces():
+    pyvista = optional_requirements.require_pyvista()
+
     config = dotenv_values()
     path = config.get('PATH_TO_OMF')
     with open(path, "rb") as stream:

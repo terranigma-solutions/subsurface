@@ -108,3 +108,10 @@ def require_subsurface():
     except ImportError:
         raise ImportError("The subsurface package is required to run this function.")
     return subsurface
+
+def require_matplotlib():
+    try:
+        import matplotlib
+    except ImportError:
+        raise ImportError("The matplotlib package is required to run this function.")
+    return matplotlib

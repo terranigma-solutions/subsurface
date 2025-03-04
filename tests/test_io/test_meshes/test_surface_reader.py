@@ -12,6 +12,7 @@ from subsurface.modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
 
 input_path = os.path.dirname(__file__) + '/../../data/surfaces'
 
+pytestmark = pytest.mark.read_mesh
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_MESH) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set the READ_MESH"

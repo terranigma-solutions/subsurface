@@ -5,12 +5,9 @@ from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pytest
-import pyvista
-from pyvista import examples
-import pyvista as pv
 
 import subsurface
-from subsurface import StructuredGrid
+from subsurface import StructuredGrid, optional_requirements
 from subsurface.modules.visualization import to_pyvista_grid, pv_plot
 from tests.conftest import RequirementsLevel
 
@@ -22,8 +19,8 @@ pytestmark = pytest.mark.skipif(
 
 def generate_vtk_struct():
     """ Use this function only to generate vtk files for testing purposes """
-
-    grid: pyvista.ExplicitStructuredGrid = examples.load_explicit_structured()
+    pyvista = optional_requirements.require_pyvista()
+    grid: pyvista.ExplicitStructuredGrid = pyvista.examples.load_explicit_structured()
     grid.cell_data['Cell Number'] = range(grid.n_cells)
     grid.cell_data['Random'] = np.random.rand(grid.n_cells)
     grid.plot(scalars='Random')
@@ -44,7 +41,7 @@ data_path = pf.joinpath('../../data/volume/')
 def test_vtk_file_to_structured_data() -> subsurface.StructuredData:
     # read vtk file with pyvista
     NamedTemporaryFile()
-    
+    pv = optional_requirements.require_pyvista()
     joinpath = data_path.joinpath('test_structured.vtk')
     pyvista_obj: pv.DataSet = pv.read(joinpath)
     pv.examples.download_angular_sector()

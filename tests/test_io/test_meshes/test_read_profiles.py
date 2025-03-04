@@ -15,6 +15,7 @@ from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 from subsurface.modules.visualization import to_pyvista_mesh_and_texture
 from tests.conftest import RequirementsLevel
 
+pytestmark = pytest.mark.read_mesh
 
 @pytest.mark.skipif(
     condition=(RequirementsLevel.READ_PROFILES) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
@@ -255,6 +256,11 @@ class TestSeismicProfiles:
         )
 
 
+@pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_MESH_PDF) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_MESH_PDF flag to True in the conftest.py file to run this test. This is using some"
+           "apps to deal with pdf files as textures."
+)
 class TestMagneticProfiles:
     def test_magnetic_interpretation_cropping_pdf(self):
         filepath = os.getenv("PATH_TO_MAGNETIC_INTERPRETATION")

@@ -7,7 +7,8 @@ from subsurface.core.structs.base_structures import UnstructuredData
 import numpy as np
 import pandas as pd
 import os
-
+import dotenv
+dotenv.load_dotenv()
 
 @enum.unique
 class RequirementsLevel(enum.Flag):
@@ -18,9 +19,11 @@ class RequirementsLevel(enum.Flag):
     WELLS = 2**5
     TRACES = 2**6
     VOL = 2**7
+    PDF = 2**8
     DEV = 2**31
     READ_WELL = PLOT | WELLS  # Reading and plotting
     READ_MESH = PLOT | MESH
+    READ_MESH_PDF = PLOT | MESH | PDF
     READ_VOLUME = PLOT | VOL
     READ_PROFILES = PLOT | MESH | TRACES
     READ_GEOSPATIAL = PLOT | GEOSPATIAL
@@ -28,7 +31,8 @@ class RequirementsLevel(enum.Flag):
 
     @classmethod
     def REQUIREMENT_LEVEL_TO_TEST(cls):
-        return cls.ALL
+        env_value = os.getenv("REQUIREMENT_LEVEL", "ALL")
+        return cls[env_value] if env_value in cls.__members__ else cls.ALL
 
 
 def check_requirements(minimum_level: RequirementsLevel):

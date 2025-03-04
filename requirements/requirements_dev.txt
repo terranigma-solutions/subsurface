@@ -13,3 +13,6 @@ sphinx_automodapi
 # FOR TESTING
 pytest
 pytest-cov
+
+# FOR CI
+teamcity-messages
