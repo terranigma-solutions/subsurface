@@ -136,7 +136,7 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
         i += 1
 
     if True:  # Taking screenshots of pyvista is not handle well by pycharm
-        pv_plot(meshes=s, image_2d=False)
+        pv_plot(meshes=s, image_2d=True)
         time.sleep(2)
 
 
