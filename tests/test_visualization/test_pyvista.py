@@ -8,6 +8,7 @@ import xarray as xr
 
 pv = pytest.importorskip("pyvista")
 
+pytestmark = pytest.mark.core
 
 def test_pyvista_points(point_set_fixture):
     s = to_pyvista_points(point_set_fixture)

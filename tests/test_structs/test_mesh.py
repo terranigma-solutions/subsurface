@@ -5,6 +5,7 @@ import pytest
 from subsurface.core.structs import PointSet
 from subsurface.core.structs.base_structures import UnstructuredData
 
+pytestmark = pytest.mark.core
 
 def test_point_set_init(point_set_fixture):
     n = 100
