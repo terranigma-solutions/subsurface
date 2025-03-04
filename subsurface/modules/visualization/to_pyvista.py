@@ -80,7 +80,7 @@ def init_plotter(
         image_2d=False,
         ve=None,
         plotter_kwargs: dict = None
-) -> pv.Plotter:
+) -> "pv.Plotter":
     plotter_kwargs = dict() if plotter_kwargs is None else plotter_kwargs
     off_screen = True if image_2d is True else None
     p = pv.Plotter(**plotter_kwargs, off_screen=off_screen)
