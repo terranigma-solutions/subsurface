@@ -12,6 +12,8 @@ from subsurface.modules.reader.volume import segy_reader
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot, to_pyvista_grid
 from tests.conftest import RequirementsLevel
 
+pytestmark = pytest.mark.read_mesh
+
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_VOLUME) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set READ_VOLUME"

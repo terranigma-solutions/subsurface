@@ -15,6 +15,7 @@ from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 from subsurface.modules.visualization import to_pyvista_mesh_and_texture
 from tests.conftest import RequirementsLevel
 
+pytestmark = pytest.mark.read_mesh
 
 @pytest.mark.skipif(
     condition=(RequirementsLevel.READ_PROFILES) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),

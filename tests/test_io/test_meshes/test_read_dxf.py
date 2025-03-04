@@ -13,6 +13,8 @@ import pandas
 from tests.conftest import RequirementsLevel
 
 
+pytestmark = pytest.mark.read_mesh
+
 @pytest.mark.skipif(
     condition=(RequirementsLevel.MESH | RequirementsLevel.PLOT) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set the READ_WELL variable to run this test"

@@ -10,6 +10,8 @@ from subsurface import TriSurf
 dotenv.load_dotenv()
 data_folder = os.getenv("PATH_TO_WEISWEILER")
 
+pytestmark = pytest.mark.core
+
 
 @pytest.mark.liquid_earth
 def test_le_mesh_v1_topo():

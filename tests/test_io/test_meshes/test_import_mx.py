@@ -14,6 +14,8 @@ dotenv.load_dotenv()
 
 PLOT = True
 
+pytestmark = pytest.mark.read_mesh
+
 pytestmark = pytest.mark.skipif(
     condition=RequirementsLevel.PLOT not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set the READ_MESH"
