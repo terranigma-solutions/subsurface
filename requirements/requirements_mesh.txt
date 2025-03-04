@@ -6,3 +6,6 @@ networkx
 # Textures
 imageio 
 omfvista
+tifffile
+pdf2image
+segyio
