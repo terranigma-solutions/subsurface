@@ -1,7 +1,7 @@
 ﻿import pytest
-import pyvista as pv
 from dotenv import dotenv_values
 
+from subsurface import optional_requirements
 from tests.conftest import RequirementsLevel
 
 config = dotenv_values()
@@ -14,6 +14,7 @@ path_to_mtl = config.get('PATH_TO_MTL')
     reason="Need to set the READ_MESH variable to run this test"
 )
 def test_read_obj():
+    pv = optional_requirements.require_pyvista()
     reader = pv.get_reader(path_to_obj)
     mesh = reader.read()
     if plot := False:

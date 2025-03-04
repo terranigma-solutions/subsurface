@@ -1,4 +1,3 @@
-import pyvista as pv
 from dataclasses import dataclass
 
 from typing import Union, List
@@ -174,7 +173,7 @@ def _traces_texture_to_sub_structs(path_to_trace, path_to_texture, idx, uv=None)
 
 
 def get_uv_from_pyvista(tri_surf: TriSurf) -> pd.DataFrame:
-    pyvista = optional_requirements.require_pyvista()
+    pv = optional_requirements.require_pyvista()
     _mesh = to_pyvista_mesh(tri_surf)
     if tri_surf.texture is None:
         raise ValueError('unstructured_element needs texture data to be mapped.')
