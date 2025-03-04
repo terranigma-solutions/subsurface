@@ -1,5 +1,5 @@
 from .csv_mesh_reader import mesh_csv_to_vertex, mesh_csv_to_cells, mesh_csv_to_attributes
-from .dxf_reader import dxf_from_file_to_vertex, dxf_from_stream_to_vertex
+from .dxf_reader import dxf_from_file_to_vertex, dxf_from_stream_to_vertex, DXFEntityType
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper, SupportedFormats
 import numpy as np
 
@@ -12,7 +12,10 @@ def read_mesh_file_to_vertex(reader_args: GenericReaderFilesHelper) -> np.ndarra
         vertex = mesh_csv_to_vertex(reader_args.file_or_buffer, reader_args.columns_map,
                                     **reader_args.pandas_reader_kwargs)
     elif reader_args.format is SupportedFormats.DXF:
-        vertex = dxf_from_file_to_vertex(reader_args.file_or_buffer)
+        vertex = dxf_from_file_to_vertex(
+            file_path=reader_args.file_or_buffer,
+            entity_type=reader_args.additional_reader_kwargs.get('entity_type', DXFEntityType.ALL)
+        )
     elif reader_args.format is SupportedFormats.DXFStream:
         vertex = dxf_from_stream_to_vertex(reader_args.file_or_buffer)
     else:

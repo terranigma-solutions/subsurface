@@ -12,6 +12,54 @@ from subsurface.core.structs.unstructured_elements import TriSurf
 from ...visualization import to_pyvista_line, to_pyvista_mesh
 
 
+def create_vertical_mesh(coords: np.ndarray, zmin: float, zmax: float):
+    """
+    Create a 'vertical curtain' triangular mesh by extruding the line of points
+    in coords from zmin to zmax.
+
+    Parameters
+    ----------
+    coords : np.ndarray
+        An Nx2 array of (x, y) points along the profile.
+    zmin : float
+        The lower z-value (bottom of the curtain).
+    zmax : float
+        The upper z-value (top of the curtain).
+
+    Returns
+    -------
+    vertices : np.ndarray
+        An array of shape (2N, 3) with xyz-coordinates for all vertices.
+    faces : np.ndarray
+        An array of shape (2*(N-1), 3) with triangle indices into `vertices`.
+        Each row is one triangle [vi, vj, vk].
+    """
+    n = len(coords)
+    if n < 2:
+        raise ValueError("Need at least 2 points to form a mesh.")
+
+    # Create 2 * n vertices
+    # “Bottom ring”: z = zmin
+    # “Top ring”: z = zmax
+    vertices = np.zeros((2 * n, 3), dtype=float)
+    vertices[:n, 0:2] = coords
+    vertices[:n, 2] = zmin
+    vertices[n:, 0:2] = coords
+    vertices[n:, 2] = zmax
+
+    # Build faces (2 triangles per segment along the line)
+    # Bottom ring indices: 0..(n-1)
+    # Top ring indices: n..(2n-1)
+    faces = []
+    for i in range(n - 1):
+        # Triangle 1: (bottom i, bottom i+1, top i)
+        faces.append([i, i + 1, i + n])
+        # Triangle 2: (top i, bottom i+1, top i+1)
+        faces.append([i + n, i + 1, i + 1 + n])
+
+    faces = np.array(faces, dtype=np.int64)
+    return vertices, faces
+
 @dataclass
 class TexturedMesh:
     unstruct: subsurface.UnstructuredData
@@ -116,7 +164,7 @@ def _traces_texture_to_sub_structs(path_to_trace, path_to_texture, idx, uv=None)
         if uv is not None:
             uv_item = pd.DataFrame(uv[n], columns=['u', 'v'])
         else:
-            uv_item = _get_uv_from_pyvista(tri_surf)
+            uv_item = get_uv_from_pyvista(tri_surf)
         tri_surf.mesh.points_attributes = uv_item
         
         textured_mesh.append(tri_surf)
@@ -125,7 +173,7 @@ def _traces_texture_to_sub_structs(path_to_trace, path_to_texture, idx, uv=None)
     return textured_mesh
 
 
-def _get_uv_from_pyvista(tri_surf: TriSurf) -> pd.DataFrame:
+def get_uv_from_pyvista(tri_surf: TriSurf) -> pd.DataFrame:
     pyvista = optional_requirements.require_pyvista()
     _mesh = to_pyvista_mesh(tri_surf)
     if tri_surf.texture is None:

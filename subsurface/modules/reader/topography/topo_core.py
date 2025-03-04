@@ -20,7 +20,6 @@ def read_structured_topography(path, crop_to_extent: Optional[Sequence]=None) ->
             dataset=rasterio.open(path),
             crop_to_extent=crop_to_extent
         )
-        
     else:
         raise NotImplementedError('The extension given cannot be read yet')
 
@@ -62,10 +61,17 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
     return structured_data
 
 
-def read_unstructured_topography(path) -> UnstructuredData:
-    return read_2d_mesh_to_unstruct(ReaderUnstructuredHelper(GenericReaderFilesHelper(
-        file_or_buffer=path
-    )))
+def read_unstructured_topography(path, additional_reader_kwargs: Optional[dict]=None) -> UnstructuredData:
+    """For example, a dxf file"""
+    
+    additional_reader_kwargs = additional_reader_kwargs or {}
+    helper = GenericReaderFilesHelper(
+        file_or_buffer=path,
+        additional_reader_kwargs=additional_reader_kwargs or {}
+    )
+    unstructured_helper = ReaderUnstructuredHelper(helper)
+    unstruct: UnstructuredData = read_2d_mesh_to_unstruct(unstructured_helper)
+    return unstruct
 
 
 def topography_to_unstructured_data(structured_data: StructuredData) -> UnstructuredData:

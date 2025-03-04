@@ -27,7 +27,7 @@ def test_read_gocad_from_file():
     unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(os.getenv("PATH_TO_MX"))
     ts = TriSurf(mesh=unstruct)
     s = sb_viz.to_pyvista_mesh(ts)
-    sb_viz.pv_plot([s], image_2d=True)
+    sb_viz.pv_plot([s], image_2d=False)
 
 
 def _meshes_to_pyvista(meshes: list[GOCADMesh]):

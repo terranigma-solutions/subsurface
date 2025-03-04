@@ -39,7 +39,18 @@ def pv_plot(meshes: list,
     p: pv.Pll = init_plotter(image_2d, ve, plotter_kwargs)
 
     for m in meshes:
-        p.add_mesh(m, cmap=cmap, categories=True, **add_mesh_kwargs)
+        # Check if m has texture data
+        texture = None
+        if hasattr(m, '_textures') and isinstance(m._textures, dict):
+            texture = m._textures.get(0, None)
+        
+        p.add_mesh(
+            mesh=m,
+            cmap=cmap,
+            categories=True,
+            texture=texture,
+            **add_mesh_kwargs
+        )
 
     p.show_bounds()
 
@@ -122,8 +133,10 @@ def to_pyvista_mesh(triangular_surface: TriSurf) -> "pv.PolyData":
             point_v=triangular_surface.texture_point_v
         )
 
-        tex = pv.numpy_to_texture(triangular_surface.texture.values)
-        mesh._textures = {0: tex}
+        texture_data = np.asarray(triangular_surface.texture.values, dtype=np.float32)
+
+        mesh._textures = {0: texture_data}
+        mesh.active_scalars_name = None
 
     return mesh
 
