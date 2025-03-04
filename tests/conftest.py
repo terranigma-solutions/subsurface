@@ -7,7 +7,8 @@ from subsurface.core.structs.base_structures import UnstructuredData
 import numpy as np
 import pandas as pd
 import os
-
+import dotenv
+dotenv.load_dotenv()
 
 @enum.unique
 class RequirementsLevel(enum.Flag):
@@ -28,7 +29,8 @@ class RequirementsLevel(enum.Flag):
 
     @classmethod
     def REQUIREMENT_LEVEL_TO_TEST(cls):
-        return cls.ALL
+        env_value = os.getenv("REQUIREMENT_LEVEL", "ALL")
+        return cls[env_value] if env_value in cls.__members__ else cls.ALL
 
 
 def check_requirements(minimum_level: RequirementsLevel):

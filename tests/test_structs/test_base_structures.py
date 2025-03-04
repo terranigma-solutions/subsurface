@@ -13,6 +13,7 @@ import xarray as xr
 from subsurface.core.utils.utils_core import replace_outliers
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot, to_pyvista_grid
 
+pytestmark = pytest.mark.core
 
 def test_unstructured_data():
     # Normal constructor
@@ -163,6 +164,7 @@ def test_write_unstruc(unstruct_factory):
     e = xr.DataArray(unstruct_factory.attributes)
     c = xr.Dataset({'v': a, 'e': b, 'a': e})
     print(c)
+
 
 @pytest.mark.skipif(check_requirements(RequirementsLevel.PLOT), reason="This test needs higher requirements.")
 def test_read_unstruct(data_path):
