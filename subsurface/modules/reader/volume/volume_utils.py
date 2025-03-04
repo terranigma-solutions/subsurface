@@ -1,8 +1,7 @@
 import enum
 from typing import List
-
-from scipy.interpolate import griddata
 import numpy as np
+from subsurface.optional_requirements import require_scipy
 
 from ....core.structs import UnstructuredData, StructuredData
 
@@ -28,8 +27,8 @@ def interpolate_unstructured_data_to_structured_data(
         coords[i] = np.linspace(boundaries_min[e], boundaries_max[e], resolution[e], endpoint=False)
 
     grid = np.meshgrid(*coords.values())
-
-    interpolated_attributes = griddata(
+    scipy = require_scipy()
+    interpolated_attributes = scipy.interpolate.griddata(
         points=ud.vertex,
         values=ud.attributes.loc[:, attr_name],
         xi=tuple(grid),
