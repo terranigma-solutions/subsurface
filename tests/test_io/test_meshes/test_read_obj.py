@@ -8,7 +8,6 @@ from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 
 from subsurface import optional_requirements
 from subsurface.modules.reader.mesh._trimesh_reader import trimesh_to_unstruct, _load_with_trimesh
-from tests.conftest import RequirementsLevel
 
 dotenv.load_dotenv()
 
@@ -16,10 +15,7 @@ path_to_obj = os.getenv("PATH_TO_OBJ")
 path_to_mtl = os.getenv("PATH_TO_MTL")
 path_to_obj_no_material = os.getenv("PATH_TO_OBJ_GALLERIES_I")
 
-pytestmark = pytest.mark.skipif(
-    condition=(RequirementsLevel.READ_MESH) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
-    reason="Need to set READ_MESH"
-)
+pytestmark = pytest.mark.read_mesh
 
 
 def test_read_obj_mesh_no_materials():
