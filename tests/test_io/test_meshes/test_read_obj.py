@@ -116,8 +116,7 @@ def test_trimesh_three_element_texture_to_unstruct():
     path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
     trimesh_obj = load_obj_with_trimesh(path_to_obj)
 
-    unstruct = trimesh_obj_to_unstruct(trimesh_obj)
+    ts = trimesh_obj_to_unstruct(trimesh_obj)
 
-    ts = TriSurf(mesh=unstruct)
     s = to_pyvista_mesh(ts)
     pv_plot([s], image_2d=False)

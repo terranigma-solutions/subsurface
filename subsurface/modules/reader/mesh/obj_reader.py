@@ -1,9 +1,6 @@
 ﻿from typing import Union
 
 import numpy as np
-import pandas
-from PIL.JpegImagePlugin import JpegImageFile
-
 from subsurface.core.structs import UnstructuredData
 
 import subsurface
@@ -56,6 +53,34 @@ def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> Union["trimes
 
 
 def trimesh_obj_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]) -> subsurface.TriSurf:
+    """
+    Convert a Trimesh or Scene object to a subsurface TriSurf object.
+
+    This function takes either a `trimesh.Trimesh` object or a `trimesh.Scene` 
+    object and converts it to a `subsurface.TriSurf` object. If the input is 
+    a scene containing multiple geometries, it processes all geometries and 
+    combines them into a single TriSurf object. If the input is a single 
+    Trimesh object, it directly converts it to a TriSurf object. An error 
+    is raised if the input is neither a `trimesh.Trimesh` nor a `trimesh.Scene` 
+    object.
+
+    Parameters:
+        scene_or_mesh (Union[trimesh.Trimesh, trimesh.Scene]): 
+            Input geometry data, either as a Trimesh object representing 
+            a single mesh or a Scene object containing multiple geometries.
+    
+    Note:
+        ! Multimesh with multiple materials will read the uvs but not the textures since in that case is better
+        ! to read directly the multiple images (compressed) whenever the user wants to work with them. 
+
+    Returns:
+        subsurface.TriSurf: Converted subsurface representation of the 
+        provided geometry data.
+
+    Raises:
+        ValueError: If the input is neither a `trimesh.Trimesh` object nor 
+        a `trimesh.Scene` object.
+    """
     trimesh = optional_requirements.require_trimesh()
     if isinstance(scene_or_mesh, trimesh.Scene):
         # Process scene with multiple geometries
@@ -63,40 +88,7 @@ def trimesh_obj_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Sce
         ts = TriSurf(mesh=unstruct)
 
     elif isinstance(scene_or_mesh, trimesh.Trimesh):
-        # Process single mesh
-        tri = scene_or_mesh
-        frame = pandas.DataFrame(tri.face_attributes)
-        # Check frame has a valid shape for cells_attr if not make None
-        if frame.shape[0] != tri.faces.shape[0]:
-            frame = None
-            
-        # Get UV coordinates if they exist
-        vertex_attr = None
-        if hasattr(tri.visual, 'uv') and tri.visual.uv is not None:
-            vertex_attr = pandas.DataFrame(
-                tri.visual.uv,
-                columns=['u', 'v']
-            )
-        
-        unstruct = UnstructuredData.from_array(
-            np.array(tri.vertices),
-            np.array(tri.faces),
-            cells_attr=frame,
-            vertex_attr=vertex_attr,
-            xarray_attributes={
-                "bounds": tri.bounds.tolist(),
-            },
-        )
-        
-        # If there is a texture
-        image: JpegImageFile = tri.visual.material.image
-        texture = StructuredData.from_numpy(np.array(image))
-        coords = tri.vertices
-
-        ts = TriSurf(
-            mesh=unstruct,
-            texture=texture,
-        )
+        ts = _trisurf_from_trimesh(scene_or_mesh)
 
 
     else:
@@ -105,13 +97,50 @@ def trimesh_obj_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Sce
     return ts
 
 
+def _trisurf_from_trimesh(scene_or_mesh):
+    # Process single mesh
+    tri = scene_or_mesh
+    pandas = optional_requirements.require_pandas()
+    frame = pandas.DataFrame(tri.face_attributes)
+    # Check frame has a valid shape for cells_attr if not make None
+    if frame.shape[0] != tri.faces.shape[0]:
+        frame = None
+    # Get UV coordinates if they exist
+    vertex_attr = None
+    if hasattr(tri.visual, 'uv') and tri.visual.uv is not None:
+        vertex_attr = pandas.DataFrame(
+            tri.visual.uv,
+            columns=['u', 'v']
+        )
+    unstruct = UnstructuredData.from_array(
+        np.array(tri.vertices),
+        np.array(tri.faces),
+        cells_attr=frame,
+        vertex_attr=vertex_attr,
+        xarray_attributes={
+                "bounds": tri.bounds.tolist(),
+        },
+    )
+    # If there is a texture
+    from PIL.JpegImagePlugin import JpegImageFile
+    image: JpegImageFile = tri.visual.material.image
+    texture = StructuredData.from_numpy(np.array(image))
+    coords = tri.vertices
+    ts = TriSurf(
+        mesh=unstruct,
+        texture=texture,
+    )
+    return ts
+
+
 def _unstruct_from_scene(scene_or_mesh: 'Scene', trimesh: 'trimesh') -> 'UnstructuredData':
-    import pandas as pd
+    pandas = optional_requirements.require_pandas()
     geometries = scene_or_mesh.geometry
     assert len(geometries) > 0, "No geometries found in the scene."
     all_vertex = []
     all_cells = []
     cell_attr = []
+    all_vertex_attr = []
     _last_cell = 0
     for i, (geom_name, geom) in enumerate(geometries.items()):
         geom: trimesh.Trimesh
@@ -130,15 +159,27 @@ def _unstruct_from_scene(scene_or_mesh: 'Scene', trimesh: 'trimesh') -> 'Unstruc
         cell_attr.append(np.ones(len(cells)) * i)
 
         _last_cell = cells.max() + 1
+
+
+        # Get UV coordinates if they exist
+        vertex_attr = None
+        if hasattr(geom.visual, 'uv') and geom.visual.uv is not None:
+            vertex_attr = pandas.DataFrame(
+                geom.visual.uv,
+                columns=['u', 'v']
+            )
+            all_vertex_attr.append(vertex_attr)
     # Create the combined UnstructuredData
     unstruct = UnstructuredData.from_array(
         vertex=np.vstack(all_vertex),
         cells=np.vstack(all_cells),
-        cells_attr=pd.DataFrame(np.hstack(cell_attr), columns=["Geometry id"]),
+        # vertex_attr=pd.concat(all_vertex_attr, ignore_index=True) if all_vertex_attr is not None else None,
+        cells_attr=pandas.DataFrame(np.hstack(cell_attr), columns=["Geometry id"]),
         xarray_attributes={
                 "bounds": scene_or_mesh.bounds.tolist(),
         },
     )
+
     return unstruct
 
 

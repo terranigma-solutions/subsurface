@@ -132,9 +132,10 @@ def to_pyvista_mesh(triangular_surface: TriSurf) -> "pv.PolyData":
             triangular_surface.mesh.points_attributes['v']
         ))
         mesh.active_texture_coordinates = uv
-        texture_data = np.asarray(triangular_surface.texture.values, dtype=np.float32)
-        mesh._textures = {0: texture_data}
-        mesh.active_scalars_name = None
+        if triangular_surface.texture is not None:
+            texture_data = np.asarray(triangular_surface.texture.values, dtype=np.float32)
+            mesh._textures = {0: texture_data}
+            mesh.active_scalars_name = None
 
     elif triangular_surface.has_texture_data_without_uv:
         mesh.texture_map_to_plane(
