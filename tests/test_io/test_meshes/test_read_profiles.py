@@ -205,7 +205,7 @@ class TestSeismicProfiles:
 
         pv_plot(
             meshes=[to_pyvista_mesh(ts)],
-            image_2d=False
+            image_2d=True
         )
 
     def test_seismic_profile(self):
@@ -252,7 +252,7 @@ class TestSeismicProfiles:
 
         pv_plot(
             meshes=[to_pyvista_mesh(ts)],
-            image_2d=False
+            image_2d=True
         )
 
 

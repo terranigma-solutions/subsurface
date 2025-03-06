@@ -3,8 +3,11 @@
 import pytest
 import dotenv
 
+import subsurface
+from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
+
 from subsurface import optional_requirements
-from tests.conftest import RequirementsLevel
+from subsurface.modules.reader.mesh._trimesh_reader import trimesh_to_unstruct, _load_with_trimesh
 
 dotenv.load_dotenv()
 
@@ -15,178 +18,102 @@ path_to_obj_no_material = os.getenv("PATH_TO_OBJ_GALLERIES_I")
 pytestmark = pytest.mark.read_mesh
 
 
-@pytest.mark.skipif(
-    condition=(RequirementsLevel.MESH | RequirementsLevel.PLOT) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
-    reason="Need to set the READ_MESH variable to run this test"
-)
 def test_read_obj_mesh_no_materials():
     pv = optional_requirements.require_pyvista()
     reader: pv.OBJReader = pv.get_reader(path_to_obj_no_material)
     mesh = reader.read()
     # Access texture coordinates if present
 
-    if plot := True:
+    if plot := False:
         mesh.plot()
 
 
-def test_trimesh_load_obj_with_mtl_submeshes():
-    # TODO: [ ] Use smaller example
+def test_trimesh_load_obj_with_mtl_submeshes_heavy():
+    """This is a heavy test"""
     # Replace these with the actual paths in your environment
 
     assert os.path.exists(path_to_obj), f"OBJ not found: {path_to_obj}"
     assert os.path.exists(path_to_mtl), f"MTL not found: {path_to_mtl}"
-    import trimesh
-
-    # Load the OBJ with Trimesh
-    # - By default, trimesh.load will return a Scene if the OBJ has multiple parts/materials
-    # - If it's a single mesh, it returns a Trimesh
-    scene_or_mesh = trimesh.load(path_to_obj)
-
-    if isinstance(scene_or_mesh, trimesh.Scene):
-        print("Loaded a Scene with multiple geometries.")
-
-        # Each geometry in the scene can have its own visual/material
-        geometries = scene_or_mesh.geometry
-        assert len(geometries) > 0, "No geometries found in the scene."
-
-        for geom_name, geom in geometries.items():
-            # 'geom' should be a Trimesh object
-            if geom.visual and hasattr(geom.visual, 'material'):
-                material = geom.visual.material
-                print(f"Geometry '{geom_name}' has material: {material}")
-            else:
-                print(f"Geometry '{geom_name}' has no material attribute.")
-
-        # Show the scene (opens an interactive viewer if possible):
-        # If you're running tests in a headless environment, comment this out
-        if PLOT := False:
-            scene_or_mesh.show()
-
-    else:
-        # Single Trimesh object
-        print("Loaded a single Trimesh.")
-
-        if scene_or_mesh.visual and hasattr(scene_or_mesh.visual, 'material'):
-            material = scene_or_mesh.visual.material
-            print("Trimesh material:", material)
-        else:
-            print("No material found on this single-mesh object.")
-
-        # Show the mesh (interactive viewer)
-        if PLOT := False:
-            scene_or_mesh.show()
+    _load_with_trimesh(path_to_obj, plot=False)
 
 
 def test_trimesh_load_obj_with_mtl_submeshes_II():
     # Replace these with the actual paths in your environment
     path_to_obj = os.getenv("PATH_TO_OBJ_MULTIMATERIAL_II")
-    import trimesh
-
-    # Load the OBJ with Trimesh
-    # - By default, trimesh.load will return a Scene if the OBJ has multiple parts/materials
-    # - If it's a single mesh, it returns a Trimesh
-    scene_or_mesh = trimesh.load(path_to_obj)
-
-    if isinstance(scene_or_mesh, trimesh.Scene):
-        print("Loaded a Scene with multiple geometries.")
-
-        # Each geometry in the scene can have its own visual/material
-        geometries = scene_or_mesh.geometry
-        assert len(geometries) > 0, "No geometries found in the scene."
-
-        for geom_name, geom in geometries.items():
-            # 'geom' should be a Trimesh object
-            if geom.visual and hasattr(geom.visual, 'material'):
-                material = geom.visual.material
-                print(f"Geometry '{geom_name}' has material: {material}")
-            else:
-                print(f"Geometry '{geom_name}' has no material attribute.")
-
-        # Show the scene (opens an interactive viewer if possible):
-        # If you're running tests in a headless environment, comment this out
-        if PLOT := True:
-            scene_or_mesh.show()
-
-    else:
-        # Single Trimesh object
-        print("Loaded a single Trimesh.")
-
-        if scene_or_mesh.visual and hasattr(scene_or_mesh.visual, 'material'):
-            material = scene_or_mesh.visual.material
-            print("Trimesh material:", material)
-        else:
-            print("No material found on this single-mesh object.")
-
-        # Show the mesh (interactive viewer)
-        if PLOT := False:
-            scene_or_mesh.show()
+    _load_with_trimesh(path_to_obj, plot=False)
 
 
 def test_trimesh_load_obj_with_jpg_texture():
     path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/Portugal outcrop decimated/textured_output.obj"
-    load_obj_with_trimesh(path_to_obj)
+    _load_with_trimesh(path_to_obj)
 
 
 def test_trimesh_load_obj_with_face_I():
     path_to_obj = os.getenv("PATH_TO_OBJ_FACE_I")
-    load_obj_with_trimesh(path_to_obj)
+    _load_with_trimesh(path_to_obj, plot=False)
 
 
 def test_trimesh_load_obj_with_face_II():
     path_to_obj = os.getenv("PATH_TO_OBJ_FACE_II")
-    load_obj_with_trimesh(path_to_obj)
+    _load_with_trimesh(path_to_obj, plot=False)
 
 
 def test_trimesh_load_obj_boxes():
     path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
-    load_obj_with_trimesh(path_to_obj)
+    _load_with_trimesh(path_to_obj)
 
 
 def test_trimesh_load_obj_with_texture_II():
     """Penguin, material exist but png is not loading correctly"""
-    raise NotImplementedError("We need to add the option to point to at least one texture directly")
     path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/TexturedMesh/PenguinBaseMesh.obj"
-    load_obj_with_trimesh(path_to_obj)
+    _load_with_trimesh(
+        path_to_obj=path_to_obj,
+        plot=False
+    )
 
 
-def load_obj_with_trimesh(path_to_obj):
-    import trimesh
+def test_trimesh_one_element_no_texture_to_unstruct():
+    path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/TexturedMesh/PenguinBaseMesh.obj"
+    trimesh_obj = _load_with_trimesh(
+        path_to_obj=path_to_obj,
+        plot=False
+    )
+    ts = trimesh_to_unstruct(trimesh_obj)
 
-    # Load the OBJ with Trimesh
-    # - By default, trimesh.load will return a Scene if the OBJ has multiple parts/materials
-    # - If it's a single mesh, it returns a Trimesh
-    scene_or_mesh = trimesh.load(path_to_obj)
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=True)
 
-    if isinstance(scene_or_mesh, trimesh.Scene):
-        print("Loaded a Scene with multiple geometries.")
 
-        # Each geometry in the scene can have its own visual/material
-        geometries = scene_or_mesh.geometry
-        assert len(geometries) > 0, "No geometries found in the scene."
+def test_trimesh_three_element_no_texture_to_unstruct():
+    path_to_obj = os.getenv("PATH_TO_OBJ_MULTIMATERIAL_II")
+    trimesh_obj = _load_with_trimesh(path_to_obj)
 
-        for geom_name, geom in geometries.items():
-            # 'geom' should be a Trimesh object
-            if geom.visual and hasattr(geom.visual, 'material'):
-                material = geom.visual.material
-                print(f"Geometry '{geom_name}' has material: {material}")
-            else:
-                print(f"Geometry '{geom_name}' has no material attribute.")
+    ts = trimesh_to_unstruct(trimesh_obj)
 
-        # Show the scene (opens an interactive viewer if possible):
-        # If you're running tests in a headless environment, comment this out
-        if PLOT := True:
-            scene_or_mesh.show()
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=True)
 
-    else:
-        # Single Trimesh object
-        print("Loaded a single Trimesh.")
 
-        if scene_or_mesh.visual and hasattr(scene_or_mesh.visual, 'material'):
-            material = scene_or_mesh.visual.material
-            print("Trimesh material:", material)
-        else:
-            print("No material found on this single-mesh object.")
+def test_trimesh_ONE_element_texture_to_unstruct():
+    trimesh_obj = _load_with_trimesh(
+        path_to_obj=(os.getenv("PATH_TO_OBJ_FACE_II")),
+        plot=False
+    )
 
-        # Show the mesh (interactive viewer)
-        if PLOT := True:
-            scene_or_mesh.show()
+    ts: subsurface.TriSurf = trimesh_to_unstruct(trimesh_obj)
+
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=True)
+
+
+def test_trimesh_three_element_texture_to_unstruct():
+    """This prints only the uv since we do not want to read
+    multiple images as structured objects
+    """
+    path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
+    trimesh_obj = _load_with_trimesh(path_to_obj)
+
+    ts = trimesh_to_unstruct(trimesh_obj)
+
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=True)

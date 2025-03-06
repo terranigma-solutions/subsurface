@@ -4,7 +4,15 @@ import pytest
 import dotenv
 
 from subsurface import optional_requirements
+from subsurface.modules.reader.mesh.glb_reader import load_glb_with_trimesh
+from subsurface.modules.reader.mesh.obj_reader import load_obj_with_trimesh
 from tests.conftest import RequirementsLevel
+
+import subsurface
+from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
+
+from subsurface import optional_requirements, TriSurf
+from subsurface.modules.reader.mesh.obj_reader import load_obj_with_trimesh, trimesh_to_unstruct
 
 dotenv.load_dotenv()
 
@@ -15,7 +23,7 @@ pytestmark = pytest.mark.read_mesh
     condition=(RequirementsLevel.MESH | RequirementsLevel.PLOT) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set the READ_MESH variable to run this test"
 )
-def test_trimesh_read_glb():
+def test_trimesh_read_glb_complex():
     """
     Test loading a .glb (binary glTF) file with trimesh.
     If it's a scene, we iterate over submeshes; 
@@ -28,42 +36,26 @@ def test_trimesh_read_glb():
     assert os.path.exists(glb_path), f"GLB file does not exist: {glb_path}"
 
     # Trimesh can load GLB/GLTF natively
-    scene_or_mesh = trimesh.load(glb_path)
 
-    # Check if we got a scene or a single mesh
-    if isinstance(scene_or_mesh, trimesh.Scene):
-        print(f"Loaded a Scene with {len(scene_or_mesh.geometry)} geometry object(s).")
+    ts: subsurface.TriSurf = load_glb_with_trimesh(glb_path)
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=True)
+    return
 
-        for geom_name, geom in scene_or_mesh.geometry.items():
-            print(f" Submesh: {geom_name}")
-            print(f"  - Vertices: {len(geom.vertices)}")
-            print(f"  - Faces: {len(geom.faces)}")
 
-            # Check if we have a material/visual
-            if geom.visual and hasattr(geom.visual, 'material'):
-                mat = geom.visual.material
-                print(f"  - Material: {mat}")
-            else:
-                print("  - No material data on this submesh.")
+def test_trimesh_read_glb():
+    """
+    Test loading a .glb (binary glTF) file with trimesh.
+    If it's a scene, we iterate over submeshes; 
+    if it's a single mesh, we inspect it directly.
+    """
 
-        # Optionally show the scene (only works in a GUI-friendly environment)
-        if PLOT := True:
-            scene_or_mesh.show()
+    glb_path = os.getenv("PATH_TO_GLB")
+    assert os.path.exists(glb_path), f"GLB file does not exist: {glb_path}"
 
-    else:
-        # A single Trimesh object
-        mesh = scene_or_mesh
-        print("Loaded a single Trimesh object.")
-        print(f" - Vertices: {len(mesh.vertices)}")
-        print(f" - Faces: {len(mesh.faces)}")
+    # Trimesh can load GLB/GLTF natively
 
-        # Check material
-        if mesh.visual and hasattr(mesh.visual, 'material'):
-            mat = mesh.visual.material
-            print(f"Material: {mat}")
-        else:
-            print("No material data on this mesh.")
-
-        # Optionally show the scene (only works in a GUI-friendly environment)
-        if PLOT := True:
-            scene_or_mesh.show()
+    ts = load_glb_with_trimesh(glb_path, plot=False)
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=True)
+    return 
