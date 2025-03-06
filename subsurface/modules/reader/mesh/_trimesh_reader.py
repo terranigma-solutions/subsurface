@@ -7,7 +7,7 @@ import subsurface
 from subsurface import optional_requirements, StructuredData, TriSurf
 
 
-def _load_with_trimesh(path_to_obj, plot = False):
+def _load_with_trimesh(path_to_obj, plot=False):
     trimesh = optional_requirements.require_trimesh()
     # Load the OBJ with Trimesh using the specified options
     scene_or_mesh = trimesh.load(path_to_obj)
@@ -149,7 +149,7 @@ def _trisurf_from_scene(scene_or_mesh: 'Scene', trimesh: 'trimesh') -> subsurfac
     unstruct = UnstructuredData.from_array(
         vertex=np.vstack(all_vertex),
         cells=np.vstack(all_cells),
-        vertex_attr=pandas.concat(all_vertex_attr, ignore_index=True) if all_vertex_attr is not None else None,
+        vertex_attr=pandas.concat(all_vertex_attr, ignore_index=True) if len(all_vertex_attr) > 0 else None,
         cells_attr=pandas.DataFrame(np.hstack(cell_attr), columns=["Geometry id"]),
         xarray_attributes={
                 "bounds": scene_or_mesh.bounds.tolist(),
@@ -222,5 +222,3 @@ def _process_scene(scene):
 
         print(f"Geometry '{geom_name}':")
         _handle_material_info(geom)
-
-
