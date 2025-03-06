@@ -2,6 +2,8 @@
 
 import pytest
 import dotenv
+
+import subsurface
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 
 from subsurface import optional_requirements, TriSurf
@@ -81,9 +83,8 @@ def test_trimesh_one_element_no_texture_to_unstruct():
         path_to_obj=path_to_obj,
         plot=False
     )
-    unstruct = trimesh_obj_to_unstruct(trimesh_obj)
+    ts = trimesh_obj_to_unstruct(trimesh_obj)
 
-    ts = TriSurf(mesh=unstruct)
     s = to_pyvista_mesh(ts)
     pv_plot([s], image_2d=True)
 
@@ -92,23 +93,22 @@ def test_trimesh_three_element_no_texture_to_unstruct():
     path_to_obj = os.getenv("PATH_TO_OBJ_MULTIMATERIAL_II")
     trimesh_obj = load_obj_with_trimesh(path_to_obj)
 
-    unstruct = trimesh_obj_to_unstruct(trimesh_obj)
+    ts = trimesh_obj_to_unstruct(trimesh_obj)
 
-    ts = TriSurf(mesh=unstruct)
     s = to_pyvista_mesh(ts)
     pv_plot([s], image_2d=False)
 
 
 def test_trimesh_ONE_element_texture_to_unstruct():
-    # TODO: Add texture
-    path_to_obj = os.getenv("PATH_TO_OBJ_FACE_II")
-    trimesh_obj = load_obj_with_trimesh(path_to_obj)
+    trimesh_obj = load_obj_with_trimesh(
+        path_to_obj=(os.getenv("PATH_TO_OBJ_FACE_II")),
+        plot=False
+    )
 
-    unstruct = trimesh_obj_to_unstruct(trimesh_obj)
+    ts: subsurface.TriSurf = trimesh_obj_to_unstruct(trimesh_obj)
 
-    ts = TriSurf(mesh=unstruct)
     s = to_pyvista_mesh(ts)
-    pv_plot([s], image_2d=False)
+    pv_plot([s], image_2d=True)
    
 
 def test_trimesh_three_element_texture_to_unstruct():

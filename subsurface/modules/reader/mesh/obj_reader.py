@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas
+from PIL.JpegImagePlugin import JpegImageFile
 
 from subsurface.core.structs import UnstructuredData
 
@@ -54,11 +55,12 @@ def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> Union["trimes
     return scene_or_mesh
 
 
-def trimesh_obj_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]) -> subsurface.UnstructuredData:
+def trimesh_obj_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]) -> subsurface.TriSurf:
     trimesh = optional_requirements.require_trimesh()
     if isinstance(scene_or_mesh, trimesh.Scene):
         # Process scene with multiple geometries
         unstruct = _unstruct_from_scene(scene_or_mesh, trimesh)
+        ts = TriSurf(mesh=unstruct)
 
     elif isinstance(scene_or_mesh, trimesh.Trimesh):
         # Process single mesh
@@ -87,22 +89,20 @@ def trimesh_obj_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Sce
         )
         
         # If there is a texture
-        texture = StructuredData.from_numpy(tri.visual.material.image)
+        image: JpegImageFile = tri.visual.material.image
+        texture = StructuredData.from_numpy(np.array(image))
         coords = tri.vertices
 
         ts = TriSurf(
             mesh=unstruct,
             texture=texture,
-            # texture_origin=[coords[0][0], coords[0][1], zmin],
-            # texture_point_u=[coords[-1][0], coords[-1][1], zmin],
-            # texture_point_v=[coords[0][0], coords[0][1], zmax]
         )
 
 
     else:
         raise ValueError("Input must be a Trimesh object or a Scene with multiple geometries.")
         
-    return unstruct
+    return ts
 
 
 def _unstruct_from_scene(scene_or_mesh: 'Scene', trimesh: 'trimesh') -> 'UnstructuredData':

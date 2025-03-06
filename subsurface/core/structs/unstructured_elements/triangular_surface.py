@@ -46,8 +46,12 @@ class TriSurf:
         self.texture_point_v = kwargs.get('texture_point_v', None)
 
     @property
-    def has_texture_data(self):
+    def has_texture_data_without_uv(self):
         return self.texture is not None and self.texture_origin is not None and self.texture_point_u is not None and self.texture_point_v is not None
+    
+    @property
+    def has_texture_data_with_uv(self):
+        return 'u' in self.mesh.points_attributes and 'v' in self.mesh.points_attributes
     
     @property
     def triangles(self):
