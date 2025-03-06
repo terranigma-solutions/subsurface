@@ -173,10 +173,15 @@ def _extract_texture_from_material(geom):
     array = np.empty(0)
     if isinstance(geom.visual.material, trimesh.visual.material.SimpleMaterial):
         image: JpegImageFile = geom.visual.material.image
+        if image is None:
+            return None
         array = np.array(image)
     elif isinstance(geom.visual.material, trimesh.visual.material.PBRMaterial):
         image: PngImageFile = geom.visual.material.baseColorTexture
         array = np.array(image.convert('RGBA'))
+
+        if image is None:
+            return None
     else:
         raise ValueError(f"Unsupported material type: {type(geom.visual.material)}")
 
