@@ -112,7 +112,9 @@ def test_trimesh_ONE_element_texture_to_unstruct():
    
 
 def test_trimesh_three_element_texture_to_unstruct():
-    # TODO: Add texture
+    """This prints only the uv since we do not want to read
+    multiple images as structured objects
+    """
     path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
     trimesh_obj = load_obj_with_trimesh(path_to_obj)
 

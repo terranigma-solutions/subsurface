@@ -44,7 +44,9 @@ def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> Union["trimes
         if plot:
             scene_or_mesh.show()
     else:
-        print("Loaded a single Trimesh.")
+        print("Loaded a single Trimesh object.")
+        print(f" - Vertices: {len(scene_or_mesh.vertices)}")
+        print(f" - Faces: {len(scene_or_mesh.faces)}")
         _handle_material_info(scene_or_mesh)
         if plot:
             scene_or_mesh.show()
@@ -84,8 +86,7 @@ def trimesh_obj_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Sce
     trimesh = optional_requirements.require_trimesh()
     if isinstance(scene_or_mesh, trimesh.Scene):
         # Process scene with multiple geometries
-        unstruct = _unstruct_from_scene(scene_or_mesh, trimesh)
-        ts = TriSurf(mesh=unstruct)
+        ts = _trisurf_from_scene(scene_or_mesh, trimesh)
 
     elif isinstance(scene_or_mesh, trimesh.Trimesh):
         ts = _trisurf_from_trimesh(scene_or_mesh)
@@ -121,11 +122,10 @@ def _trisurf_from_trimesh(scene_or_mesh):
                 "bounds": tri.bounds.tolist(),
         },
     )
-    # If there is a texture
-    from PIL.JpegImagePlugin import JpegImageFile
-    image: JpegImageFile = tri.visual.material.image
-    texture = StructuredData.from_numpy(np.array(image))
-    coords = tri.vertices
+
+    texture = _extract_texture_from_material(tri)
+    
+    
     ts = TriSurf(
         mesh=unstruct,
         texture=texture,
@@ -133,7 +133,7 @@ def _trisurf_from_trimesh(scene_or_mesh):
     return ts
 
 
-def _unstruct_from_scene(scene_or_mesh: 'Scene', trimesh: 'trimesh') -> 'UnstructuredData':
+def _trisurf_from_scene(scene_or_mesh: 'Scene', trimesh: 'trimesh') -> subsurface.TriSurf:
     pandas = optional_requirements.require_pandas()
     geometries = scene_or_mesh.geometry
     assert len(geometries) > 0, "No geometries found in the scene."
@@ -142,6 +142,7 @@ def _unstruct_from_scene(scene_or_mesh: 'Scene', trimesh: 'trimesh') -> 'Unstruc
     cell_attr = []
     all_vertex_attr = []
     _last_cell = 0
+    texture = None
     for i, (geom_name, geom) in enumerate(geometries.items()):
         geom: trimesh.Trimesh
         _handle_material_info(geom)
@@ -162,25 +163,56 @@ def _unstruct_from_scene(scene_or_mesh: 'Scene', trimesh: 'trimesh') -> 'Unstruc
 
 
         # Get UV coordinates if they exist
-        vertex_attr = None
         if hasattr(geom.visual, 'uv') and geom.visual.uv is not None:
             vertex_attr = pandas.DataFrame(
                 geom.visual.uv,
                 columns=['u', 'v']
             )
             all_vertex_attr.append(vertex_attr)
+
+        # Extract texture from material if it is only one geometry
+        if len(geometries) == 1:
+            texture = _extract_texture_from_material(geom)
+
     # Create the combined UnstructuredData
     unstruct = UnstructuredData.from_array(
         vertex=np.vstack(all_vertex),
         cells=np.vstack(all_cells),
-        # vertex_attr=pd.concat(all_vertex_attr, ignore_index=True) if all_vertex_attr is not None else None,
+        vertex_attr=pandas.concat(all_vertex_attr, ignore_index=True) if all_vertex_attr is not None else None,
         cells_attr=pandas.DataFrame(np.hstack(cell_attr), columns=["Geometry id"]),
         xarray_attributes={
                 "bounds": scene_or_mesh.bounds.tolist(),
         },
     )
 
-    return unstruct
+    # If there is a texture
+    ts = TriSurf(
+        mesh=unstruct,
+        texture=texture,
+    )
+
+    return ts
+
+
+def _extract_texture_from_material(geom):
+    from PIL.JpegImagePlugin import JpegImageFile
+    from PIL.PngImagePlugin import PngImageFile
+    import trimesh
+    
+    array = np.empty(0)
+    if isinstance(geom.visual.material, trimesh.visual.material.SimpleMaterial):
+        image: JpegImageFile = geom.visual.material.image  
+        array = np.array(image)
+    elif isinstance(geom.visual.material, trimesh.visual.material.PBRMaterial):
+        image: PngImageFile = geom.visual.material.baseColorTexture      
+        array = np.array(image.convert('RGBA'))       
+    else:
+        raise ValueError(f"Unsupported material type: {type(geom.visual.material)}")
+        
+    # Asser that image has 3 channels    assert array.shape[2] == 3    from PIL.PngImagePlugin import PngImageFile
+    assert array.shape[2] == 3 or array.shape[2] == 4
+    texture = StructuredData.from_numpy(array)
+    return texture
 
 
 def _validate_texture_path(texture_path):
@@ -211,6 +243,11 @@ def _process_scene(scene):
     geometries = scene.geometry
     assert len(geometries) > 0, "No geometries found in the scene."
 
+    print(f"Loaded a Scene with {len(scene.geometry)} geometry object(s).")
     for geom_name, geom in geometries.items():
+        print(f" Submesh: {geom_name}")
+        print(f"  - Vertices: {len(geom.vertices)}")
+        print(f"  - Faces: {len(geom.faces)}")
+
         print(f"Geometry '{geom_name}':")
         _handle_material_info(geom)
