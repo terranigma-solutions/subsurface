@@ -16,7 +16,6 @@ path_to_obj = os.getenv("PATH_TO_OBJ")
 path_to_mtl = os.getenv("PATH_TO_MTL")
 path_to_obj_no_material = os.getenv("PATH_TO_OBJ_GALLERIES_I")
 
-pytestmark = pytest.mark.read_mesh
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_MESH) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set READ_MESH"

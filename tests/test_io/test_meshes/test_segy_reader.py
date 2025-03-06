@@ -212,38 +212,39 @@ def test_segy_3d_segy__volume_segsak_II() -> None:
 
     # Step II
 
-    # Ensure the order is (samples, iline, xline)
-    # Some xarray objects might already be in that order
-    data_da = V3D.data.transpose("samples", "iline", "xline")
+    if PLOT:=False:
+        # Ensure the order is (samples, iline, xline)
+        # Some xarray objects might already be in that order
+        data_da = V3D.data.transpose("samples", "iline", "xline")
 
-    # Convert to a NumPy array
-    data_3d = data_da.values  # shape: (nz, ny, nx)
-    nz, ny, nx = data_3d.shape
-    print("3D Data Shape:", data_3d.shape)
+        # Convert to a NumPy array
+        data_3d = data_da.values  # shape: (nz, ny, nx)
+        nz, ny, nx = data_3d.shape
+        print("3D Data Shape:", data_3d.shape)
 
-    import pyvista as pv
+        import pyvista as pv
 
-    # Spacing in each dimension (index spacing = 1 by default, or define actual spacing if known)
-    dx = 1.0  # spacing along xline
-    dy = 1.0  # spacing along iline
-    dz = 1.0  # spacing along samples (e.g., 2 ms, or convert to depth if you have a velocity model)
+        # Spacing in each dimension (index spacing = 1 by default, or define actual spacing if known)
+        dx = 1.0  # spacing along xline
+        dy = 1.0  # spacing along iline
+        dz = 1.0  # spacing along samples (e.g., 2 ms, or convert to depth if you have a velocity model)
 
-    # Origin (0,0,0) or shift as needed
-    origin = (0, 0, 0)
+        # Origin (0,0,0) or shift as needed
+        origin = (0, 0, 0)
 
-    # Create the UniformGrid
-    grid = pv.UniformGrid()
-    grid.origin = origin  # bottom-left of the dataset
-    grid.spacing = (dx, dy, dz)  # distance between points along each axis
-    grid.dimensions = (nx, ny, nz)  # note the order: (x, y, z)
-    # Flatten the data in x-fastest order (Fortran order) if needed
-    grid.point_data["Amplitude"] = data_3d.ravel(order="F")
+        # Create the UniformGrid
+        grid = pv.UniformGrid()
+        grid.origin = origin  # bottom-left of the dataset
+        grid.spacing = (dx, dy, dz)  # distance between points along each axis
+        grid.dimensions = (nx, ny, nz)  # note the order: (x, y, z)
+        # Flatten the data in x-fastest order (Fortran order) if needed
+        grid.point_data["Amplitude"] = data_3d.ravel(order="F")
 
-    # Volume Rendering
-    plotter = pv.Plotter()
-    plotter.add_volume(grid, cmap="seismic", opacity="sigmoid")
-    plotter.show_grid()
-    plotter.show()
+        # Volume Rendering
+        plotter = pv.Plotter()
+        plotter.add_volume(grid, cmap="seismic", opacity="sigmoid")
+        plotter.show_grid()
+        plotter.show()
 
 
 def test_segy_3d_segy_segsak_III() -> None:
