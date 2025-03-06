@@ -2,9 +2,10 @@
 
 import pytest
 import dotenv
+from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 
-from subsurface import optional_requirements
-from subsurface.modules.reader.mesh.obj_reader import load_obj_with_trimesh
+from subsurface import optional_requirements, TriSurf
+from subsurface.modules.reader.mesh.obj_reader import load_obj_with_trimesh, trimesh_obj_to_unstruct
 from tests.conftest import RequirementsLevel
 
 dotenv.load_dotenv()
@@ -52,12 +53,12 @@ def test_trimesh_load_obj_with_jpg_texture():
 
 def test_trimesh_load_obj_with_face_I():
     path_to_obj = os.getenv("PATH_TO_OBJ_FACE_I")
-    load_obj_with_trimesh(path_to_obj)
+    load_obj_with_trimesh(path_to_obj, plot=True)
 
 
 def test_trimesh_load_obj_with_face_II():
     path_to_obj = os.getenv("PATH_TO_OBJ_FACE_II")
-    load_obj_with_trimesh(path_to_obj)
+    load_obj_with_trimesh(path_to_obj, plot=True)
 
 
 def test_trimesh_load_obj_boxes():
@@ -72,3 +73,51 @@ def test_trimesh_load_obj_with_texture_II():
         path_to_obj=path_to_obj,
         plot=True
     )
+
+
+def test_trimesh_one_element_no_texture_to_unstruct():
+    path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/TexturedMesh/PenguinBaseMesh.obj"
+    trimesh_obj = load_obj_with_trimesh(
+        path_to_obj=path_to_obj,
+        plot=False
+    )
+    unstruct = trimesh_obj_to_unstruct(trimesh_obj)
+
+    ts = TriSurf(mesh=unstruct)
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=True)
+
+
+def test_trimesh_three_element_no_texture_to_unstruct():
+    path_to_obj = os.getenv("PATH_TO_OBJ_MULTIMATERIAL_II")
+    trimesh_obj = load_obj_with_trimesh(path_to_obj)
+
+    unstruct = trimesh_obj_to_unstruct(trimesh_obj)
+
+    ts = TriSurf(mesh=unstruct)
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=False)
+
+
+def test_trimesh_ONE_element_texture_to_unstruct():
+    # TODO: Add texture
+    path_to_obj = os.getenv("PATH_TO_OBJ_FACE_II")
+    trimesh_obj = load_obj_with_trimesh(path_to_obj)
+
+    unstruct = trimesh_obj_to_unstruct(trimesh_obj)
+
+    ts = TriSurf(mesh=unstruct)
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=False)
+   
+
+def test_trimesh_three_element_texture_to_unstruct():
+    # TODO: Add texture
+    path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
+    trimesh_obj = load_obj_with_trimesh(path_to_obj)
+
+    unstruct = trimesh_obj_to_unstruct(trimesh_obj)
+
+    ts = TriSurf(mesh=unstruct)
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=False)
