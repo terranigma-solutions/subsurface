@@ -13,13 +13,14 @@ try:
     from subsurface import visualization
 except ImportError:
     pass
-
+try:
+    from importlib.metadata import version, PackageNotFoundError
+except ImportError:  # For Python <3.8, fallback
+    from importlib_metadata import version, PackageNotFoundError
+    
 # Version.
 try:
-    # - Released versions just tags:       0.8.0
-    # - GitHub commits add .dev#+hash:     0.8.1.dev4+g2785721
-    # - Uncommitted changes add timestamp: 0.8.1.dev4+g2785721.d20191022
-    from ._version import version as __version__
+    __version__ = version("subsurface")  # Use package name
 except ImportError:
     # If it was not installed, then we don't know the version. We could throw a
     # warning here, but this case *should* be rare. subsurface should be
