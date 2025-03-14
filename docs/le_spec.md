@@ -1,7 +1,3 @@
-Below is a revised, polished version of the specification. Repetitive statements have been streamlined, and formatting has been made more consistent and concise.
-
----
-
 # **LiquidEarth Mesh (`.le`) File Format Specification**
 
 ## **Overview**
