@@ -20,7 +20,7 @@
    :target: http://swu.ng/slack
    :alt: SWUNG Slack
 
-|
+| 
 
 
 .. sphinx-inclusion-marker
