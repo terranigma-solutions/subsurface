@@ -50,9 +50,10 @@ def read_requirements(file_name, base_path=""):
 
 
 setup(
-    name="subsurface",
+    name="subsurface_terra",
     packages=find_packages(exclude=("tests", "docs", "examples")),
-    description="Subsurface data types and utilities",
+    description="Subsurface data types and utilities. This version is the one used by Terranigma Solutions. Please feel free to "
+                "take anything in this repository for the original one.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://softwareunderground.github.io/subsurface",
