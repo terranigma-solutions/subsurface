@@ -59,7 +59,7 @@ def dxf_file_to_unstruct_input(
     """
     ezdxf = optional_requirements.require_ezdxf()
     dataset = ezdxf.readfile(file)
-    cell_attr_int, cell_attr_map, cells, vertex = _dxf_dataset_to_unstruct_input(dataset)
+    vertex, cells, cell_attr_int, cell_attr_map = _dxf_dataset_to_unstruct_input(dataset)
 
     if vertex.size == 0:
         raise ValueError("The DXF file does not contain any 3DFACE entities.")
@@ -124,7 +124,14 @@ def _extract_vertices_from_dataset(
     return np.unique(vertices, axis=0)
 
 
-def _dxf_dataset_to_unstruct_input(dataset):
+def _dxf_dataset_to_unstruct_input(dataset: 'ezdxf.drawing.Drawing') -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+    """
+    Build unstructured-mesh-like data from 3DFACE entities in a dataset:
+      - vertex coordinates
+      - connectivity in 'cells' array
+      - cell attributes in both integer-coded and mapping (string->int) forms
+
+    """
     """
     Build unstructured-mesh-like data from 3DFACE entities in a dataset:
       - vertex coordinates
@@ -167,4 +174,4 @@ def _dxf_dataset_to_unstruct_input(dataset):
     cells = np.arange(0, vertices.shape[0]).reshape(-1, 3)
 
     cell_attr_int, cell_attr_map = _map_cell_attr_strings_to_integers(cell_attr)
-    return cell_attr_int, cell_attr_map, cells, vertices
+    return vertices, cells, cell_attr_int, cell_attr_map
