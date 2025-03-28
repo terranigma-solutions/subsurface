@@ -22,13 +22,16 @@ def read_collar(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     return data_df
 
 
-def read_survey(reader_helper: GenericReaderFilesHelper):
+def read_survey(reader_helper: GenericReaderFilesHelper, validate_survey: bool = True) -> pd.DataFrame:
     if reader_helper.index_col is False: reader_helper.index_col = 0
 
     d = check_format_and_read_to_df(reader_helper)
     _map_rows_and_cols_inplace(d, reader_helper)
 
-    d_no_singles = _validate_survey_data(d)
+    if validate_survey:
+        d_no_singles = _validate_survey_data(d)
+    else:
+        d_no_singles = d
 
     return d_no_singles
 
@@ -37,12 +40,16 @@ def read_lith(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     return read_attributes(reader_helper, is_lith=True)
 
 
-def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool = False) -> pd.DataFrame:
-    if reader_helper.index_col is False: reader_helper.index_col = 0
-
+def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool = False, validate_attr: bool = True) -> pd.DataFrame:
+    if reader_helper.index_col is False:
+        reader_helper.index_col = 0
+        
     d = check_format_and_read_to_df(reader_helper)
 
     _map_rows_and_cols_inplace(d, reader_helper)
+    if validate_attr is False:
+        return d
+    
     if is_lith:
         d = _validate_lith_data(d, reader_helper)
     else:
