@@ -1,5 +1,6 @@
 from typing import Union, TextIO
 import io
+import os
 
 import numpy as np
 from subsurface.core.structs import UnstructuredData
@@ -7,6 +8,14 @@ from subsurface.core.structs import UnstructuredData
 import subsurface
 from subsurface import optional_requirements
 from subsurface.core.structs import TriSurf, StructuredData
+
+
+def _load_with_trimesh(path_to_obj, plot):
+    return LoadWithTrimesh._load_with_trimesh(path_to_obj, plot)
+
+
+def trimesh_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]) -> TriSurf:
+    return TrimeshToSubsurface.trimesh_to_unstruct(scene_or_mesh)
 
 
 class LoadWithTrimesh:
@@ -240,77 +249,40 @@ class TrimeshToSubsurface:
 
 class TriMeshReaderFromBlob:
     @classmethod
-    def OBJ_stream_to_trisurf(cls, obj_stream: TextIO, mtl_stream: io.BytesIO, texture_stream: io.BytesIO) -> \
-            TriSurf:
+    def OBJ_stream_to_trisurf(cls, obj_stream: TextIO, mtl_stream: TextIO, texture_stream: io.BytesIO) -> TriSurf:
         """
         Load an OBJ file from a stream and convert it to a TriSurf object.
         
-        If space_id and path_in are provided, will attempt to load associated
-        MTL and texture files from the same location.
-        
         Parameters:
-            obj_stream: BytesIO containing the OBJ file data
-            space_id: Optional Azure space ID for loading associated files
-            path_in: Optional path to the OBJ file for locating related files
+            obj_stream: TextIO containing the OBJ file data (text format)
+            mtl_stream: TextIO containing the MTL file data (text format)
+            texture_stream: BytesIO containing the texture file data (binary format)
         
         Returns:
             TriSurf: The loaded mesh with textures if available
         """
         trimesh = optional_requirements.require_trimesh()
         import tempfile
-        import os
 
-        path_in = "foo"
-        # If no additional context provided, just load directly from stream
-        # TODO: Add the option if no material
+        path_in = "file.obj"
 
         # Create a temporary directory to store associated files
         with tempfile.TemporaryDirectory() as temp_dir:
             # Write the OBJ content to a temp file
             obj_path = os.path.join(temp_dir, os.path.basename(path_in))
-            with open(obj_path, 'wb') as f:
+            with open(obj_path, 'w') as f:  # Use text mode 'w' for text files
                 obj_stream.seek(0)
                 f.write(obj_stream.read())
                 obj_stream.seek(0)
 
-            # Extract mtl references from the OBJ file
-            mtl_files = cls._extract_mtl_references(obj_stream)
-            dir_path = os.path.dirname(path_in)
-
-            # Download and save MTL files
-            for mtl_file in mtl_files:
-                mtl_path = f"{dir_path}/{mtl_file}" if dir_path else mtl_file
-                try:
-                    # mtl_stream = read_files_from_space(
-                    #     path_in=mtl_path,
-                    #     space_id=space_id
-                    # )
-
-                    # Save the MTL file to temp directory
-                    mtl_temp_path = os.path.join(temp_dir, mtl_file)
-                    with open(mtl_temp_path, 'wb') as f:
-                        f.write(mtl_stream.read())
-
-                    # Extract texture references from MTL
-                    mtl_stream.seek(0)
-                    texture_files = cls._extract_texture_references(mtl_stream)
-
-                    # Download texture files
-                    for texture_file in texture_files:
-                        texture_path = f"{dir_path}/{texture_file}" if dir_path else texture_file
-                        try:
-                            # texture_stream = read_files_from_space(
-                            #     path_in=texture_path,
-                            #     space_id=space_id
-                            # )
-
-                            # Save the texture file to temp directory
-                            with open(os.path.join(temp_dir, texture_file), 'wb') as f:
-                                f.write(texture_stream.read())
-                        except Exception as e:
-                            print(f"Failed to load texture {texture_file}: {e}")
-                except Exception as e:
-                    print(f"Failed to load MTL file {mtl_file}: {e}")
+            
+            if mtl_stream is not None:
+                cls.write_material_files(
+                    mtl_stream=mtl_stream, 
+                    obj_stream=obj_stream, 
+                    temp_dir=temp_dir, 
+                    texture_stream=texture_stream
+                )
 
             # Now load the OBJ with all associated files available
             scene_or_mesh = trimesh.load(obj_path)
@@ -321,12 +293,47 @@ class TriMeshReaderFromBlob:
         return tri_surf
 
     @classmethod
+    def write_material_files(cls, mtl_stream: TextIO, obj_stream: TextIO, temp_dir, texture_stream: io.BytesIO):
+        # Extract mtl references from the OBJ file
+        mtl_files = cls._extract_mtl_references(obj_stream)
+        # Download and save MTL files
+        for mtl_file in mtl_files:
+            mtl_path = f"{temp_dir}/{mtl_file}" if temp_dir else mtl_file
+            try:
+                # Save the MTL file to temp directory
+                mtl_temp_path = os.path.join(temp_dir, mtl_file)
+                with open(mtl_temp_path, 'w') as f:  # Use text mode 'w' for text files
+                    mtl_stream.seek(0)
+                    f.write(mtl_stream.read())
+
+                # Extract texture references from MTL
+                mtl_stream.seek(0)
+                texture_files = cls._extract_texture_references(mtl_stream)
+
+                if texture_stream is None:
+                    continue
+                    
+                # Download texture files
+                for texture_file in texture_files:
+                    texture_path = f"{temp_dir}/{texture_file}" if temp_dir else texture_file
+                    try:
+                        # Save the texture file to temp directory
+                        with open(os.path.join(temp_dir, texture_file), 'wb') as f:  # Binary mode for textures
+                            texture_stream.seek(0)
+                            f.write(texture_stream.read())
+                    except Exception as e:
+                        print(f"Failed to load texture {texture_file}: {e}")
+            except Exception as e:
+                print(f"Failed to load MTL file {mtl_file}: {e}")
+
+    @classmethod
     def _extract_mtl_references(cls, obj_stream):
         """Extract MTL file references from an OBJ file."""
         obj_stream.seek(0)
         mtl_files = []
 
-        obj_text = obj_stream.read().decode('utf-8')
+        # TextIO stream already contains decoded text, so no need to decode
+        obj_text = obj_stream.read()
         obj_stream.seek(0)
 
         for line in obj_text.splitlines():
@@ -342,7 +349,8 @@ class TriMeshReaderFromBlob:
         mtl_stream.seek(0)
         texture_files = []
 
-        mtl_text = mtl_stream.read().decode('utf-8')
+        # TextIO stream already contains decoded text, so no need to decode
+        mtl_text = mtl_stream.read()
         mtl_stream.seek(0)
 
         for line in mtl_text.splitlines():
