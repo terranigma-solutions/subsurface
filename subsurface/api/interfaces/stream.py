@@ -1,3 +1,4 @@
+import io
 from io import BytesIO
 from typing import TextIO
 
@@ -40,10 +41,13 @@ def MX_stream_to_unstruc(stream: TextIO) -> list[UnstructuredData]:
     return list_unstruct
 
 
-def OBJ_stream_to_trisurf(stream: BytesIO) -> TriSurf:
-    tri_mesh: TriSurf = reader.load_obj_with_trimesh_from_binary(stream)
-    breakpoint()
-    raise NotImplementedError
+def OBJ_stream_to_trisurf(obj_stream: TextIO, mtl_stream: list[TextIO], texture_stream: list[io.BytesIO]) -> TriSurf:
+    tri_mesh: TriSurf = reader.load_obj_with_trimesh_from_binary(
+        obj_stream=obj_stream,
+        mtl_stream=mtl_stream,
+        texture_stream=texture_stream
+    )
+    return tri_mesh
 
 
 def VTK_stream_to_struct(stream: BytesIO, attribute_name: str) -> list[StructuredData]:

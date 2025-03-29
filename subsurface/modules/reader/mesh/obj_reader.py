@@ -1,20 +1,20 @@
 ﻿from typing import Union, TextIO
+import io
 
 from ._trimesh_reader import _load_with_trimesh, trimesh_to_unstruct, TriMeshReaderFromBlob
 from ....core.structs import TriSurf
 
 
-def load_obj_with_trimesh_from_binary(stream: TextIO):
+
+def load_obj_with_trimesh_from_binary(obj_stream: TextIO, mtl_stream: list[TextIO], texture_stream: list[io.BytesIO]) -> TriSurf:
     tri_surf: TriSurf = TriMeshReaderFromBlob.OBJ_stream_to_trisurf(
-        obj_stream=stream,
-        mtl_stream=None,
-        texture_stream=None
+        obj_stream=obj_stream,
+        mtl_stream=mtl_stream,
+        texture_stream=texture_stream
     )
     
     return tri_surf
     
-    # TODO: Somehow call here trimesh
-
 
 def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> TriSurf:
     """

@@ -155,6 +155,7 @@ class TrimeshToSubsurface:
         )
         return ts
 
+    @classmethod
     def _trisurf_from_scene(cls, scene_or_mesh: 'Scene', trimesh: 'trimesh') -> TriSurf:
         pandas = optional_requirements.require_pandas()
         geometries = scene_or_mesh.geometry
@@ -253,7 +254,7 @@ class TrimeshToSubsurface:
 
 class TriMeshReaderFromBlob:
     @classmethod
-    def OBJ_stream_to_trisurf(cls, obj_stream: TextIO, mtl_stream: TextIO, texture_stream: io.BytesIO) -> TriSurf:
+    def OBJ_stream_to_trisurf(cls, obj_stream: TextIO, mtl_stream: list[TextIO], texture_stream: list[io.BytesIO]) -> TriSurf:
         """
         Load an OBJ file from a stream and convert it to a TriSurf object.
         
@@ -282,10 +283,10 @@ class TriMeshReaderFromBlob:
             
             if mtl_stream is not None:
                 cls.write_material_files(
-                    mtl_stream=mtl_stream, 
+                    mtl_streams=mtl_stream, 
                     obj_stream=obj_stream, 
                     temp_dir=temp_dir, 
-                    texture_stream=texture_stream
+                    texture_streams=texture_stream
                 )
 
             # Now load the OBJ with all associated files available
@@ -297,12 +298,13 @@ class TriMeshReaderFromBlob:
         return tri_surf
 
     @classmethod
-    def write_material_files(cls, mtl_stream: TextIO, obj_stream: TextIO, temp_dir, texture_stream: io.BytesIO):
+    def write_material_files(cls, mtl_streams: list[TextIO], obj_stream: TextIO, temp_dir, texture_streams: list[io.BytesIO]):
         # Extract mtl references from the OBJ file
         mtl_files = cls._extract_mtl_references(obj_stream)
         # Download and save MTL files
-        for mtl_file in mtl_files:
+        for e, mtl_file in enumerate(mtl_files):
             mtl_path = f"{temp_dir}/{mtl_file}" if temp_dir else mtl_file
+            mtl_stream = mtl_streams[e] if mtl_streams else None
             try:
                 # Save the MTL file to temp directory
                 mtl_temp_path = os.path.join(temp_dir, mtl_file)
@@ -314,12 +316,13 @@ class TriMeshReaderFromBlob:
                 mtl_stream.seek(0)
                 texture_files = cls._extract_texture_references(mtl_stream)
 
-                if texture_stream is None:
+                if texture_streams is None:
                     continue
                     
                 # Download texture files
-                for texture_file in texture_files:
+                for ee, texture_file in enumerate(texture_files):
                     texture_path = f"{temp_dir}/{texture_file}" if temp_dir else texture_file
+                    texture_stream = texture_streams[ee] if texture_streams else None
                     try:
                         # Save the texture file to temp directory
                         with open(os.path.join(temp_dir, texture_file), 'wb') as f:  # Binary mode for textures
@@ -349,20 +352,37 @@ class TriMeshReaderFromBlob:
 
     @classmethod
     def _extract_texture_references(cls, mtl_stream):
-        """Extract texture file references from an MTL file."""
+        """
+        Extract texture file references from an MTL file.
+        Works with both TextIO and BytesIO streams.
+        
+        Parameters:
+            mtl_stream: TextIO or BytesIO containing the MTL file data
+            
+        Returns:
+            list[str]: List of texture file names referenced in the MTL
+        """
         mtl_stream.seek(0)
         texture_files = []
-
-        # TextIO stream already contains decoded text, so no need to decode
-        mtl_text = mtl_stream.read()
+        
+        # Handle both TextIO and BytesIO
+        if isinstance(mtl_stream, io.TextIOWrapper):
+            # TextIO stream already contains decoded text
+            mtl_text = mtl_stream.read()
+        else:
+            # BytesIO stream needs to be decoded
+            mtl_text = mtl_stream.read().decode('utf-8', errors='replace')
+        
         mtl_stream.seek(0)
-
+        
         for line in mtl_text.splitlines():
             # Check for texture map definitions
-            if any(line.startswith(prefix) for prefix in ['map_Kd ', 'map_Ka ', 'map_Ks ', 'map_Bump ', 'map_d ']):
-                parts = line.split(None, 1)
-                if len(parts) > 1:
-                    texture_name = parts[1].strip()
-                    texture_files.append(texture_name)
-
+            for prefix in ['map_Kd ', 'map_Ka ', 'map_Ks ', 'map_Bump ', 'map_d ']:
+                if line.startswith(prefix):
+                    parts = line.split(None, 1)
+                    if len(parts) > 1:
+                        texture_name = parts[1].strip()
+                        texture_files.append(texture_name)
+                    break
+        
         return texture_files
