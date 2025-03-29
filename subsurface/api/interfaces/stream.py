@@ -2,8 +2,8 @@ from io import BytesIO
 from typing import TextIO
 
 import pandas
-from subsurface.modules.reader.volume.volume_utils import interpolate_unstructured_data_to_structured_data
 
+from ...core.structs import TriSurf
 from ...core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
 from ...core.reader_helpers.readers_data import GenericReaderFilesHelper
 from ...core.geological_formats import BoreholeSet
@@ -12,6 +12,7 @@ from ...core.structs.base_structures import UnstructuredData, StructuredData
 from ...modules import reader
 from ...modules.reader.volume.read_volume import read_volumetric_mesh_to_subsurface, read_VTK_structured_grid
 from ...modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
+from ...modules.reader.volume.volume_utils import interpolate_unstructured_data_to_structured_data
 
 from ..reader.read_wells import read_wells
 
@@ -37,6 +38,12 @@ def OMF_stream_to_unstruc(stream: BytesIO) -> list[UnstructuredData]:
 def MX_stream_to_unstruc(stream: TextIO) -> list[UnstructuredData]:
     list_unstruct: list[UnstructuredData] = [reader.mx_to_unstruc_from_binary(stream)]
     return list_unstruct
+
+
+def OBJ_stream_to_trisurf(stream: BytesIO) -> TriSurf:
+    tri_mesh: TriSurf = reader.load_obj_with_trimesh_from_binary(stream)
+    breakpoint()
+    raise NotImplementedError
 
 
 def VTK_stream_to_struct(stream: BytesIO, attribute_name: str) -> list[StructuredData]:

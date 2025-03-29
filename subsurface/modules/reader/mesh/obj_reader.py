@@ -1,10 +1,22 @@
-﻿from typing import Union
+﻿from typing import Union, TextIO
 
-import subsurface
-from subsurface.modules.reader.mesh._trimesh_reader import _load_with_trimesh, trimesh_to_unstruct
+from ._trimesh_reader import _load_with_trimesh, trimesh_to_unstruct, TriMeshReaderFromBlob
+from ....core.structs import TriSurf
 
 
-def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> subsurface.TriSurf:
+def load_obj_with_trimesh_from_binary(stream: TextIO):
+    tri_surf: TriSurf = TriMeshReaderFromBlob.OBJ_stream_to_trisurf(
+        obj_stream=stream,
+        mtl_stream=None,
+        texture_stream=None
+    )
+    
+    return tri_surf
+    
+    # TODO: Somehow call here trimesh
+
+
+def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> TriSurf:
     """
     Load and process an OBJ file, returning trimesh-compatible objects.
 
