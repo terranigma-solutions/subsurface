@@ -9,7 +9,6 @@ from subsurface.modules.reader.wells.wells_utils import add_tops_from_base_and_a
 
 
 def read_collar(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
-    if reader_helper.usecols is None: reader_helper.usecols = [0, 1, 2, 3]
     if reader_helper.index_col is False: reader_helper.index_col = 0
 
     # Check file_or_buffer type
