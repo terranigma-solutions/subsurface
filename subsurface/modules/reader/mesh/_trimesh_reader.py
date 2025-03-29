@@ -220,6 +220,10 @@ class TrimeshToSubsurface:
         from PIL.PngImagePlugin import PngImageFile
         import trimesh
 
+
+        if geom.visual is None or getattr(geom.visual, 'material', None) is None:
+            return None
+
         array = np.empty(0)
         if isinstance(geom.visual.material, trimesh.visual.material.SimpleMaterial):
             image: JpegImageFile = geom.visual.material.image
