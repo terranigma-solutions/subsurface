@@ -67,7 +67,7 @@ def test_trimesh_load_obj_with_texture_II():
     """Penguin, material exist but png is not loading correctly"""
     path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/TexturedMesh/PenguinBaseMesh.obj"
     _load_with_trimesh(
-        path_to_obj=path_to_obj,
+        path_to_file_or_buffer=path_to_obj,
         plot=False
     )
 
@@ -75,7 +75,7 @@ def test_trimesh_load_obj_with_texture_II():
 def test_trimesh_one_element_no_texture_to_unstruct():
     path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/TexturedMesh/PenguinBaseMesh.obj"
     trimesh_obj = _load_with_trimesh(
-        path_to_obj=path_to_obj,
+        path_to_file_or_buffer=path_to_obj,
         plot=False
     )
     ts = trimesh_to_unstruct(trimesh_obj)
@@ -96,7 +96,7 @@ def test_trimesh_three_element_no_texture_to_unstruct():
 
 def test_trimesh_ONE_element_texture_to_unstruct():
     trimesh_obj = _load_with_trimesh(
-        path_to_obj=(os.getenv("PATH_TO_OBJ_FACE_II")),
+        path_to_file_or_buffer=(os.getenv("PATH_TO_OBJ_FACE_II")),
         plot=False
     )
 

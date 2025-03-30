@@ -10,8 +10,8 @@ from subsurface import optional_requirements
 from subsurface.core.structs import TriSurf, StructuredData
 
 
-def _load_with_trimesh(path_to_obj, file_type: Optional[str] = None, plot=False):
-    return LoadWithTrimesh.load_with_trimesh(path_to_obj, file_type, plot)
+def _load_with_trimesh(path_to_file_or_buffer, file_type: Optional[str] = None, plot=False):
+    return LoadWithTrimesh.load_with_trimesh(path_to_file_or_buffer, file_type, plot)
 
 
 def trimesh_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]) -> TriSurf:
@@ -20,12 +20,13 @@ def trimesh_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]
 
 class LoadWithTrimesh:
     @classmethod
-    def load_with_trimesh(cls, path_to_obj, file_type: Optional[str] = None, plot=False):
+    def load_with_trimesh(cls, path_to_file_or_buffer, file_type: Optional[str] = None, plot=False):
         trimesh = optional_requirements.require_trimesh()
         # Load the OBJ with Trimesh using the specified options
         scene_or_mesh = trimesh.load(
-            file_obj=path_to_obj,
-            file_type=file_type
+            file_obj=path_to_file_or_buffer,
+            file_type=file_type,
+            force="mesh"
         )
         # Process single mesh vs. scene
         if isinstance(scene_or_mesh, trimesh.Scene):
