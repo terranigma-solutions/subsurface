@@ -5,7 +5,7 @@ Python installation file.
 import os
 import sys
 from os import path
-from setuptools import setup_test_environment, find_packages
+from setuptools import setup, find_packages
 
 if not sys.version_info[:2] >= (3, 8):
     sys.exit(f"subsurface is only meant for Python 3.8 and up.\n"
