@@ -1,16 +1,18 @@
 ﻿from typing import Union, TextIO
 import io
 
-from ._trimesh_reader import load_with_trimesh, trimesh_to_unstruct, TriMeshReaderFromBlob
+from ._trimesh_reader import load_with_trimesh, trimesh_to_unstruct, TriMeshReaderFromBlob, TriMeshTransformations
 from ....core.structs import TriSurf
 
 
 
-def load_obj_with_trimesh_from_binary(obj_stream: TextIO, mtl_stream: list[TextIO], texture_stream: list[io.BytesIO]) -> TriSurf:
+def load_obj_with_trimesh_from_binary(obj_stream: TextIO, mtl_stream: list[TextIO], 
+                                      texture_stream: list[io.BytesIO], coord_system: TriMeshTransformations) -> TriSurf:
     tri_surf: TriSurf = TriMeshReaderFromBlob.OBJ_stream_to_trisurf(
         obj_stream=obj_stream,
         mtl_stream=mtl_stream,
-        texture_stream=texture_stream
+        texture_stream=texture_stream,
+        coord_system=coord_system
     )
     
     return tri_surf

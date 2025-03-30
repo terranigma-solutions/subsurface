@@ -4,11 +4,9 @@ import io
 import os
 
 import numpy as np
-from subsurface.core.structs import UnstructuredData
-
-import subsurface
-from subsurface import optional_requirements
-from subsurface.core.structs import TriSurf, StructuredData
+from ....core.structs import UnstructuredData
+from .... import optional_requirements
+from ....core.structs import TriSurf, StructuredData
 
 
 class TriMeshTransformations(enum.Enum):
@@ -297,7 +295,8 @@ class TrimeshToSubsurface:
 
 class TriMeshReaderFromBlob:
     @classmethod
-    def OBJ_stream_to_trisurf(cls, obj_stream: TextIO, mtl_stream: list[TextIO], texture_stream: list[io.BytesIO]) -> TriSurf:
+    def OBJ_stream_to_trisurf(cls, obj_stream: TextIO, mtl_stream: list[TextIO],
+                              texture_stream: list[io.BytesIO], coord_system: TriMeshTransformations) -> TriSurf:
         """
         Load an OBJ file from a stream and convert it to a TriSurf object.
         
@@ -332,7 +331,11 @@ class TriMeshReaderFromBlob:
                 )
 
             # Now load the OBJ with all associated files available
-            scene_or_mesh = load_with_trimesh(obj_path, "obj", TriMeshTransformations.RIGHT_HANDED_Z_UP)
+            scene_or_mesh = load_with_trimesh(
+                path_to_file_or_buffer=obj_path,
+                file_type="obj",
+                coordinate_system=coord_system
+            )
 
             # Convert to a TriSurf object
             tri_surf = TrimeshToSubsurface.trimesh_to_unstruct(scene_or_mesh)

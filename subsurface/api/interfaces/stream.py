@@ -11,6 +11,7 @@ from ...core.geological_formats import BoreholeSet
 from ...core.structs.base_structures import UnstructuredData, StructuredData
 
 from ...modules import reader
+from ...modules.reader.mesh._trimesh_reader import TriMeshTransformations
 from ...modules.reader.volume.read_volume import read_volumetric_mesh_to_subsurface, read_VTK_structured_grid
 from ...modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
 from ...modules.reader.volume.volume_utils import interpolate_unstructured_data_to_structured_data
@@ -41,17 +42,19 @@ def MX_stream_to_unstruc(stream: TextIO) -> list[UnstructuredData]:
     return list_unstruct
 
 
-def OBJ_stream_to_trisurf(obj_stream: TextIO, mtl_stream: list[TextIO], texture_stream: list[io.BytesIO]) -> TriSurf:
+def OBJ_stream_to_trisurf(obj_stream: TextIO, mtl_stream: list[TextIO],
+                          texture_stream: list[io.BytesIO], coordinate_system: TriMeshTransformations) -> TriSurf:
     tri_mesh: TriSurf = reader.load_obj_with_trimesh_from_binary(
         obj_stream=obj_stream,
         mtl_stream=mtl_stream,
-        texture_stream=texture_stream
+        texture_stream=texture_stream,
+        coord_system=coordinate_system
     )
     return tri_mesh
 
 
-def GLTF_stream_to_trisurf(gltf_stream: io.BytesIO) -> TriSurf:
-    tri_mesh: TriSurf = reader.load_gltf_with_trimesh(gltf_stream)
+def GLTF_stream_to_trisurf(gltf_stream: io.BytesIO, coordinate_system: TriMeshTransformations) -> TriSurf:
+    tri_mesh: TriSurf = reader.load_gltf_with_trimesh(gltf_stream, coordinate_system)
     return tri_mesh
 
 def VTK_stream_to_struct(stream: BytesIO, attribute_name: str) -> list[StructuredData]:
