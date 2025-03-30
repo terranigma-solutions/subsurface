@@ -2,10 +2,10 @@ import io
 from typing import Union
 
 from ....core.structs import TriSurf
-from ._trimesh_reader import load_with_trimesh, trimesh_to_unstruct
+from ._trimesh_reader import load_with_trimesh, trimesh_to_unstruct, TriMeshTransformations
 
 
-def load_gltf_with_trimesh(path_to_glb: Union[str | io.BytesIO], plot: bool = False) -> TriSurf:
+def load_gltf_with_trimesh(path_to_glb: Union[str | io.BytesIO], coordinate_system: TriMeshTransformations) -> TriSurf:
     """
     load_obj_with_trimesh(path_to_glb, plot=False)
 
@@ -25,6 +25,6 @@ def load_gltf_with_trimesh(path_to_glb: Union[str | io.BytesIO], plot: bool = Fa
     subsurface.TriSurf
         A TriSurf object representing the processed 3D surface geometry.
     """
-    trimesh = load_with_trimesh(path_to_glb, file_type="glb", plot=plot)
+    trimesh = load_with_trimesh(path_to_glb, file_type="glb", coordinate_system=coordinate_system, plot=False)
     trisurf = trimesh_to_unstruct(trimesh)
     return trisurf

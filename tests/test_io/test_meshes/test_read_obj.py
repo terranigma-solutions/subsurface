@@ -7,7 +7,7 @@ import subsurface
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 
 from subsurface import optional_requirements
-from subsurface.modules.reader.mesh._trimesh_reader import trimesh_to_unstruct, load_with_trimesh
+from subsurface.modules.reader.mesh._trimesh_reader import trimesh_to_unstruct, load_with_trimesh, TriMeshTransformations
 
 dotenv.load_dotenv()
 
@@ -81,7 +81,7 @@ def test_trimesh_one_element_no_texture_to_unstruct():
     ts = trimesh_to_unstruct(trimesh_obj)
 
     s = to_pyvista_mesh(ts)
-    pv_plot([s], image_2d=False)
+    pv_plot([s], image_2d=True)
 
 
 def test_trimesh_three_element_no_texture_to_unstruct():
@@ -111,7 +111,7 @@ def test_trimesh_three_element_texture_to_unstruct():
     multiple images as structured objects
     """
     path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
-    trimesh_obj = load_with_trimesh(path_to_obj)
+    trimesh_obj = load_with_trimesh(path_to_obj, coordinate_system=TriMeshTransformations.ORIGINAL)
 
     ts = trimesh_to_unstruct(trimesh_obj)
 

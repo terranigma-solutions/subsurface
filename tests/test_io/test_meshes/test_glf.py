@@ -4,6 +4,7 @@ import dotenv
 import pytest
 
 import subsurface
+from subsurface.modules.reader.mesh._trimesh_reader import TriMeshTransformations
 from subsurface.modules.reader.mesh.glb_reader import load_gltf_with_trimesh
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 from tests.conftest import RequirementsLevel
@@ -30,7 +31,7 @@ def test_trimesh_read_glb_complex():
 
     # Trimesh can load GLB/GLTF natively
 
-    ts: subsurface.TriSurf = load_gltf_with_trimesh(glb_path)
+    ts: subsurface.TriSurf = load_gltf_with_trimesh(glb_path, TriMeshTransformations.RIGHT_HANDED_Z_UP)
     s = to_pyvista_mesh(ts)
     pv_plot([s], image_2d=True)
     return
@@ -48,7 +49,7 @@ def test_trimesh_read_glb():
 
     # Trimesh can load GLB/GLTF natively
 
-    ts = load_gltf_with_trimesh(glb_path, plot=False)
+    ts = load_gltf_with_trimesh(glb_path, TriMeshTransformations.RIGHT_HANDED_Z_UP)
     s = to_pyvista_mesh(ts)
     pv_plot([s], image_2d=True)
     return 
