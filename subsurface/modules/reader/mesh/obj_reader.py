@@ -1,10 +1,24 @@
-﻿from typing import Union
+﻿from typing import Union, TextIO
+import io
 
-import subsurface
-from subsurface.modules.reader.mesh._trimesh_reader import _load_with_trimesh, trimesh_to_unstruct
+from ._trimesh_reader import load_with_trimesh, trimesh_to_unstruct, TriMeshReaderFromBlob, TriMeshTransformations
+from ....core.structs import TriSurf
 
 
-def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> subsurface.TriSurf:
+
+def load_obj_with_trimesh_from_binary(obj_stream: TextIO, mtl_stream: list[TextIO], 
+                                      texture_stream: list[io.BytesIO], coord_system: TriMeshTransformations) -> TriSurf:
+    tri_surf: TriSurf = TriMeshReaderFromBlob.OBJ_stream_to_trisurf(
+        obj_stream=obj_stream,
+        mtl_stream=mtl_stream,
+        texture_stream=texture_stream,
+        coord_system=coord_system
+    )
+    
+    return tri_surf
+    
+
+def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> TriSurf:
     """
     Load and process an OBJ file, returning trimesh-compatible objects.
 
@@ -34,6 +48,6 @@ def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> subsurface.Tr
         `ValueError`: If the OBJ file could not be properly processed.
 
     """
-    trimesh = _load_with_trimesh(path_to_obj, plot)
+    trimesh = load_with_trimesh(path_to_obj, file_type="obj", plot=plot)
     trisurf = trimesh_to_unstruct(trimesh)
     return trisurf

@@ -7,7 +7,7 @@ import subsurface
 from subsurface.modules.visualization import to_pyvista_mesh, pv_plot
 
 from subsurface import optional_requirements
-from subsurface.modules.reader.mesh._trimesh_reader import trimesh_to_unstruct, _load_with_trimesh
+from subsurface.modules.reader.mesh._trimesh_reader import trimesh_to_unstruct, load_with_trimesh, TriMeshTransformations
 
 dotenv.load_dotenv()
 
@@ -34,48 +34,48 @@ def test_trimesh_load_obj_with_mtl_submeshes_heavy():
 
     assert os.path.exists(path_to_obj), f"OBJ not found: {path_to_obj}"
     assert os.path.exists(path_to_mtl), f"MTL not found: {path_to_mtl}"
-    _load_with_trimesh(path_to_obj, plot=False)
+    load_with_trimesh(path_to_obj, plot=False)
 
 
 def test_trimesh_load_obj_with_mtl_submeshes_II():
     # Replace these with the actual paths in your environment
     path_to_obj = os.getenv("PATH_TO_OBJ_MULTIMATERIAL_II")
-    _load_with_trimesh(path_to_obj, plot=False)
+    load_with_trimesh(path_to_obj, plot=False)
 
 
 def test_trimesh_load_obj_with_jpg_texture():
     path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/Portugal outcrop decimated/textured_output.obj"
-    _load_with_trimesh(path_to_obj)
+    load_with_trimesh(path_to_obj)
 
 
 def test_trimesh_load_obj_with_face_I():
     path_to_obj = os.getenv("PATH_TO_OBJ_FACE_I")
-    _load_with_trimesh(path_to_obj, plot=False)
+    load_with_trimesh(path_to_obj, plot=False)
 
 
 def test_trimesh_load_obj_with_face_II():
     path_to_obj = os.getenv("PATH_TO_OBJ_FACE_II")
-    _load_with_trimesh(path_to_obj, plot=False)
+    load_with_trimesh(path_to_obj, plot=False)
 
 
 def test_trimesh_load_obj_boxes():
     path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
-    _load_with_trimesh(path_to_obj)
+    load_with_trimesh(path_to_obj)
 
 
 def test_trimesh_load_obj_with_texture_II():
     """Penguin, material exist but png is not loading correctly"""
     path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/TexturedMesh/PenguinBaseMesh.obj"
-    _load_with_trimesh(
-        path_to_obj=path_to_obj,
+    load_with_trimesh(
+        path_to_file_or_buffer=path_to_obj,
         plot=False
     )
 
 
 def test_trimesh_one_element_no_texture_to_unstruct():
     path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/TexturedMesh/PenguinBaseMesh.obj"
-    trimesh_obj = _load_with_trimesh(
-        path_to_obj=path_to_obj,
+    trimesh_obj = load_with_trimesh(
+        path_to_file_or_buffer=path_to_obj,
         plot=False
     )
     ts = trimesh_to_unstruct(trimesh_obj)
@@ -86,7 +86,7 @@ def test_trimesh_one_element_no_texture_to_unstruct():
 
 def test_trimesh_three_element_no_texture_to_unstruct():
     path_to_obj = os.getenv("PATH_TO_OBJ_MULTIMATERIAL_II")
-    trimesh_obj = _load_with_trimesh(path_to_obj)
+    trimesh_obj = load_with_trimesh(path_to_obj)
 
     ts = trimesh_to_unstruct(trimesh_obj)
 
@@ -95,8 +95,8 @@ def test_trimesh_three_element_no_texture_to_unstruct():
 
 
 def test_trimesh_ONE_element_texture_to_unstruct():
-    trimesh_obj = _load_with_trimesh(
-        path_to_obj=(os.getenv("PATH_TO_OBJ_FACE_II")),
+    trimesh_obj = load_with_trimesh(
+        path_to_file_or_buffer=(os.getenv("PATH_TO_OBJ_FACE_II")),
         plot=False
     )
 
@@ -111,7 +111,7 @@ def test_trimesh_three_element_texture_to_unstruct():
     multiple images as structured objects
     """
     path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
-    trimesh_obj = _load_with_trimesh(path_to_obj)
+    trimesh_obj = load_with_trimesh(path_to_obj, coordinate_system=TriMeshTransformations.ORIGINAL)
 
     ts = trimesh_to_unstruct(trimesh_obj)
 
