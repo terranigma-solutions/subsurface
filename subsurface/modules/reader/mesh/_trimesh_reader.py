@@ -10,8 +10,75 @@ from subsurface import optional_requirements
 from subsurface.core.structs import TriSurf, StructuredData
 
 
-def _load_with_trimesh(path_to_file_or_buffer, file_type: Optional[str] = None, plot=False):
-    return LoadWithTrimesh.load_with_trimesh(path_to_file_or_buffer, file_type, plot)
+def load_with_trimesh(path_to_file_or_buffer, file_type: Optional[str] = None,
+                     coordinate_system: str = "right_handed_z_up", *, plot=False):
+    """
+    Load a mesh with trimesh and convert to the specified coordinate system.
+
+    Parameters:
+        path_to_file_or_buffer: Path to the mesh file or file-like object
+        file_type: Optional file type specification
+        coordinate_system: Target coordinate system, options:
+                           - "original" (no conversion)
+                           - "right_handed_z_up" (scientific standard)
+                           - "right_handed_y_up" (OpenGL standard)
+                           - "left_handed_y_up" (DirectX standard)
+        plot: Whether to plot the mesh
+    """
+    trimesh = optional_requirements.require_trimesh()
+    scene_or_mesh = LoadWithTrimesh.load_with_trimesh(path_to_file_or_buffer, file_type, plot)
+
+    if coordinate_system == "original":
+        return scene_or_mesh
+
+    # Define transformations for different coordinate systems
+    if coordinate_system == "right_handed_z_up":
+        # Transform from Y-up (modeling software) to Z-up (scientific)
+        # This rotates the model so that:
+        # Old Y axis → New Z axis (pointing up)
+        # Old Z axis → New -Y axis
+        # Old X axis → Remains as X axis
+        transform = np.array([
+            [1, 0, 0, 0],   # X → X
+            [0, 0, 1, 0],   # Y → Z 
+            [0, -1, 0, 0],  # Z → -Y
+            [0, 0, 0, 1]
+        ])
+        
+        # Apply the coordinate transformation
+        if isinstance(scene_or_mesh, trimesh.Scene):
+            for geometry in scene_or_mesh.geometry.values():
+                geometry.apply_transform(transform)
+        else:
+            scene_or_mesh.apply_transform(transform)
+            
+        # After transformation, ensure all coordinates are positive
+        bounds = None
+        if isinstance(scene_or_mesh, trimesh.Scene):
+            # For scenes, calculate global bounds of all geometries
+            bounds = scene_or_mesh.bounds
+        else:
+            bounds = scene_or_mesh.bounds
+
+        # If any lower bounds are negative, create a translation to shift the model
+        translation = np.zeros(3)
+        for i in range(3):
+            if bounds[0][i] < 0:
+                translation[i] = -bounds[0][i]
+
+        if np.any(translation != 0):
+            # Create translation matrix
+            trans_matrix = np.eye(4)
+            trans_matrix[:3, 3] = translation
+
+            # Apply translation to ensure positive coordinates
+            if isinstance(scene_or_mesh, trimesh.Scene):
+                for geometry in scene_or_mesh.geometry.values():
+                    geometry.apply_transform(trans_matrix)
+            else:
+                scene_or_mesh.apply_transform(trans_matrix)
+
+    return scene_or_mesh
 
 
 def trimesh_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]) -> TriSurf:
@@ -41,6 +108,7 @@ class LoadWithTrimesh:
             cls.handle_material_info(scene_or_mesh)
             if plot:
                 scene_or_mesh.show()
+
         return scene_or_mesh
 
     @classmethod
@@ -288,7 +356,7 @@ class TriMeshReaderFromBlob:
                 )
 
             # Now load the OBJ with all associated files available
-            scene_or_mesh = trimesh.load(obj_path)
+            scene_or_mesh = load_with_trimesh(obj_path, "obj", False)
 
             # Convert to a TriSurf object
             tri_surf = TrimeshToSubsurface.trimesh_to_unstruct(scene_or_mesh)

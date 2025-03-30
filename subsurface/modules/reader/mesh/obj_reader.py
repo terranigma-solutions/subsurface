@@ -1,7 +1,7 @@
 ﻿from typing import Union, TextIO
 import io
 
-from ._trimesh_reader import _load_with_trimesh, trimesh_to_unstruct, TriMeshReaderFromBlob
+from ._trimesh_reader import load_with_trimesh, trimesh_to_unstruct, TriMeshReaderFromBlob
 from ....core.structs import TriSurf
 
 
@@ -46,6 +46,6 @@ def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> TriSurf:
         `ValueError`: If the OBJ file could not be properly processed.
 
     """
-    trimesh = _load_with_trimesh(path_to_obj, file_type="obj", plot=plot)
+    trimesh = load_with_trimesh(path_to_obj, file_type="obj", plot=plot)
     trisurf = trimesh_to_unstruct(trimesh)
     return trisurf
