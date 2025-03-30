@@ -46,6 +46,6 @@ def load_obj_with_trimesh(path_to_obj: str, plot: bool = False) -> TriSurf:
         `ValueError`: If the OBJ file could not be properly processed.
 
     """
-    trimesh = _load_with_trimesh(path_to_obj, plot)
+    trimesh = _load_with_trimesh(path_to_obj, file_type="obj", plot=plot)
     trisurf = trimesh_to_unstruct(trimesh)
     return trisurf

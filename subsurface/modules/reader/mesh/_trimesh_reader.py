@@ -1,4 +1,4 @@
-from typing import Union, TextIO
+from typing import Union, TextIO, Optional
 import io
 import os
 
@@ -10,8 +10,8 @@ from subsurface import optional_requirements
 from subsurface.core.structs import TriSurf, StructuredData
 
 
-def _load_with_trimesh(path_to_obj, plot):
-    return LoadWithTrimesh._load_with_trimesh(path_to_obj, plot)
+def _load_with_trimesh(path_to_obj, file_type: Optional[str] = None, plot=False):
+    return LoadWithTrimesh.load_with_trimesh(path_to_obj, file_type, plot)
 
 
 def trimesh_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]) -> TriSurf:
@@ -20,13 +20,12 @@ def trimesh_to_unstruct(scene_or_mesh: Union["trimesh.Trimesh", "trimesh.Scene"]
 
 class LoadWithTrimesh:
     @classmethod
-    def _load_with_trimesh(cls, path_to_obj, plot=False):
-        plot = True
+    def load_with_trimesh(cls, path_to_obj, file_type: Optional[str] = None, plot=False):
         trimesh = optional_requirements.require_trimesh()
         # Load the OBJ with Trimesh using the specified options
         scene_or_mesh = trimesh.load(
             file_obj=path_to_obj,
-            file_type="obj"
+            file_type=file_type
         )
         # Process single mesh vs. scene
         if isinstance(scene_or_mesh, trimesh.Scene):
@@ -221,7 +220,6 @@ class TrimeshToSubsurface:
         from PIL.PngImagePlugin import PngImageFile
         import trimesh
 
-
         if geom.visual is None or getattr(geom.visual, 'material', None) is None:
             return None
 
@@ -280,12 +278,11 @@ class TriMeshReaderFromBlob:
                 f.write(obj_stream.read())
                 obj_stream.seek(0)
 
-            
             if mtl_stream is not None:
                 cls.write_material_files(
-                    mtl_streams=mtl_stream, 
-                    obj_stream=obj_stream, 
-                    temp_dir=temp_dir, 
+                    mtl_streams=mtl_stream,
+                    obj_stream=obj_stream,
+                    temp_dir=temp_dir,
                     texture_streams=texture_stream
                 )
 
@@ -318,7 +315,7 @@ class TriMeshReaderFromBlob:
 
                 if texture_streams is None:
                     continue
-                    
+
                 # Download texture files
                 for ee, texture_file in enumerate(texture_files):
                     texture_path = f"{temp_dir}/{texture_file}" if temp_dir else texture_file
@@ -364,7 +361,7 @@ class TriMeshReaderFromBlob:
         """
         mtl_stream.seek(0)
         texture_files = []
-        
+
         # Handle both TextIO and BytesIO
         if isinstance(mtl_stream, io.TextIOWrapper):
             # TextIO stream already contains decoded text
@@ -372,9 +369,9 @@ class TriMeshReaderFromBlob:
         else:
             # BytesIO stream needs to be decoded
             mtl_text = mtl_stream.read().decode('utf-8', errors='replace')
-        
+
         mtl_stream.seek(0)
-        
+
         for line in mtl_text.splitlines():
             # Check for texture map definitions
             for prefix in ['map_Kd ', 'map_Ka ', 'map_Ks ', 'map_Bump ', 'map_d ']:
@@ -384,5 +381,5 @@ class TriMeshReaderFromBlob:
                         texture_name = parts[1].strip()
                         texture_files.append(texture_name)
                     break
-        
+
         return texture_files

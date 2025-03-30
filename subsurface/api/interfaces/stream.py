@@ -50,6 +50,10 @@ def OBJ_stream_to_trisurf(obj_stream: TextIO, mtl_stream: list[TextIO], texture_
     return tri_mesh
 
 
+def GLTF_stream_to_trisurf(gltf_stream: io.BytesIO) -> TriSurf:
+    tri_mesh: TriSurf = reader.load_gltf_with_trimesh(gltf_stream)
+    return tri_mesh
+
 def VTK_stream_to_struct(stream: BytesIO, attribute_name: str) -> list[StructuredData]:
     struct = read_VTK_structured_grid(stream, attribute_name)
     return [struct]

@@ -1,8 +1,11 @@
-import subsurface
-from subsurface.modules.reader.mesh._trimesh_reader import _load_with_trimesh, trimesh_to_unstruct
+import io
+from typing import Union
+
+from ....core.structs import TriSurf
+from ._trimesh_reader import _load_with_trimesh, trimesh_to_unstruct
 
 
-def load_glb_with_trimesh(path_to_glb: str, plot: bool = False) -> subsurface.TriSurf:
+def load_gltf_with_trimesh(path_to_glb: Union[str | io.BytesIO], plot: bool = False) -> TriSurf:
     """
     load_obj_with_trimesh(path_to_glb, plot=False)
 
@@ -22,6 +25,6 @@ def load_glb_with_trimesh(path_to_glb: str, plot: bool = False) -> subsurface.Tr
     subsurface.TriSurf
         A TriSurf object representing the processed 3D surface geometry.
     """
-    trimesh = _load_with_trimesh(path_to_glb, plot)
+    trimesh = _load_with_trimesh(path_to_glb, file_type="glb", plot=plot)
     trisurf = trimesh_to_unstruct(trimesh)
     return trisurf
