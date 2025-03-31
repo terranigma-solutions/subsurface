@@ -78,7 +78,7 @@ def test_trimesh_one_element_no_texture_to_unstruct():
         path_to_file_or_buffer=path_to_obj,
         plot=False
     )
-    ts = trimesh_to_unstruct(trimesh_obj)
+    ts: subsurface.TriSurf = trimesh_to_unstruct(trimesh_obj)
 
     s = to_pyvista_mesh(ts)
     pv_plot([s], image_2d=True)
