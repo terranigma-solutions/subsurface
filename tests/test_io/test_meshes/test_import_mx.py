@@ -1,7 +1,9 @@
 import os
 
 import dotenv
+import pathlib
 import pytest
+from dotenv import dotenv_values
 
 import subsurface
 import subsurface.modules.visualization as sb_viz
@@ -44,3 +46,18 @@ def _meshes_to_pyvista(meshes: list[GOCADMesh]):
         pyvista_meshes.append(pv_mesh)
 
     return pyvista_meshes
+
+
+@pytest.mark.liquid_earth
+def test_read_mx_from_file__gen11818__idn64():
+    from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
+
+    config = dotenv_values()
+
+    dirpath = pathlib.Path(config.get('PATH_TO_IDN64'))
+    filepath = dirpath.joinpath('mx_ubc/muon_only.mx')
+
+    unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(str(filepath))
+    ts = TriSurf(mesh=unstruct)
+    s = sb_viz.to_pyvista_mesh(ts)
+    sb_viz.pv_plot([s], image_2d=True)
