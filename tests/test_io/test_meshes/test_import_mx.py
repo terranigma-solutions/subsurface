@@ -1,5 +1,3 @@
-import os
-
 import dotenv
 import pathlib
 import pytest
@@ -18,14 +16,7 @@ PLOT = True
 
 pytestmark = pytest.mark.read_mesh
 
-pytestmark = pytest.mark.skipif(
-    condition=RequirementsLevel.PLOT not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
-    reason="Need to set the READ_MESH"
-)
 
-
-@pytest.mark.skipif(os.getenv("TERRA_PATH_DEVOPS") is None, reason="Need to set the TERRA_PATH_DEVOPS")
-@pytest.mark.liquid_earth
 def test_read_gocad_from_file():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
 
@@ -53,8 +44,7 @@ def _meshes_to_pyvista(meshes: list[GOCADMesh]):
 
     return pyvista_meshes
 
-@pytest.mark.skipif(os.getenv("TERRA_PATH_DEVOPS") is None, reason="Need to set the TERRA_PATH_DEVOPS")
-@pytest.mark.liquid_earth
+
 def test_read_mx_from_file__gen11818__idn64():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
 
@@ -70,8 +60,6 @@ def test_read_mx_from_file__gen11818__idn64():
     sb_viz.pv_plot([s], image_2d=True)
 
 
-@pytest.mark.skipif(os.getenv("TERRA_PATH_DEVOPS") is None, reason="Need to set the TERRA_PATH_DEVOPS")
-@pytest.mark.liquid_earth
 def test_read_mx_from_file__gen11818__idn64_2():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
 
