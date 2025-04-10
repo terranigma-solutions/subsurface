@@ -53,7 +53,7 @@ def _meshes_to_pyvista(meshes: list[GOCADMesh]):
 
     return pyvista_meshes
 
-
+@pytest.mark.skipif(os.getenv("TERRA_PATH_DEVOPS") is None, reason="Need to set the TERRA_PATH_DEVOPS")
 @pytest.mark.liquid_earth
 def test_read_mx_from_file__gen11818__idn64():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
