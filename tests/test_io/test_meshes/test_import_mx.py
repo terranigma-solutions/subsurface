@@ -28,7 +28,13 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.liquid_earth
 def test_read_gocad_from_file():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
-    unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(os.getenv("PATH_TO_MX"))
+
+    config = dotenv_values()
+
+    devops_path = pathlib.Path(config.get('TERRA_PATH_DEVOPS'))
+    filepath = devops_path.joinpath('meshes\GOCAD\mix\horizons_faults.mx')
+
+    unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(filepath)
     ts = TriSurf(mesh=unstruct)
     s = sb_viz.to_pyvista_mesh(ts)
     sb_viz.pv_plot([s], image_2d=True)
@@ -54,8 +60,8 @@ def test_read_mx_from_file__gen11818__idn64():
 
     config = dotenv_values()
 
-    dirpath = pathlib.Path(config.get('PATH_TO_IDN64'))
-    filepath = dirpath.joinpath('mx_ubc/muon_only.mx')
+    devops_path = pathlib.Path(config.get('TERRA_PATH_DEVOPS'))
+    filepath = devops_path.joinpath('meshes\GOCAD\IDN-64\mx_ubc\muon_only.mx')
 
     unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(str(filepath))
     ts = TriSurf(mesh=unstruct)
