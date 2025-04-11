@@ -7,6 +7,7 @@ from subsurface.core.structs import StructuredData
 from .... import optional_requirements
 from ....core.structs import UnstructuredData
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
+import numpy as np
 import pandas as pd
 
 
@@ -32,7 +33,7 @@ def read_VTK_structured_grid(file_or_buffer: Union[str, BytesIO], active_scalars
         # If it's a file path, read directly
         pyvista_obj = pv.read(file_or_buffer)
     try:
-        pyvista_struct: pv.ExplicitStructuredGrid = pyvista_obj.cast_to_explicit_structured_grid()
+        pyvista_struct: pv.ExplicitStructuredGrid = pv_cast_to_explicit_structured_grid(pyvista_obj)
     except Exception as e:
         raise f"The file is not a structured grid: {e}"
 
@@ -99,3 +100,71 @@ def read_volumetric_mesh_attr_file(reader_helper: GenericReaderFilesHelper) -> p
     df = pd.read_table(reader_helper.file_or_buffer, **reader_helper.pandas_reader_kwargs)
     df.columns = df.columns.astype(str).str.strip()
     return df
+
+
+def pv_cast_to_explicit_structured_grid(pyvista_object):
+
+    pv = optional_requirements.require_pyvista()
+
+    match pyvista_object:
+
+        case pv.RectilinearGrid() as rectl_grid:
+
+            return __pv_convert_rectilinear_to_explicit(rectl_grid)
+
+        case _:
+
+            return pyvista_object.cast_to_explicit_structured_grid()
+
+
+def __pv_convert_rectilinear_to_explicit(rectl_grid):
+
+    pv = optional_requirements.require_pyvista()
+
+    # Extract the coordinate arrays from the input RectilinearGrid.
+    x = np.asarray(rectl_grid.x)
+    y = np.asarray(rectl_grid.y)
+    z = np.asarray(rectl_grid.z)
+
+    # Helper function: "double" the coordinates to produce an expanded set
+    # that, when processed internally via np.unique, returns the original nodal values.
+    def doubled_coords(arr):
+        return np.repeat(arr, 2)[1:-1]
+
+    # Double the coordinate arrays.
+    xcorn = doubled_coords(x)
+    ycorn = doubled_coords(y)
+    zcorn = doubled_coords(z)
+
+    # Build a complete grid of corner points via meshgrid. Fortran ('F') order ensures
+    # the connectivity ordering aligns with VTK's expectations.
+    xx, yy, zz = np.meshgrid(xcorn, ycorn, zcorn, indexing='ij')
+    corners = np.column_stack((xx.ravel(order='F'),
+                               yy.ravel(order='F'),
+                               zz.ravel(order='F')))
+
+    # The dimensions to pass to the ExplicitStructuredGrid constructor should be
+    # the counts of unique coordinates in each direction.
+    dims = (len(np.unique(xcorn)),
+            len(np.unique(ycorn)),
+            len(np.unique(zcorn)))
+
+    # Create the ExplicitStructuredGrid.
+    explicit_grid = pv.ExplicitStructuredGrid(dims, corners)
+    explicit_grid.compute_connectivity()
+
+    # --- Copy associated data arrays ---
+
+    # Transfer all cell data arrays.
+    for name, array in rectl_grid.cell_data.items():
+        explicit_grid.cell_data[name] = array.copy()
+
+    # Transfer all point data arrays.
+    for name, array in rectl_grid.point_data.items():
+        explicit_grid.point_data[name] = array.copy()
+
+    # (Optional) Transfer field data as well.
+    for name, array in rectl_grid.field_data.items():
+        explicit_grid.field_data[name] = array.copy()
+
+    return explicit_grid

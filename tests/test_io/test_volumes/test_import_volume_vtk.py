@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import pathlib
 from tempfile import NamedTemporaryFile
 
@@ -8,6 +9,7 @@ import pytest
 
 import subsurface
 from subsurface import StructuredGrid, optional_requirements
+from subsurface.modules.reader.volume.read_volume import pv_cast_to_explicit_structured_grid
 from subsurface.modules.visualization import to_pyvista_grid, pv_plot
 from tests.conftest import RequirementsLevel
 
@@ -45,10 +47,8 @@ def test_vtk_file_to_structured_data() -> subsurface.StructuredData:
     joinpath = data_path.joinpath('test_structured.vtk')
     pyvista_obj: pv.DataSet = pv.read(joinpath)
     pv.examples.download_angular_sector()
-    try:
-        pyvista_struct: pv.ExplicitStructuredGrid = pyvista_obj.cast_to_explicit_structured_grid()
-    except Exception as e:
-        raise "The file is not a structured grid"
+
+    pyvista_struct: pv.ExplicitStructuredGrid = pv_cast_to_explicit_structured_grid(pyvista_obj)
 
     active_scalars = "Cell Number"
 
@@ -130,3 +130,27 @@ def test_vtk_file_to_binary():
         new_file.write(binary_cell_number)
         new_file = open("test_volume_Random.le", "wb")
         new_file.write(binary_random)
+
+
+def test_vtk_file_to_structured_data__gen11818__idn63() -> subsurface.StructuredData:
+
+    pv = optional_requirements.require_pyvista()
+
+    devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
+    filepath = devops_path.joinpath(r"volume\VTK\IDN-63\muon.vtk")
+
+    pyvista_obj: pv.DataSet = pv.read(filepath)
+    pv.examples.download_angular_sector()
+
+    pyvista_struct = pv_cast_to_explicit_structured_grid(pyvista_obj)
+
+    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
+        grid=pyvista_struct,
+        data_array_name="model_name"
+    )
+
+    sg: subsurface.StructuredGrid = StructuredGrid(struct)
+
+    mesh = to_pyvista_grid(sg)
+    pv_plot([mesh], image_2d=True)
+    return struct
