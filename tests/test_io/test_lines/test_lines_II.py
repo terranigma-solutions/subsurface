@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import pytest
 import numpy as np
-from subsurface import UnstructuredData
+from subsurface.core.structs.base_structures import UnstructuredData
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
 from subsurface.core.geological_formats.boreholes.collars import Collars
 from subsurface.core.geological_formats.boreholes.survey import Survey
