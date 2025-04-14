@@ -111,7 +111,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
 
     # Start with a copy of the existing attributes DataFrame
     new_attrs = survey.survey_trajectory.data.points_attributes.copy()
-    if 'component lith' in attrs.columns:
+    if 'component lith' in attrs.columns and 'lith_ids' not in attrs.columns:
         # Factorize lith components directly in-place
         attrs['lith_ids'], _ = pd.factorize(attrs['component lith'], use_na_sentinel=True)
 
