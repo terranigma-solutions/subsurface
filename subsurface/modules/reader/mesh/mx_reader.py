@@ -157,7 +157,7 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
             continue
 
         if in_tface:
-            if line.startswith('VRTX'):
+            if line.startswith('VRTX') or line.startswith('PVRTX'):
                 # Parse vertex line
                 parts = line.split()
                 if len(parts) >= 5:
@@ -167,6 +167,7 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
                     vertex_indices.append(vid)
                     vertex_list.append([x, y, z])
                     vid_to_index[vid] = len(vertex_list) - 1
+                    # If PVRTX then there could be more columns with property values. For now, we are just parsing the vertex coordinates.
                 continue
             elif line.startswith('ATOM'):
                 # Parse ATOM line
