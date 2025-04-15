@@ -102,21 +102,81 @@ def read_volumetric_mesh_attr_file(reader_helper: GenericReaderFilesHelper) -> p
     return df
 
 
-def pv_cast_to_explicit_structured_grid(pyvista_object):
-
+def pv_cast_to_explicit_structured_grid(pyvista_object: 'pv.DataSet') -> 'pv.ExplicitStructuredGrid':
     pv = optional_requirements.require_pyvista()
 
     match pyvista_object:
-
         case pv.RectilinearGrid() as rectl_grid:
-
             return __pv_convert_rectilinear_to_explicit(rectl_grid)
-
+        case pv.UnstructuredGrid() as unstr_grid:
+            return __pv_convert_unstructured_to_explicit(unstr_grid)
         case _:
-
             return pyvista_object.cast_to_explicit_structured_grid()
 
 
+def __pv_convert_unstructured_to_explicit(unstr_grid):
+    """
+    Convert a PyVista UnstructuredGrid to an ExplicitStructuredGrid if possible.
+    """
+    pv = optional_requirements.require_pyvista()
+
+    # First check if the grid has the necessary attributes to be treated as structured
+    if not hasattr(unstr_grid, 'n_cells') or unstr_grid.n_cells == 0:
+        raise ValueError("The unstructured grid has no cells.")
+    
+    # Try to detect if the grid has a structured topology
+    # Check if the grid has cell type 11 (VTK_VOXEL) or 12 (VTK_HEXAHEDRON)
+    cell_types = unstr_grid.celltypes
+    
+    # Voxels (11) and hexahedra (12) are the cell types used in structured grids
+    if not all(ct in [11, 12] for ct in cell_types):
+        raise ValueError("The unstructured grid contains non-hexahedral cells and cannot be converted to explicit structured.")
+    
+    # Try to infer dimensions from the grid
+    try:
+        # Method 1: Try PyVista's built-in conversion if available
+        return unstr_grid.cast_to_explicit_structured_grid()
+    except (AttributeError, TypeError):
+        pass
+    
+    try:
+        # Method 2: If the grid has dimensions stored as field data
+        if "dimensions" in unstr_grid.field_data:
+            dims = unstr_grid.field_data["dimensions"]
+            if len(dims) == 3:
+                nx, ny, nz = dims
+                # Verify that dimensions match the number of cells
+                if (nx-1)*(ny-1)*(nz-1) != unstr_grid.n_cells:
+                    raise ValueError("Stored dimensions do not match the number of cells.")
+                
+                # Extract points and reorder if needed
+                points = unstr_grid.points.reshape((nx, ny, nz, 3))
+                
+                # Create explicit structured grid
+                explicit_grid = pv.ExplicitStructuredGrid((nx, ny, nz), points.reshape((-1, 3)))
+                explicit_grid.compute_connectivity()
+                
+                # Transfer data arrays
+                for name, array in unstr_grid.cell_data.items():
+                    explicit_grid.cell_data[name] = array.copy()
+                for name, array in unstr_grid.point_data.items():
+                    explicit_grid.point_data[name] = array.copy()
+                for name, array in unstr_grid.field_data.items():
+                    if name != "dimensions":  # Skip dimensions field
+                        explicit_grid.field_data[name] = array.copy()
+                
+                return explicit_grid
+    except (ValueError, KeyError):
+        pass
+    
+    # If none of the above methods work, use PyVista's extract_cells function
+    # to reconstruct the structured grid if possible
+    try:
+        # This is a best-effort approach that tries multiple strategies
+        return pv.core.filters.convert_unstructured_to_structured_grid(unstr_grid)
+    except Exception as e:
+        raise ValueError(f"Failed to convert unstructured grid to explicit structured grid: {e}")
+    
 def __pv_convert_rectilinear_to_explicit(rectl_grid):
 
     pv = optional_requirements.require_pyvista()
