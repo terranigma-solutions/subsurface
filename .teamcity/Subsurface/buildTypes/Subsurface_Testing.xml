@@ -3,13 +3,11 @@
   <name>Testing</name>
   <description />
   <settings>
-    <disabled-settings>
-      <setting-ref ref="Run_Test_2" />
-    </disabled-settings>
     <parameters>
       <param name="REQUIREMENT_LEVEL" value="READ_MESH" />
       <param name="env.MPLBACKEND" value="Agg" />
       <param name="env.PATH_TO_ASCII_DRILLHOLES" value="%env.TERRA_PATH_DEVOPS%/boreholes/ASCII_drillholes/" />
+      <param name="env.PATH_TO_BGR" value="%env.TERRA_PATH_DEVOPS%/boreholes/" />
       <param name="env.PATH_TO_BOLIDEN" value="%env.TERRA_PATH_DEVOPS%/combined/Leapfrog_OMF/Garpenberg_global_20220715.omf" />
       <param name="env.PATH_TO_GLB" value="%env.TERRA_PATH_DEVOPS%/meshes/GLB - GLTF/Duck.glb" />
       <param name="env.PATH_TO_GLB_COMPLEX" value="%env.TERRA_PATH_DEVOPS%/meshes/GLB - GLTF/GlbFile.glb" />
@@ -26,13 +24,12 @@
       <param name="env.PATH_TO_SECTION" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/L1_CDP-Coords.txt" />
       <param name="env.PATH_TO_SEISMIC" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/Linie01.segy" />
       <param name="env.PATH_TO_SEISMIC_FINAL" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/L1_final-mig.sgy" />
-      <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
-      <param name="env.PATH_TO_SPREMBERG_COLLAR" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_collar_updated.csv" />
-      <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
-      <param name="env.PATH_TO_SPREMBERG_STRATIGRAPHY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_stratigraphy.csv" />
       <param name="env.PATH_TO_SPREMBERG_ASSAY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_assay.csv" />
+      <param name="env.PATH_TO_SPREMBERG_COLLAR" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_collar_updated.csv" />
+      <param name="env.PATH_TO_SPREMBERG_STRATIGRAPHY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_stratigraphy.csv" />
+      <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
+      <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
       <param name="env.TERRA_PATH_DEVOPS" value="D:\OneDrive - Terranigma Solutions GmbH/Documents - Terranigma Base/DevOps/SubsurfaceTestData/" />
-      <param name="env.PATH_TO_BGR" value="%env.TERRA_PATH_DEVOPS%/boreholes/" />
     </parameters>
     <build-runners>
       <runner id="Setup" name="Setup" type="simpleRunner">
