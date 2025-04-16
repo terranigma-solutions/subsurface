@@ -37,9 +37,9 @@ def load_with_trimesh(path_to_file_or_buffer, file_type: Optional[str] = None,
             # Old Z axis → New -Y axis
             # Old X axis → Remains as X axis
             transform = np.array([
-                    [-1, 0, 0, 0],  
-                    [0, 0, 1, 0],  
-                    [0, 1, 0, 0], 
+                    [1, 0, 0, 0],  # X → X
+                    [0, 0, 1, 0],  # Y → Z 
+                    [0, 1, 0, 0],  # Z → -Y
                     [0, 0, 0, 1]
             ])
 
