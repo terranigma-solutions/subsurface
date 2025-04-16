@@ -1,21 +1,29 @@
 import dotenv
 import os
 import pandas as pd
+import pytest
 
 from subsurface import UnstructuredData
+from subsurface.api.reader.read_wells import read_wells
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
 from subsurface.core.geological_formats.boreholes.collars import Collars
 from subsurface.core.geological_formats.boreholes.survey import Survey
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 from subsurface.core.structs.unstructured_elements import PointSet
-from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith
+from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_attributes
 from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_line, init_plotter
+from ._aux_func import _plot
+from ...conftest import RequirementsLevel
 
 dotenv.load_dotenv()
 
 PLOT = True
 
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_WELL"
+)
 
 def test_read_collar():
     reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
@@ -89,6 +97,56 @@ def test_add_auxiliary_fields_to_survey():
     data_set: xr.Dataset = data_array.data
 
     pass
+
+
+def test_read_assay():
+    reader_collar: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=os.getenv("PATH_TO_SPREMBERG_COLLAR"),
+        header=0,
+        usecols=[0, 1, 2, 4],
+        columns_map={
+                "hole_id"            : "id",  # ? Index name is not mapped
+                "X_GK5_incl_inserted": "x",
+                "Y__incl_inserted"   : "y",
+                "Z_GK"               : "z"
+        }
+    )
+    reader: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=os.getenv("PATH_TO_SPREMBERG_SURVEY"),
+        columns_map={
+                'depth'  : 'md',
+                'dip'    : 'dip',
+                'azimuth': 'azi'
+        },
+    )
+
+    reader_attr: GenericReaderFilesHelper = GenericReaderFilesHelper(
+        file_or_buffer=os.getenv("PATH_TO_SPREMBERG_ASSAY"),
+        columns_map={
+                'hole_id'   : 'id',
+                'depth_from': 'top',
+                'depth_to'  : 'base'
+        },
+        additional_reader_kwargs={
+                'na_values': [-9999]
+        }
+    )
+    
+    borehole_set: BoreholeSet = read_wells(
+        collars_reader=reader_collar,
+        surveys_reader=reader,
+        attrs_reader=reader_attr,
+        is_lith_attr=False,
+        add_attrs_as_nodes=True
+    )
+    
+    _plot(
+        scalar="Cu(%)_GDR",
+        trajectory=borehole_set.combined_trajectory,
+        collars=borehole_set.collars,
+        image_2d=True
+    )
+
 
 
 def test_read_stratigraphy():

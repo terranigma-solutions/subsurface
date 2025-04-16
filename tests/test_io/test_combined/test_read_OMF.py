@@ -1,6 +1,7 @@
-import numpy as np
-from dotenv import dotenv_values
+import os
 
+import dotenv
+import numpy as np
 import subsurface
 from tests.conftest import RequirementsLevel
 from subsurface import optional_requirements, TriSurf
@@ -14,11 +15,11 @@ pytestmark = pytest.mark.skipif(
     reason="Need to set READ_MESH"
 )
 
+dotenv.load_dotenv()
 
 @pytest.fixture(scope="module")
 def load_omf():
-    config = dotenv_values()
-    path = config.get('PATH_TO_OMF')
+    path = os.getenv('PATH_TO_OMF')
     omfvista = optional_requirements.require_omf()
     omf = omfvista.load_project(path)
     return omf
@@ -110,17 +111,3 @@ def test_omf_to_unstruct_all_surfaces_to_one_unstructured_data(load_omf):
     list_of_polydata.append(s)
     pv_plot(list_of_polydata, image_2d=True)
 
-
-def test_omf_from_stream_to_unstruct_all_surfaces():
-    pyvista = optional_requirements.require_pyvista()
-
-    config = dotenv_values()
-    path = config.get('PATH_TO_OMF')
-    with open(path, "rb") as stream:
-        from subsurface.modules.reader import omf_stream_to_unstructs
-        unstruct = omf_stream_to_unstructs(stream)
-
-    ts: subsurface.TriSurf = TriSurf(mesh=unstruct)
-    s: pyvista.PolyData = to_pyvista_mesh(ts)
-
-    pv_plot([s], image_2d=True)

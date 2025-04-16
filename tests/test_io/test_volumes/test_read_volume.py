@@ -15,7 +15,7 @@ pf = pathlib.Path(__file__).parent.absolute()
 data_path = pf.joinpath('../../data/volume/')
 
 pytestmark = pytest.mark.skipif(
-    condition=(RequirementsLevel.PLOT) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    condition=(RequirementsLevel.READ_VOLUME) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set the READ_MESH"
 )
 

@@ -37,6 +37,10 @@ def test_trimesh_read_glb_complex():
     return
 
 
+@pytest.mark.skipif(
+    condition=(RequirementsLevel.MESH | RequirementsLevel.PLOT) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_MESH variable to run this test"
+)
 def test_trimesh_read_glb():
     """
     Test loading a .glb (binary glTF) file with trimesh.

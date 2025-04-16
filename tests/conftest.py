@@ -36,7 +36,7 @@ class RequirementsLevel(enum.Flag):
 
 
 def check_requirements(minimum_level: RequirementsLevel):
-    return RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST().value < minimum_level.value
+    return minimum_level not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
 
 
 def pytest_configure(config):

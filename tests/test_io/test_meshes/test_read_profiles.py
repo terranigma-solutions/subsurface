@@ -56,6 +56,10 @@ def test_read_trace_to_unstruct(data_path):
     s, uv = to_pyvista_mesh_and_texture(ts)
     pv_plot([s], image_2d=True)
 
+@pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_PROFILES) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_PROFILES flag to True in the conftest.py file to run this test"
+)
 def test_interpreted_profile():
     filepath = os.getenv("PATH_TO_INTERPRETATION")
 
@@ -134,6 +138,10 @@ def test_line_set_from_trace(data_path):
     pv_plot(m, image_2d=True)
 
 
+@pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_PROFILES) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_PROFILES flag to True in the conftest.py file to run this test"
+)
 class TestSeismicProfiles:
     def test_interpreted_profile_seismics(self):
         filepath = os.getenv("PATH_TO_INTERPRETATION")

@@ -12,7 +12,8 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 from subsurface.core.structs.unstructured_elements import PointSet
 from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith
-from tests.test_io.test_lines._aux_func import _plot
+from ._aux_func import _plot
+from ...conftest import RequirementsLevel
 
 dotenv.load_dotenv()
 
@@ -21,6 +22,10 @@ PLOT = True
 pf = pathlib.Path(__file__).parent.absolute()
 data_path = pf.joinpath('../../data/borehole/')
 
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_MESH"
+)
 
 @pytest.mark.liquid_earth
 def test_read_kim():
