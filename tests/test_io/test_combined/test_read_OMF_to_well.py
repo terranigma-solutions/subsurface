@@ -1,5 +1,7 @@
-﻿import pytest
-from dotenv import dotenv_values
+﻿import os
+
+import pytest
+import dotenv
 
 import subsurface
 from tests.conftest import RequirementsLevel
@@ -7,6 +9,7 @@ from subsurface import LineSet, UnstructuredData, PointSet, optional_requirement
 from subsurface.modules.visualization import pv_plot, to_pyvista_line, to_pyvista_points, PyvistaScalarType
 from subsurface.modules.writer import base_structs_to_binary_file
 
+dotenv.load_dotenv()
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_MESH) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set READ_MESH"
@@ -16,8 +19,7 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def load_omf():
-    config = dotenv_values()
-    path = config.get('PATH_TO_BOLIDEN')
+    path = os.getenv("PATH_TO_BOLIDEN")
     omfvista = optional_requirements.require_omf()
     omf = omfvista.load_project(path)
 

@@ -1,6 +1,7 @@
-import numpy as np
-from dotenv import dotenv_values
+import os
 
+import dotenv
+import numpy as np
 import subsurface
 from tests.conftest import RequirementsLevel
 from subsurface import optional_requirements, TriSurf
@@ -14,11 +15,11 @@ pytestmark = pytest.mark.skipif(
     reason="Need to set READ_MESH"
 )
 
+dotenv.load_dotenv()
 
 @pytest.fixture(scope="module")
 def load_omf():
-    config = dotenv_values()
-    path = config.get('PATH_TO_OMF')
+    path = os.getenv('PATH_TO_OMF')
     omfvista = optional_requirements.require_omf()
     omf = omfvista.load_project(path)
     return omf
