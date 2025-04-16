@@ -115,8 +115,8 @@ def test_omf_to_unstruct_all_surfaces_to_one_unstructured_data(load_omf):
 def test_omf_from_stream_to_unstruct_all_surfaces():
     pyvista = optional_requirements.require_pyvista()
 
-    config = dotenv_values()
-    path = config.get('PATH_TO_OMF')
+    path = os.getenv('PATH_TO_OMF')
+    omf = load_omf
     with open(path, "rb") as stream:
         from subsurface.modules.reader import omf_stream_to_unstructs
         unstruct = omf_stream_to_unstructs(stream)
