@@ -68,7 +68,7 @@ venv\Scripts\python -m pytest --teamcity -v -m core]]></param>
 @echo on
 set REQUIREMENT_LEVEL=READ_MESH
 echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
-venv\Scripts\python -m pytest --teamcity -v -m read_mesh]]></param>
+venv\Scripts\python -m pytest --teamcity -v]]></param>
           <param name="teamcity.step.mode" value="execute_if_failed" />
           <param name="use.custom.script" value="true" />
         </parameters>
