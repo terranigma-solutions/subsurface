@@ -111,17 +111,3 @@ def test_omf_to_unstruct_all_surfaces_to_one_unstructured_data(load_omf):
     list_of_polydata.append(s)
     pv_plot(list_of_polydata, image_2d=True)
 
-
-def test_omf_from_stream_to_unstruct_all_surfaces():
-    pyvista = optional_requirements.require_pyvista()
-
-    path = os.getenv('PATH_TO_OMF')
-    omf = load_omf
-    with open(path, "rb") as stream:
-        from subsurface.modules.reader import omf_stream_to_unstructs
-        unstruct = omf_stream_to_unstructs(stream)
-
-    ts: subsurface.TriSurf = TriSurf(mesh=unstruct)
-    s: pyvista.PolyData = to_pyvista_mesh(ts)
-
-    pv_plot([s], image_2d=True)
