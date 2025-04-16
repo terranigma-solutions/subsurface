@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<build-type xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" uuid="ed495f4f-4df2-4a37-bbfe-2489430a46e8" xsi:noNamespaceSchemaLocation="https://www.jetbrains.com/teamcity/schemas/2021.1/project-config.xsd">
+  <name>Testing</name>
+  <description />
+  <settings>
+    <disabled-settings>
+      <setting-ref ref="Run_Test_2" />
+    </disabled-settings>
+    <parameters>
+      <param name="REQUIREMENT_LEVEL" value="READ_MESH" />
+      <param name="env.MPLBACKEND" value="Agg" />
+      <param name="env.PATH_TO_ASCII_DRILLHOLES" value="%env.TERRA_PATH_DEVOPS%/boreholes/ASCII_drillholes/" />
+      <param name="env.PATH_TO_BOLIDEN" value="%env.TERRA_PATH_DEVOPS%/combined/Leapfrog_OMF/Garpenberg_global_20220715.omf" />
+      <param name="env.PATH_TO_GLB" value="%env.TERRA_PATH_DEVOPS%/meshes/GLB - GLTF/Duck.glb" />
+      <param name="env.PATH_TO_GLB_COMPLEX" value="%env.TERRA_PATH_DEVOPS%/meshes/GLB - GLTF/GlbFile.glb" />
+      <param name="env.PATH_TO_INTERPRETATION" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/Anl2-1.tif" />
+      <param name="env.PATH_TO_MAGNETIC_INTERPRETATION" value="%env.TERRA_PATH_DEVOPS%/meshes/Magnetic/Plate 2a - Profile 1 2D inversion.pdf" />
+      <param name="env.PATH_TO_MTL" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/Broadhaven_Obj/model/model.mtl" />
+      <param name="env.PATH_TO_OBJ" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/Broadhaven_Obj/model/model.obj" />
+      <param name="env.PATH_TO_OBJ_FACE_I" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/Faces/face1.obj" />
+      <param name="env.PATH_TO_OBJ_FACE_II" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/Faces/Lapp_458_Rum_19_2_2024-02-21_0820_scan5_geoim4.obj" />
+      <param name="env.PATH_TO_OBJ_GALLERIES_I" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/Galleries/Solid1.obj" />
+      <param name="env.PATH_TO_OBJ_MULTIMATERIAL_II" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/MultiMaterialObj/MultiMaterialObj.obj" />
+      <param name="env.PATH_TO_OBJ_SCANS" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/Core scans Boliden/rsrbF9l2zc/model.obj" />
+      <param name="env.PATH_TO_OMF" value="%env.TERRA_PATH_DEVOPS%/combined/Leapfrog_OMF/Collinstown.omf" />
+      <param name="env.PATH_TO_SECTION" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/L1_CDP-Coords.txt" />
+      <param name="env.PATH_TO_SEISMIC" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/Linie01.segy" />
+      <param name="env.PATH_TO_SEISMIC_FINAL" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/L1_final-mig.sgy" />
+      <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
+      <param name="env.TERRA_PATH_DEVOPS" value="D:\OneDrive - Terranigma Solutions GmbH/Documents - Terranigma Base/DevOps/SubsurfaceTestData/" />
+    </parameters>
+    <build-runners>
+      <runner id="Setup" name="Setup" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[@echo on
+python -m venv venv
+call venv\Scripts\activate
+venv\Scripts\python -m pip install --upgrade pip
+
+echo Checking directory...
+dir
+dir .requirements
+
+venv\Scripts\pip install --verbose -r requirements/requirements_dev.txt
+venv\Scripts\pip install --verbose teamcity-messages]]></param>
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+      <runner id="Run_Test" name="Run Test: Core" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_plot.txt
+
+@echo on
+set REQUIREMENT_LEVEL=READ_MESH
+echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
+venv\Scripts\python -m pytest --teamcity -v -m core]]></param>
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+      <runner id="Run_Test_2" name="Run Test: Mesh" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_mesh.txt
+
+@echo on
+set REQUIREMENT_LEVEL=READ_MESH
+echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
+venv\Scripts\python -m pytest --teamcity -v -m read_mesh]]></param>
+          <param name="teamcity.step.mode" value="execute_if_failed" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+      <runner id="Run_Test_wells" name="Run Test: Wells" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_wells.txt
+
+@echo on
+set REQUIREMENT_LEVEL=READ_WELL
+echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
+venv\Scripts\python -m pytest --teamcity -v]]></param>
+          <param name="teamcity.step.mode" value="execute_if_failed" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+    </build-runners>
+    <vcs-settings>
+      <vcs-entry-ref root-id="Subsurface_HttpsGithubComTerranigmaSolutionsSubsurfaceRefsHeadsMain2" />
+    </vcs-settings>
+    <requirements />
+    <build-triggers>
+      <build-trigger id="TRIGGER_4" type="vcsTrigger">
+        <parameters>
+          <param name="branchFilter"><![CDATA[+pr:draft=false
++:refs/heads/main]]></param>
+          <param name="enableQueueOptimization" value="true" />
+          <param name="quietPeriodMode" value="DO_NOT_USE" />
+        </parameters>
+      </build-trigger>
+    </build-triggers>
+    <build-extensions>
+      <extension id="perfmon" type="perfmon">
+        <parameters>
+          <param name="teamcity.perfmon.feature.enabled" value="true" />
+        </parameters>
+      </extension>
+      <extension id="BUILD_EXT_5" type="commit-status-publisher">
+        <parameters>
+          <param name="github_authentication_type" value="token" />
+          <param name="github_host" value="https://api.github.com" />
+          <param name="publisherId" value="githubStatusPublisher" />
+          <param name="secure:github_access_token" value="credentialsJSON:4df4bdb0-1278-4834-a702-18ae3a286003" />
+        </parameters>
+      </extension>
+      <extension id="BUILD_EXT_6" type="pullRequests">
+        <parameters>
+          <param name="authenticationType" value="token" />
+          <param name="filterAuthorRole" value="MEMBER" />
+          <param name="providerType" value="github" />
+          <param name="secure:accessToken" value="credentialsJSON:4df4bdb0-1278-4834-a702-18ae3a286003" />
+        </parameters>
+      </extension>
+    </build-extensions>
+    <cleanup />
+  </settings>
+</build-type>
+

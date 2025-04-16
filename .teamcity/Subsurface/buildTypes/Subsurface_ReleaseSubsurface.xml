@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" uuid="671f325d-03f3-4855-994a-eb6080da9084" xsi:noNamespaceSchemaLocation="https://www.jetbrains.com/teamcity/schemas/2021.1/project-config.xsd">
+  <name>Release Subsurface</name>
+  <settings>
+    <parameters>
+      <param name="env.PACKAGE_VERSION" value="" spec="text description='The version that I want to release' label='Package version' validationMode='any' display='prompt'" />
+      <param name="env.TWINE_PASSWORD" value="credentialsJSON:e9a0b402-f8b3-4f86-978c-9c88c456dc9c" spec="password display='normal'" />
+    </parameters>
+    <build-runners>
+      <runner id="Git_Tagging" name="Git Tagging" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[git tag v%env.PACKAGE_VERSION%
+git push origin v%env.PACKAGE_VERSION%]]></param>
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+      <runner id="Build" name="Build" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[python -m pip install --upgrade build
+python -m build]]></param>
+          <param name="teamcity.kubernetes.executor.pull.policy" value="IfNotPresent" />
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+      <runner id="Push_to_PyPi" name="Push to PyPi" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[python -m pip install --upgrade twine
+python -m twine upload dist/* -u __token__ -p %env.TWINE_PASSWORD%]]></param>
+          <param name="teamcity.kubernetes.executor.pull.policy" value="IfNotPresent" />
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+      <runner id="Push_To_GitHub" name="Push To GitHub" type="simpleRunner">
+        <parameters>
+          <param name="script.content" value="gh release create %env.PACKAGE_VERSION% dist/* --title &quot;%env.PACKAGE_VERSION%&quot; --notes &quot;Release notes here&quot;" />
+          <param name="teamcity.kubernetes.executor.pull.policy" value="IfNotPresent" />
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+    </build-runners>
+    <vcs-settings>
+      <vcs-entry-ref root-id="Subsurface_HttpsGithubComTerranigmaSolutionsSubsurfaceRefsHeadsMain" />
+    </vcs-settings>
+    <requirements />
+    <build-triggers />
+    <build-extensions>
+      <extension id="BUILD_EXT_1" type="perfmon">
+        <parameters>
+          <param name="teamcity.perfmon.feature.enabled" value="true" />
+        </parameters>
+      </extension>
+    </build-extensions>
+    <cleanup />
+  </settings>
+</template>
+
