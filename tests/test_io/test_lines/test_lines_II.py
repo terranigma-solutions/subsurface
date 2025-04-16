@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import pytest
 import numpy as np
+
+from conftest import RequirementsLevel
 from subsurface.core.structs.base_structures import UnstructuredData
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
 from subsurface.core.geological_formats.boreholes.collars import Collars
@@ -20,6 +22,10 @@ PLOT = True
 
 data_folder = os.getenv("PATH_TO_ASCII_DRILLHOLES")
 
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_MESH"
+)
 
 @pytest.mark.liquid_earth
 def test_read_attr_into_borehole():

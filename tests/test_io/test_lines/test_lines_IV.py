@@ -1,7 +1,9 @@
 import dotenv
 import os
 import pandas as pd
+import pytest
 
+from conftest import RequirementsLevel
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
 from subsurface.core.geological_formats.boreholes.collars import Collars
 from subsurface.core.geological_formats.boreholes.survey import Survey
@@ -17,6 +19,10 @@ PLOT = True
 
 data_folder = os.getenv("PATH_TO_BGR")
 
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_MESH"
+)
 
 def test_read():
     raw_borehole_data_csv = data_folder + "boreholes_test.csv"

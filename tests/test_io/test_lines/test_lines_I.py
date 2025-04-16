@@ -1,7 +1,9 @@
 import dotenv
 import os
 import pandas as pd
+import pytest
 
+from conftest import RequirementsLevel
 from subsurface import UnstructuredData
 from subsurface.api.reader.read_wells import read_wells
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
@@ -18,6 +20,10 @@ dotenv.load_dotenv()
 
 PLOT = True
 
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_MESH"
+)
 
 def test_read_collar():
     reader: GenericReaderFilesHelper = GenericReaderFilesHelper(

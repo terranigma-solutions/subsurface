@@ -4,6 +4,7 @@ import pathlib
 
 import pytest
 
+from conftest import RequirementsLevel
 from subsurface import UnstructuredData
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
 from subsurface.core.geological_formats.boreholes.collars import Collars
@@ -21,6 +22,10 @@ PLOT = True
 pf = pathlib.Path(__file__).parent.absolute()
 data_path = pf.joinpath('../../data/borehole/')
 
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_MESH"
+)
 
 @pytest.mark.liquid_earth
 def test_read_kim():
