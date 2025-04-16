@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import pytest
 
-from conftest import RequirementsLevel
 from subsurface import UnstructuredData
 from subsurface.api.reader.read_wells import read_wells
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
@@ -15,6 +14,7 @@ from subsurface.core.structs.unstructured_elements import PointSet
 from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith, read_attributes
 from subsurface.modules.visualization import to_pyvista_points, pv_plot, to_pyvista_line, init_plotter
 from ._aux_func import _plot
+from ...conftest import RequirementsLevel
 
 dotenv.load_dotenv()
 

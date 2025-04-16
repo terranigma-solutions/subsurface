@@ -3,7 +3,6 @@ import os
 import pandas as pd
 import pytest
 
-from conftest import RequirementsLevel
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
 from subsurface.core.geological_formats.boreholes.collars import Collars
 from subsurface.core.geological_formats.boreholes.survey import Survey
@@ -11,7 +10,8 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 from subsurface.modules.reader.wells.read_borehole_interface import read_collar, read_survey, read_lith
 import subsurface as ss
-from tests.test_io.test_lines._aux_func import _plot
+from ._aux_func import _plot
+from ...conftest import RequirementsLevel
 
 dotenv.load_dotenv()
 
