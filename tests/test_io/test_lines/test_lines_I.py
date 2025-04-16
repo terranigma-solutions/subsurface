@@ -144,7 +144,7 @@ def test_read_assay():
         scalar="Cu(%)_GDR",
         trajectory=borehole_set.combined_trajectory,
         collars=borehole_set.collars,
-        image_2d=False
+        image_2d=True
     )
 
 
