@@ -17,7 +17,7 @@ path_to_mtl = os.getenv("PATH_TO_MTL")
 path_to_obj_no_material = os.getenv("PATH_TO_OBJ_GALLERIES_I")
 
 pytestmark = pytest.mark.skipif(
-    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    condition=(RequirementsLevel.READ_MESH) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set the READ_WELL"
 )
 
