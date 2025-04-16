@@ -22,7 +22,7 @@ PLOT = True
 
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
-    reason="Need to set the READ_MESH"
+    reason="Need to set the READ_WELL"
 )
 
 def test_read_collar():
