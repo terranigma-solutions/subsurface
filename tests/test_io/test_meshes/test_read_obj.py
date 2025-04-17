@@ -21,6 +21,7 @@ pytestmark = pytest.mark.skipif(
     reason="Need to set the READ_WELL"
 )
 
+
 def test_read_obj_mesh_no_materials():
     pv = optional_requirements.require_pyvista()
     reader: pv.OBJReader = pv.get_reader(path_to_obj_no_material)
@@ -89,7 +90,11 @@ def test_trimesh_one_element_no_texture_to_unstruct():
 
 def test_trimesh_three_element_no_texture_to_unstruct():
     path_to_obj = os.getenv("PATH_TO_OBJ_MULTIMATERIAL_II")
-    trimesh_obj = load_with_trimesh(path_to_obj)
+    trimesh_obj = load_with_trimesh(
+        path_to_file_or_buffer=path_to_obj,
+        # coordinate_system=TriMeshTransformations.RIGHT_HANDED_Z_UP_Y_REVERSED,
+    coordinate_system = TriMeshTransformations.RIGHT_HANDED_Z_UP
+    )
 
     ts = trimesh_to_unstruct(trimesh_obj)
 

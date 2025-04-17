@@ -10,6 +10,7 @@ from ....core.structs import TriSurf, StructuredData
 
 
 class TriMeshTransformations(enum.Enum):
+    RIGHT_HANDED_Z_UP_Y_REVERSED = "RIGHT_HANDED_Z_UP_Y_REVERSED"
     RIGHT_HANDED_Z_UP = "right_handed_z_up"
     ORIGINAL = "original"
 
@@ -26,10 +27,11 @@ def load_with_trimesh(path_to_file_or_buffer, file_type: Optional[str] = None,
     # Compute a -90° rotation around the X axis
     angle_rad = np.deg2rad(-90)
     transform = trimesh.transformations.rotation_matrix(angle_rad, [1, 0, 0])
-    
+
     match coordinate_system:
         case TriMeshTransformations.ORIGINAL:
             return scene_or_mesh
+        # * Forward -Z up Y
         case TriMeshTransformations.RIGHT_HANDED_Z_UP:
             # Transform from Y-up (modeling software) to Z-up (scientific)
             # This rotates the model so that:
@@ -43,12 +45,27 @@ def load_with_trimesh(path_to_file_or_buffer, file_type: Optional[str] = None,
                     [0, 0, 0, 1]
             ])
 
+            if isinstance(scene_or_mesh, trimesh.Scene):
+                for geometry in scene_or_mesh.geometry.values():
+                    geometry.apply_transform(transform)
+            else:
+                scene_or_mesh.apply_transform(transform)
+        case TriMeshTransformations.RIGHT_HANDED_Z_UP_Y_REVERSED:
+
+            # * Forward Z Up Y
+            transform=np.array([
+                    [1, 0, 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 0, 1],
+            ])
             # Apply the coordinate transformation
             if isinstance(scene_or_mesh, trimesh.Scene):
                 for geometry in scene_or_mesh.geometry.values():
                     geometry.apply_transform(transform)
             else:
                 scene_or_mesh.apply_transform(transform)
+        # TODO: Add all the options of blender
         case _:
             raise ValueError(f"Invalid coordinate system: {coordinate_system}")
 
