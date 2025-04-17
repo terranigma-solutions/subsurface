@@ -192,7 +192,7 @@ def test_read_stratigraphy():
     foo["well_name"] = foo["well_id"].map(well_id_mapper)
     
 
-    if PLOT and True:
+    if PLOT and False:
         trajectory = borehole_set.combined_trajectory
         s = to_pyvista_line(
             line_set=trajectory,
