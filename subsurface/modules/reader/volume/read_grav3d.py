@@ -1,5 +1,8 @@
 ﻿from dataclasses import dataclass
 from typing import List
+import numpy as np
+
+from ....core.structs import StructuredData
 
 
 @dataclass
@@ -71,14 +74,6 @@ def read_msh_file(filepath) -> MeshData:
         Dictionary containing the mesh information
     """
 
-    """
-    This is in the msh file
-    100 139 46
-    313375 6072925 400
-    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
-    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25
-    25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 25 
-    """
     with open(filepath, 'r') as f:
         lines = [line.strip() for line in f.readlines() if line.strip()]
 
@@ -145,7 +140,36 @@ def read_msh_file(filepath) -> MeshData:
     mesh_data = MeshData.from_dict(mesh_data_dict)
 
     return mesh_data
-import numpy as np
+
+
+def structured_data_from(array: np.ndarray, mesh: MeshData) -> StructuredData:
+    easting = np.array(mesh.cell_sizes.easting)
+    x_centers = mesh.origin.x0 + np.cumsum(easting) - easting[0] / 2
+    # For northing, start from origin.y0
+    northing = np.array(mesh.cell_sizes.northing)
+    y_centers = mesh.origin.y0 + np.cumsum(northing) - northing[0] / 2
+    # For vertical, note that the top is given by origin.z0 and cells extend downward.
+    vertical = np.array(mesh.cell_sizes.vertical)
+    z_centers = mesh.origin.z0 - (np.cumsum(vertical) - vertical[0] / 2)
+    # Create the DataArray.
+    # The array shape is (nn, ne, nz). We use dimension names 'north', 'east' and 'vertical'
+    import xarray as xr
+    xr_data_array = xr.DataArray(
+        data=array,
+        dims=['x', 'y', 'z'],
+        coords={
+                'x': y_centers,
+                'y': x_centers,
+                'z': z_centers,
+        },
+        name='model'
+    )
+    # Optionally, wrap the xr.DataArray into a StructuredData instance
+    struct: StructuredData = StructuredData.from_data_array(
+        data_array=xr_data_array,
+        data_array_name='model'
+    )
+    return struct
 
 def read_mod_file(filepath: str, mesh: MeshData) -> np.ndarray:
     """
@@ -191,6 +215,5 @@ def read_mod_file(filepath: str, mesh: MeshData) -> np.ndarray:
         (mesh.dimensions.nn, mesh.dimensions.ne, mesh.dimensions.nz)
     )
     
-    # -9999 to nan
     model_array[model_array == -99_999.0] = np.nan
     return model_array
