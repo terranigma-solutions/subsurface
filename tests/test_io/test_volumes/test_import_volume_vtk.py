@@ -137,7 +137,7 @@ def test_vtk_file_to_structured_data__gen11818__idn63() -> subsurface.Structured
     pv = optional_requirements.require_pyvista()
 
     devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
-    filepath = devops_path.joinpath(r"volume\VTK\IDN-63\muon.vtk")
+    filepath = devops_path.joinpath(r"volume/VTK/IDN-63/muon.vtk")
 
     pyvista_obj: pv.DataSet = pv.read(filepath)
     pv.examples.download_angular_sector()
