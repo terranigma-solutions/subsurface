@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<build-type xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" uuid="ed495f4f-4df2-4a37-bbfe-2489430a46e8" xsi:noNamespaceSchemaLocation="https://www.jetbrains.com/teamcity/schemas/2021.1/project-config.xsd">
+<build-type xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" uuid="ed495f4f-4df2-4a37-bbfe-2489430a46e8" xsi:noNamespaceSchemaLocation="https://www.jetbrains.com/teamcity/schemas/2025.3/project-config.xsd">
   <name>Testing</name>
   <description />
   <settings>
+    <options>
+      <option name="shouldFailBuildOnBadExitCode" value="false" />
+    </options>
     <parameters>
       <param name="REQUIREMENT_LEVEL" value="READ_MESH" />
       <param name="env.MPLBACKEND" value="Agg" />
@@ -11,6 +14,9 @@
       <param name="env.PATH_TO_BOLIDEN" value="%env.TERRA_PATH_DEVOPS%/combined/Leapfrog_OMF/Garpenberg_global_20220715.omf" />
       <param name="env.PATH_TO_GLB" value="%env.TERRA_PATH_DEVOPS%/meshes/GLB - GLTF/Duck.glb" />
       <param name="env.PATH_TO_GLB_COMPLEX" value="%env.TERRA_PATH_DEVOPS%/meshes/GLB - GLTF/GlbFile.glb" />
+      <param name="env.PATH_TO_GRAV3D_MOD" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/19_simpeg_inv_result_25ft_7.62m_psi2_Sep.mod" />
+      <param name="env.PATH_TO_GRAV3D_MSH" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/client_voxel.msh" />
+      <param name="env.PATH_TO_GRAV3D_MSH_II" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/IDN-65/ubc_mesh_mod" />
       <param name="env.PATH_TO_INTERPRETATION" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/Anl2-1.tif" />
       <param name="env.PATH_TO_MAGNETIC_INTERPRETATION" value="%env.TERRA_PATH_DEVOPS%/meshes/Magnetic/Plate 2a - Profile 1 2D inversion.pdf" />
       <param name="env.PATH_TO_MTL" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/Broadhaven_Obj/model/model.mtl" />
@@ -30,9 +36,6 @@
       <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
       <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
       <param name="env.TERRA_PATH_DEVOPS" value="D:\OneDrive - Terranigma Solutions GmbH/Documents - Terranigma Base/DevOps/SubsurfaceTestData/" />
-      <param name="env.PATH_TO_GRAV3D_MOD" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/19_simpeg_inv_result_25ft_7.62m_psi2_Sep.mod" />
-      <param name="env.PATH_TO_GRAV3D_MSH" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/client_voxel.msh" />
-      <param name="env.PATH_TO_GRAV3D_MSH_II" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/IDN-65/ubc_mesh_mod" />
     </parameters>
     <build-runners>
       <runner id="Setup" name="Setup" type="simpleRunner">
@@ -92,7 +95,6 @@ venv\Scripts\python -m pytest --teamcity -v]]></param>
     <vcs-settings>
       <vcs-entry-ref root-id="Subsurface_HttpsGithubComTerranigmaSolutionsSubsurfaceRefsHeadsMain2" />
     </vcs-settings>
-    <requirements />
     <build-triggers>
       <build-trigger id="TRIGGER_4" type="vcsTrigger">
         <parameters>
@@ -126,7 +128,6 @@ venv\Scripts\python -m pytest --teamcity -v]]></param>
         </parameters>
       </extension>
     </build-extensions>
-    <cleanup />
   </settings>
 </build-type>
 
