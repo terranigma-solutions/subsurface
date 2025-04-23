@@ -33,6 +33,10 @@ class StructuredGrid:
         grid_3d = np.meshgrid(*cart_coord, indexing='ij')
         return grid_3d
 
+    @property
+    def active_attributes(self) -> np.ndarray:
+        return self.ds.data[self.ds.active_data_array_name].values
+
     def meshgrid_2d(self, attribute_name_coord_name: str = None) -> list:
         """
 
