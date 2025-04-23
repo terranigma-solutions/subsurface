@@ -21,16 +21,6 @@ class GridDimensions:
     ny: int
     nz: int
 
-    @property
-    def ne(self) -> int:
-        """Legacy accessor for nx (easting)"""
-        return self.nx
-
-    @property
-    def nn(self) -> int:
-        """Legacy accessor for ny (northing)"""
-        return self.ny
-
 
 @dataclass
 class GridOrigin:
@@ -46,21 +36,6 @@ class GridOrigin:
     y: float
     z: float
 
-    @property
-    def x0(self) -> float:
-        """Legacy accessor for x"""
-        return self.x
-
-    @property
-    def y0(self) -> float:
-        """Legacy accessor for y"""
-        return self.y
-
-    @property
-    def z0(self) -> float:
-        """Legacy accessor for z"""
-        return self.z
-
 
 @dataclass
 class GridCellSizes:
@@ -75,21 +50,6 @@ class GridCellSizes:
     x: List[float]
     y: List[float]
     z: List[float]
-
-    @property
-    def easting(self) -> List[float]:
-        """Legacy accessor for x"""
-        return self.x
-
-    @property
-    def northing(self) -> List[float]:
-        """Legacy accessor for y"""
-        return self.y
-
-    @property
-    def vertical(self) -> List[float]:
-        """Legacy accessor for z"""
-        return self.z
 
 
 @dataclass
@@ -144,13 +104,6 @@ class GridData:
             cell_sizes=GridCellSizes(x=x_sizes, y=y_sizes, z=z_sizes),
             metadata=metadata
         )
-
-
-# For backward compatibility
-MeshData = GridData
-Dimensions = GridDimensions
-Origin = GridOrigin
-CellSizes = GridCellSizes
 
 
 def parse_cell_sizes(lines: List[str], start_index: int, count: int) -> Tuple[List[float], int]:
@@ -253,17 +206,17 @@ def read_msh_file(filepath: Union[str, Path]) -> GridData:
 
     # Create a dictionary with all the parsed information
     grid_data_dict = {
-        'dimensions': {'nx': nx, 'ny': ny, 'nz': nz},
-        'origin': {'x': x, 'y': y, 'z': z},
-        'cell_sizes': {
-            'x': x_sizes,
-            'y': y_sizes,
-            'z': z_sizes
-        },
-        'metadata': {
-            'file_format': 'grav3d',
-            'filepath': str(filepath)
-        }
+            'dimensions': {'nx': nx, 'ny': ny, 'nz': nz},
+            'origin'    : {'x': x, 'y': y, 'z': z},
+            'cell_sizes': {
+                    'x': x_sizes,
+                    'y': y_sizes,
+                    'z': z_sizes
+            },
+            'metadata'  : {
+                    'file_format': 'grav3d',
+                    'filepath'   : str(filepath)
+            }
     }
 
     return GridData.from_dict(grid_data_dict)
@@ -292,13 +245,13 @@ def calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
     z_centers = grid.origin.z - (np.cumsum(z_sizes) - z_sizes[0] / 2)
 
     return {
-        'x': x_centers,
-        'y': y_centers,
-        'z': z_centers
+            'x': x_centers,
+            'y': y_centers,
+            'z': z_centers
     }
 
 
-def structured_data_from(array: np.ndarray, grid: GridData, 
+def structured_data_from(array: np.ndarray, grid: GridData,
                          data_name: str = 'model') -> StructuredData:
     """
     Convert a 3D numpy array and grid information into a StructuredData object.
@@ -329,9 +282,9 @@ def structured_data_from(array: np.ndarray, grid: GridData,
         data=array,
         dims=['y', 'x', 'z'],  # Dimensions in the order they appear in the array
         coords={
-            'x': centers['x'],
-            'y': centers['y'],
-            'z': centers['z'],
+                'x': centers['x'],
+                'y': centers['y'],
+                'z': centers['z'],
         },
         name=data_name,
         attrs=grid.metadata  # Include grid metadata in the data array
@@ -345,8 +298,9 @@ def structured_data_from(array: np.ndarray, grid: GridData,
 
     return struct
 
-def read_mod_file(filepath: Union[str, Path], grid: GridData, 
-               missing_value: float = -99_999.0) -> np.ndarray:
+
+def read_mod_file(filepath: Union[str, Path], grid: GridData,
+                  missing_value: float = -99_999.0) -> np.ndarray:
     """
     Read a model file containing property values for a 3D grid.
 
