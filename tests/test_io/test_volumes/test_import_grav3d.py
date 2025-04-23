@@ -10,7 +10,7 @@ from subsurface import StructuredGrid
 from subsurface.modules.reader.volume.read_grav3d import (
     GridData, read_msh_file, read_mod_file, structured_data_from
 )
-from subsurface.modules.visualization import init_plotter
+from subsurface.modules.visualization import init_plotter, pyvista_to_matplotlib
 
 dotenv.load_dotenv()
 
@@ -42,14 +42,19 @@ def test_import_grav3d():
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
 
     # Visualize the grid
-    p = init_plotter(image_2d=False, ve=1, plotter_kwargs=None)
+
+    image_2d = True
+    p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
     p.add_volume(
         sg.active_attributes,
         opacity='linear'
     )
     p.add_axes()
     p.add_bounding_box()
-    p.show()
+    if image_2d is False:
+        p.show()
+    else:
+        pyvista_to_matplotlib(p)
 
 
 def test_import_grav3d_II():
@@ -86,14 +91,20 @@ def test_import_grav3d_II():
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
 
     # Visualize the grid
-    p = init_plotter(image_2d=False, ve=1, plotter_kwargs=None)
+    image_2d = True
+    p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
     p.add_volume(
         sg.active_attributes,
         opacity='linear'
     )
     p.add_axes()
     p.add_bounding_box()
-    p.show()
+    image_2d = True
+    if image_2d is False:
+        p.show()
+    else:
+        pyvista_to_matplotlib(p)
+
 
 
 def test_import_grav3d_III():
@@ -125,11 +136,19 @@ def test_import_grav3d_III():
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
 
     # Visualize the grid
-    p = init_plotter(image_2d=False, ve=1, plotter_kwargs=None)
+    image_2d = True
+    p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
     p.add_volume(
         sg.active_attributes,
         opacity='linear'
     )
     p.add_axes()
     p.add_bounding_box()
-    p.show()
+    image_2d = True
+    if image_2d is False:
+        p.show()
+    else:
+        pyvista_to_matplotlib(p)
+
+
+
