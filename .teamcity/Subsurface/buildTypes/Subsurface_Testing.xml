@@ -30,6 +30,9 @@
       <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
       <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
       <param name="env.TERRA_PATH_DEVOPS" value="D:\OneDrive - Terranigma Solutions GmbH/Documents - Terranigma Base/DevOps/SubsurfaceTestData/" />
+      <param name="env.PATH_TO_GRAV3D_MOD" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/19_simpeg_inv_result_25ft_7.62m_psi2_Sep.mod" />
+      <param name="env.PATH_TO_GRAV3D_MSH" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/client_voxel.msh" />
+      <param name="env.PATH_TO_GRAV3D_MSH_II" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/IDN-65/ubc_mesh_mod" />
     </parameters>
     <build-runners>
       <runner id="Setup" name="Setup" type="simpleRunner">
