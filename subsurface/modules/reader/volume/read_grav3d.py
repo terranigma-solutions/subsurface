@@ -106,7 +106,8 @@ class GridData:
         )
 
 
-def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO) -> StructuredData:
+def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing_value: Optional[float],
+                             attr_name: Optional[str]) -> StructuredData:
     """
     Read a structured grid mesh and values from streams and return a StructuredData object.
 
@@ -144,30 +145,14 @@ def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO) -> Stru
         # Read all values from the stream
         lines = [line.strip() for line in values_stream if line.strip()]
 
-        # Convert each line to a float
-        values = np.array([float(line) for line in lines], dtype=float)
-
-        # Calculate expected number of values based on grid dimensions
-        nx, ny, nz = grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz
-        expected_count = nx * ny * nz
-
-        if len(values) != expected_count:
-            raise ValueError(
-                f"Invalid model stream: expected {expected_count} values, got {len(values)}"
-            )
-
-        # Reshape to (ny, nx, nz) with z changing fastest
-        model_array = values.reshape((ny, nx, nz))
-
-        # Replace missing values with NaN
-        model_array[model_array == -99_999.0] = np.nan
+        model_array = _parse_mod_file(grid, lines, missing_value=missing_value)
 
     except Exception as e:
         # Add context to any errors
         raise ValueError(f"Error reading model stream: {str(e)}") from e
 
     # Create and return a StructuredData object
-    return structured_data_from(model_array, grid, data_name='model')
+    return structured_data_from(model_array, grid, data_name=attr_name)
 
 
 def read_msh_file(filepath: Union[str, Path]) -> GridData:
@@ -240,30 +225,31 @@ def read_mod_file(filepath: Union[str, Path], grid: GridData,
         with open(filepath, 'r') as f:
             lines = [line.strip() for line in f if line.strip()]
 
-        # Convert each line to a float
-        values = np.array([float(line) for line in lines], dtype=float)
-
-        # Calculate expected number of values based on grid dimensions
-        nx, ny, nz = grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz
-        expected_count = nx * ny * nz
-
-        if len(values) != expected_count:
-            raise ValueError(
-                f"Invalid model file: expected {expected_count} values, got {len(values)}"
-            )
-
-        # Reshape to (ny, nx, nz) with z changing fastest
-        model_array = values.reshape((ny, nx, nz))
-
-        # Replace missing values with NaN
-        if missing_value is not None:
-            model_array[model_array == missing_value] = np.nan
+        model_array = _parse_mod_file(grid, lines, missing_value)
 
         return model_array
 
     except Exception as e:
         # Add context to any errors
         raise ValueError(f"Error reading model file {filepath}: {str(e)}") from e
+
+
+def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[float]) -> np.ndarray:
+    # Convert each line to a float
+    values = np.array([float(line) for line in lines], dtype=float)
+    # Calculate expected number of values based on grid dimensions
+    nx, ny, nz = grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz
+    expected_count = nx * ny * nz
+    if len(values) != expected_count:
+        raise ValueError(
+            f"Invalid model file: expected {expected_count} values, got {len(values)}"
+        )
+    # Reshape to (ny, nx, nz) with z changing fastest
+    model_array = values.reshape((ny, nx, nz))
+    # Replace missing values with NaN
+    if missing_value is not None:
+        model_array[model_array == missing_value] = np.nan
+    return model_array
 
 
 def structured_data_from(array: np.ndarray, grid: GridData,

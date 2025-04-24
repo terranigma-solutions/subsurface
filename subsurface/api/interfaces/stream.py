@@ -1,6 +1,6 @@
 import io
 from io import BytesIO
-from typing import TextIO
+from typing import TextIO, Optional
 
 import pandas
 
@@ -63,8 +63,8 @@ def VTK_stream_to_struct(stream: BytesIO, attribute_name: str) -> list[Structure
     return [struct]
 
 
-def MSH_stream_to_struct(grid_stream: TextIO, values_stream: TextIO) -> list[StructuredData]:
-    struct = reader.read_msh_structured_grid(grid_stream, values_stream)
+def MSH_stream_to_struct(grid_stream: TextIO, values_stream: TextIO, missing_value: Optional[float], attr_name: Optional[str]) -> list[StructuredData]:
+    struct = reader.read_msh_structured_grid(grid_stream, values_stream, missing_value, attr_name)
     return [struct]
 
 
