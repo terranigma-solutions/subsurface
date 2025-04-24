@@ -112,8 +112,41 @@ def test_vtk_from_numpy():
         grid.save(temp_file.name)
         print(f"VTK file saved to: {temp_file.name}")
     grid.plot(show_edges=True)
+
+
+def test_vtk_from_numpy_II():
+    path = os.getenv("PATH_TO_VOLUME_NUMPY")
+    # read npz
+    data = np.load(path + "mesh_10m.npz")
+    # array
+    vertex = data['arr_0']
+    # get corners from vertex XYZ array
+    corners = np.zeros((vertex.shape[0], 3))
+    corners[:, 0] = vertex[:, 0]
+    corners[:, 1] = vertex[:, 1]
+    corners[:, 2] = vertex[:, 2]
     
-    
+    data = np.load(path + "mesh_10m_MacPass_Bayesian_inference_density_model.npz")
+    attr = data['data']
+    mask = data['mask']
+
+    dims = attr.shape
+    import pyvista as pv
+    grid = pv.ExplicitStructuredGrid(dims, corners)
+    grid = grid.compute_connectivity()
+
+    # * Attributes
+    grid.cell_data['Density'] = range(grid.n_cells)
+
+    # Temp file save
+    if False:
+        with NamedTemporaryFile(suffix='.vtk', delete=False) as temp_file:
+            grid.save(temp_file.name)
+            print(f"VTK file saved to: {temp_file.name}")
+    grid.plot(show_edges=True)
+
+    pass
+
 
 def test_vtk_file_to_binary():
     struct: subsurface.StructuredData = test_vtk_file_to_structured_data()
