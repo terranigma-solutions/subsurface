@@ -131,11 +131,28 @@ class StructuredData:
     def values(self) -> np.ndarray:
         return self.data[self.active_data_array_name].values
 
+    _bounds: Tuple[float, float, float, float, float, float] = None
+
     @property
     def bounds(self):
+        if self._bounds is not None:
+            return self._bounds
+
         array_: xr.DataArray = self.data[self.active_data_array_name]
-        bounds = self._get_bounds(array_)
+        bounds = self._get_bounds_from_coord(array_)
         return bounds
+
+    @bounds.setter
+    def bounds(self, bounds: Tuple[float, float, float, float, float, float]):
+        """
+        Set the bounds of the structured data. This is useful for defining the
+        spatial extent of the data in a structured grid.
+
+        Args:
+            bounds (Tuple[float, float, float, float, float, float]): A tuple containing
+                the minimum and maximum values for each dimension (xmin, xmax, ymin, ymax, zmin, zmax).
+        """
+        self._bounds = bounds
 
     @property
     def shape(self):
@@ -146,7 +163,7 @@ class StructuredData:
         return self.data[self.active_data_array_name]
 
     @staticmethod
-    def _get_bounds(xr_obj: xr.DataArray):
+    def _get_bounds_from_coord(xr_obj: xr.DataArray):
         bounds = {}
         for coord in xr_obj.coords:
             bounds[coord] = (xr_obj[coord].min().item(), xr_obj[coord].max().item())

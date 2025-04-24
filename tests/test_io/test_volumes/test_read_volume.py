@@ -1,4 +1,7 @@
+import os
 import pathlib
+
+import numpy as np
 import pytest
 
 import subsurface
@@ -20,6 +23,55 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def test_read_volume_from_numpy():
+    path = os.getenv("PATH_TO_VOLUME_NUMPY")
+    # read npz
+    data = np.load(path + "mesh_10m.npz")
+    # array
+    vertex = data['arr_0']
+
+    models = [
+            "mesh_10m_MacPass_Bayesian_inference_density_model",
+            "mesh_10m_MacPass_Bayesian_inference_posterior_variance_model",
+            "mesh_10m_MacPass_Joint_Muon_Gravity_constrained_full_model",
+            "mesh_10m_MacPass_Joint_Muon_Gravity_Density_unconstrained",
+            "mesh_10m_MacPass_Muon_Density_unconstrained"
+    ]
+    
+    for density_model_name in models:
+        data = np.load(path + density_model_name + ".npz")
+        attr = data['data']
+        mask = data['mask']
+
+        # put nans to all the masked values
+        attr[mask] = np.nan
+        attr[attr == -99_999.] = np.nan
+
+        # Calculate spacing
+        vertex_max = vertex.max(axis=0)
+        vertex_min = vertex.min(axis=0)
+
+        struct: subsurface.StructuredData = subsurface.StructuredData.from_numpy(
+            array=attr,
+            data_array_name="Density"
+        )
+
+        struct.bounds = {
+                "X": (vertex_min[0], vertex_max[0]),
+                "Y": (vertex_min[1], vertex_max[1]),
+                "Z": (vertex_min[2], vertex_max[2])
+        }
+        binary = struct.to_binary()
+        # Save to file
+        with open(path + density_model_name + ".le", "wb") as f:
+            f.write(binary)
+
+        sg: subsurface.StructuredGrid = StructuredGrid(struct)
+
+        mesh = to_pyvista_grid(sg)
+        pv_plot([mesh], image_2d=True)
+
+
 def test_volumetric_mesh_to_subsurface():
     ud = read_volumetric_mesh_to_subsurface(
         reader_helper_coord=GenericReaderFilesHelper(
@@ -28,10 +80,10 @@ def test_volumetric_mesh_to_subsurface():
             index_col=False,
             col_names=['elem', '_2', '_3', 'x', 'y', 'z'],
             additional_reader_kwargs={
-                "skiprows": 1,
-                "delimiter": "\s{2,}",
-                "on_bad_lines": "error",
-                "nrows": None,
+                    "skiprows"    : 1,
+                    "delimiter"   : "\s{2,}",
+                    "on_bad_lines": "error",
+                    "nrows"       : None,
             }
         ),
         reader_helper_attr=GenericReaderFilesHelper(
@@ -50,7 +102,7 @@ def test_volumetric_mesh_to_subsurface():
 @pytest.mark.liquid_earth
 def test_interpolate_ud_to_sd():
     ud, ud_mesh = test_volumetric_mesh_to_subsurface()
-    sd: subsurface.StructuredData  = interpolate_unstructured_data_to_structured_data(
+    sd: subsurface.StructuredData = interpolate_unstructured_data_to_structured_data(
         ud=ud,
         attr_name="pres",
         resolution=[50, 50, 50]
@@ -70,10 +122,10 @@ def test_read_volumetric_mesh():
             index_col=False,
             col_names=['elem', '_2', '_3', 'x', 'y', 'z'],
             additional_reader_kwargs={
-                "skiprows": 1,
-                "delimiter": "\s{2,}",
-                "on_bad_lines": "error",
-                "nrows": None,
+                    "skiprows"    : 1,
+                    "delimiter"   : "\s{2,}",
+                    "on_bad_lines": "error",
+                    "nrows"       : None,
             }
         )
     )

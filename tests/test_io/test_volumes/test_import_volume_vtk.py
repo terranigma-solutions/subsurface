@@ -100,7 +100,7 @@ def test_vtk_from_numpy():
     print("Dims: ", dims)
     print("Corners: ", corners.shape)
     print("Corners: ", corners)
-    
+
     grid = pv.ExplicitStructuredGrid(dims, corners)
     grid = grid.compute_connectivity()
 
@@ -112,8 +112,9 @@ def test_vtk_from_numpy():
         grid.save(temp_file.name)
         print(f"VTK file saved to: {temp_file.name}")
     grid.plot(show_edges=True)
-    
-    
+
+
+
 
 def test_vtk_file_to_binary():
     struct: subsurface.StructuredData = test_vtk_file_to_structured_data()
