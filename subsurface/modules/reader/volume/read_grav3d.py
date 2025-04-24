@@ -1,5 +1,5 @@
 ﻿from dataclasses import dataclass, field
-from typing import List, Dict, Any, Tuple, Optional, Union
+from typing import List, Dict, Any, Tuple, Optional, Union, TextIO
 import numpy as np
 import xarray as xr
 from pathlib import Path
@@ -106,48 +106,68 @@ class GridData:
         )
 
 
-def parse_cell_sizes(lines: List[str], start_index: int, count: int) -> Tuple[List[float], int]:
+def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO) -> StructuredData:
     """
-    Parse cell sizes from file lines, handling both compact (N*value) and expanded notation.
+    Read a structured grid mesh and values from streams and return a StructuredData object.
+
+    This function is designed to work with streams (e.g., from Azure blob storage)
+    rather than file paths.
 
     Args:
-        lines: List of lines from the file
-        start_index: Index to start parsing from
-        count: Number of values to parse
+        grid_stream: TextIO stream containing the grid definition (.msh format)
+        values_stream: TextIO stream containing the property values (.mod format)
 
     Returns:
-        Tuple containing:
-            - List of parsed values
-            - Next line index after parsing
+        StructuredData object containing the grid and property values
+
+    Raises:
+        ValueError: If the stream format is invalid
     """
-    line = lines[start_index]
+    # Read all lines from the grid stream
+    lines = [line.strip() for line in grid_stream if line.strip()]
 
-    # Check for compact notation (N*value)
-    if '*' in line:
-        parts = line.split('*')
-        repetition = int(parts[0])
-        value = float(parts[1])
-        values = [value] * repetition
-        return values, start_index + 1
+    # Create metadata for the grid
+    metadata = {
+            'file_format': 'grav3d',
+            'source'     : 'stream'
+    }
 
-    # Handle expanded notation across multiple lines
-    values = []
-    line_index = start_index
+    # Parse grid information from lines
+    try:
+        grid = _parse_grid_from_lines(lines, metadata)
+    except ValueError as e:
+        # Add context about the stream to the error message
+        raise ValueError(f"Error parsing grid stream: {e}") from e
 
-    while len(values) < count and line_index < len(lines):
-        current_line = lines[line_index]
+    # Read values from the values stream
+    try:
+        # Read all values from the stream
+        lines = [line.strip() for line in values_stream if line.strip()]
 
-        # If we encounter a line with compact notation while parsing expanded, 
-        # it's likely the next section
-        if '*' in current_line and len(values) > 0:
-            break
+        # Convert each line to a float
+        values = np.array([float(line) for line in lines], dtype=float)
 
-        # Add all numbers from the current line
-        values.extend([float(x) for x in current_line.split()])
-        line_index += 1
+        # Calculate expected number of values based on grid dimensions
+        nx, ny, nz = grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz
+        expected_count = nx * ny * nz
 
-    # Take only the required number of values
-    return values[:count], line_index
+        if len(values) != expected_count:
+            raise ValueError(
+                f"Invalid model stream: expected {expected_count} values, got {len(values)}"
+            )
+
+        # Reshape to (ny, nx, nz) with z changing fastest
+        model_array = values.reshape((ny, nx, nz))
+
+        # Replace missing values with NaN
+        model_array[model_array == -99_999.0] = np.nan
+
+    except Exception as e:
+        # Add context to any errors
+        raise ValueError(f"Error reading model stream: {str(e)}") from e
+
+    # Create and return a StructuredData object
+    return structured_data_from(model_array, grid, data_name='model')
 
 
 def read_msh_file(filepath: Union[str, Path]) -> GridData:
@@ -178,125 +198,16 @@ def read_msh_file(filepath: Union[str, Path]) -> GridData:
     with open(filepath, 'r') as f:
         lines = [line.strip() for line in f.readlines() if line.strip()]
 
-    if len(lines) < 2:
-        raise ValueError(f"Invalid mesh file format: {filepath}")
-
-    # Parse dimensions (first line)
-    try:
-        dims = lines[0].split()
-        nx, ny, nz = int(dims[0]), int(dims[1]), int(dims[2])
-    except (IndexError, ValueError) as e:
-        raise ValueError(f"Invalid dimensions in mesh file: {e}")
-
-    # Parse origin coordinates (second line)
-    try:
-        origin = lines[1].split()
-        x, y, z = float(origin[0]), float(origin[1]), float(origin[2])
-    except (IndexError, ValueError) as e:
-        raise ValueError(f"Invalid origin in mesh file: {e}")
-
-    # Parse cell sizes
-    try:
-        current_line = 2
-        x_sizes, current_line = parse_cell_sizes(lines, current_line, nx)
-        y_sizes, current_line = parse_cell_sizes(lines, current_line, ny)
-        z_sizes, _ = parse_cell_sizes(lines, current_line, nz)
-    except (IndexError, ValueError) as e:
-        raise ValueError(f"Error parsing cell sizes: {e}")
-
-    # Create a dictionary with all the parsed information
-    grid_data_dict = {
-            'dimensions': {'nx': nx, 'ny': ny, 'nz': nz},
-            'origin'    : {'x': x, 'y': y, 'z': z},
-            'cell_sizes': {
-                    'x': x_sizes,
-                    'y': y_sizes,
-                    'z': z_sizes
-            },
-            'metadata'  : {
-                    'file_format': 'grav3d',
-                    'filepath'   : str(filepath)
-            }
+    metadata = {
+            'file_format': 'grav3d',
+            'filepath'   : str(filepath)
     }
 
-    return GridData.from_dict(grid_data_dict)
-
-
-def calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
-    """
-    Calculate the center coordinates of each cell in the grid.
-
-    Args:
-        grid: GridData object containing grid dimensions, origin, and cell sizes
-
-    Returns:
-        Dictionary with 'x', 'y', and 'z' keys containing arrays of cell center coordinates
-    """
-    # Convert cell sizes to numpy arrays for vectorized operations
-    x_sizes = np.array(grid.cell_sizes.x)
-    y_sizes = np.array(grid.cell_sizes.y)
-    z_sizes = np.array(grid.cell_sizes.z)
-
-    # Calculate cell centers by adding cumulative sizes and offsetting by half the first cell size
-    x_centers = grid.origin.x + np.cumsum(x_sizes) - x_sizes[0] / 2
-    y_centers = grid.origin.y + np.cumsum(y_sizes) - y_sizes[0] / 2
-
-    # For z, cells typically extend downward from the origin
-    z_centers = grid.origin.z - (np.cumsum(z_sizes) - z_sizes[0] / 2)
-
-    return {
-            'x': x_centers,
-            'y': y_centers,
-            'z': z_centers
-    }
-
-
-def structured_data_from(array: np.ndarray, grid: GridData,
-                         data_name: str = 'model') -> StructuredData:
-    """
-    Convert a 3D numpy array and grid information into a StructuredData object.
-
-    Args:
-        array: 3D numpy array of property values with shape (ny, nx, nz)
-        grid: GridData object containing grid dimensions, origin, and cell sizes
-        data_name: Name for the data array (default: 'model')
-
-    Returns:
-        StructuredData object containing the data array with proper coordinates
-
-    Raises:
-        ValueError: If array shape doesn't match grid dimensions
-    """
-    # Verify array shape matches grid dimensions
-    expected_shape = (grid.dimensions.ny, grid.dimensions.nx, grid.dimensions.nz)
-    if array.shape != expected_shape:
-        raise ValueError(
-            f"Array shape {array.shape} doesn't match grid dimensions {expected_shape}"
-        )
-
-    # Calculate cell center coordinates
-    centers = calculate_cell_centers(grid)
-
-    # Create the xarray DataArray with proper coordinates
-    xr_data_array = xr.DataArray(
-        data=array,
-        dims=['y', 'x', 'z'],  # Dimensions in the order they appear in the array
-        coords={
-                'x': centers['x'],
-                'y': centers['y'],
-                'z': centers['z'],
-        },
-        name=data_name,
-        attrs=grid.metadata  # Include grid metadata in the data array
-    )
-
-    # Create a StructuredData instance from the xarray DataArray
-    struct = StructuredData.from_data_array(
-        data_array=xr_data_array,
-        data_array_name=data_name
-    )
-
-    return struct
+    try:
+        return _parse_grid_from_lines(lines, metadata)
+    except ValueError as e:
+        # Add context about the file to the error message
+        raise ValueError(f"Error parsing mesh file {filepath}: {e}") from e
 
 
 def read_mod_file(filepath: Union[str, Path], grid: GridData,
@@ -353,3 +264,179 @@ def read_mod_file(filepath: Union[str, Path], grid: GridData,
     except Exception as e:
         # Add context to any errors
         raise ValueError(f"Error reading model file {filepath}: {str(e)}") from e
+
+
+def structured_data_from(array: np.ndarray, grid: GridData,
+                         data_name: str = 'model') -> StructuredData:
+    """
+    Convert a 3D numpy array and grid information into a StructuredData object.
+
+    Args:
+        array: 3D numpy array of property values with shape (ny, nx, nz)
+        grid: GridData object containing grid dimensions, origin, and cell sizes
+        data_name: Name for the data array (default: 'model')
+
+    Returns:
+        StructuredData object containing the data array with proper coordinates
+
+    Raises:
+        ValueError: If array shape doesn't match grid dimensions
+    """
+    # Verify array shape matches grid dimensions
+    expected_shape = (grid.dimensions.ny, grid.dimensions.nx, grid.dimensions.nz)
+    if array.shape != expected_shape:
+        raise ValueError(
+            f"Array shape {array.shape} doesn't match grid dimensions {expected_shape}"
+        )
+
+    # Calculate cell center coordinates
+    centers = _calculate_cell_centers(grid)
+
+    # Create the xarray DataArray with proper coordinates
+    xr_data_array = xr.DataArray(
+        data=array,
+        dims=['y', 'x', 'z'],  # Dimensions in the order they appear in the array
+        coords={
+                'x': centers['x'],
+                'y': centers['y'],
+                'z': centers['z'],
+        },
+        name=data_name,
+        attrs=grid.metadata  # Include grid metadata in the data array
+    )
+
+    # Create a StructuredData instance from the xarray DataArray
+    struct = StructuredData.from_data_array(
+        data_array=xr_data_array,
+        data_array_name=data_name
+    )
+
+    return struct
+
+
+def _parse_grid_from_lines(lines: List[str], metadata: Dict[str, Any] = None) -> GridData:
+    """
+    Parse grid information from a list of lines.
+
+    Args:
+        lines: List of lines containing grid information
+        metadata: Optional metadata to include in the GridData object
+
+    Returns:
+        GridData object containing the parsed grid information
+
+    Raises:
+        ValueError: If the lines format is invalid
+    """
+    if len(lines) < 2:
+        raise ValueError("Invalid format: insufficient data")
+
+    # Parse dimensions (first line)
+    try:
+        dims = lines[0].split()
+        nx, ny, nz = int(dims[0]), int(dims[1]), int(dims[2])
+    except (IndexError, ValueError) as e:
+        raise ValueError(f"Invalid dimensions: {e}")
+
+    # Parse origin coordinates (second line)
+    try:
+        origin = lines[1].split()
+        x, y, z = float(origin[0]), float(origin[1]), float(origin[2])
+    except (IndexError, ValueError) as e:
+        raise ValueError(f"Invalid origin: {e}")
+
+    # Parse cell sizes
+    try:
+        current_line = 2
+        x_sizes, current_line = _parse_cell_sizes(lines, current_line, nx)
+        y_sizes, current_line = _parse_cell_sizes(lines, current_line, ny)
+        z_sizes, _ = _parse_cell_sizes(lines, current_line, nz)
+    except (IndexError, ValueError) as e:
+        raise ValueError(f"Error parsing cell sizes: {e}")
+
+    # Create a GridData object with the parsed information
+    grid_data_dict = {
+            'dimensions': {'nx': nx, 'ny': ny, 'nz': nz},
+            'origin'    : {'x': x, 'y': y, 'z': z},
+            'cell_sizes': {
+                    'x': x_sizes,
+                    'y': y_sizes,
+                    'z': z_sizes
+            },
+            'metadata'  : metadata or {}
+    }
+
+    return GridData.from_dict(grid_data_dict)
+
+
+def _parse_cell_sizes(lines: List[str], start_index: int, count: int) -> Tuple[List[float], int]:
+    """
+    Parse cell sizes from file lines, handling both compact (N*value) and expanded notation.
+
+    Args:
+        lines: List of lines from the file
+        start_index: Index to start parsing from
+        count: Number of values to parse
+
+    Returns:
+        Tuple containing:
+            - List of parsed values
+            - Next line index after parsing
+    """
+    line = lines[start_index]
+
+    # Check for compact notation (N*value)
+    if '*' in line:
+        parts = line.split('*')
+        repetition = int(parts[0])
+        value = float(parts[1])
+        values = [value] * repetition
+        return values, start_index + 1
+
+    # Handle expanded notation across multiple lines
+    values = []
+    line_index = start_index
+
+    while len(values) < count and line_index < len(lines):
+        current_line = lines[line_index]
+
+        # If we encounter a line with compact notation while parsing expanded, 
+        # it's likely the next section
+        if '*' in current_line and len(values) > 0:
+            break
+
+        # Add all numbers from the current line
+        values.extend([float(x) for x in current_line.split()])
+        line_index += 1
+
+    # Take only the required number of values
+    return values[:count], line_index
+
+
+def _calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
+    """
+    Calculate the center coordinates of each cell in the grid.
+
+    Args:
+        grid: GridData object containing grid dimensions, origin, and cell sizes
+
+    Returns:
+        Dictionary with 'x', 'y', and 'z' keys containing arrays of cell center coordinates
+    """
+    # Convert cell sizes to numpy arrays for vectorized operations
+    x_sizes = np.array(grid.cell_sizes.x)
+    y_sizes = np.array(grid.cell_sizes.y)
+    z_sizes = np.array(grid.cell_sizes.z)
+
+    # Calculate cell centers by adding cumulative sizes and offsetting by half the first cell size
+    x_centers = grid.origin.x + np.cumsum(x_sizes) - x_sizes[0] / 2
+    y_centers = grid.origin.y + np.cumsum(y_sizes) - y_sizes[0] / 2
+
+    # For z, cells typically extend downward from the origin
+    z_centers = grid.origin.z - (np.cumsum(z_sizes) - z_sizes[0] / 2)
+
+    return {
+            'x': x_centers,
+            'y': y_centers,
+            'z': z_centers
+    }
