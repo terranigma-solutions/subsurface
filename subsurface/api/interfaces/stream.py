@@ -1,6 +1,6 @@
 import io
 from io import BytesIO
-from typing import TextIO
+from typing import TextIO, Optional
 
 import pandas
 
@@ -57,8 +57,14 @@ def GLTF_stream_to_trisurf(gltf_stream: io.BytesIO, coordinate_system: TriMeshTr
     tri_mesh: TriSurf = reader.load_gltf_with_trimesh(gltf_stream, coordinate_system)
     return tri_mesh
 
+
 def VTK_stream_to_struct(stream: BytesIO, attribute_name: str) -> list[StructuredData]:
     struct = read_VTK_structured_grid(stream, attribute_name)
+    return [struct]
+
+
+def MSH_stream_to_struct(grid_stream: TextIO, values_stream: TextIO, missing_value: Optional[float], attr_name: Optional[str]) -> list[StructuredData]:
+    struct = reader.read_msh_structured_grid(grid_stream, values_stream, missing_value, attr_name)
     return [struct]
 
 

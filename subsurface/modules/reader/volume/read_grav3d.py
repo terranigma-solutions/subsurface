@@ -1,5 +1,5 @@
 ﻿from dataclasses import dataclass, field
-from typing import List, Dict, Any, Tuple, Optional, Union
+from typing import List, Dict, Any, Tuple, Optional, Union, TextIO
 import numpy as np
 import xarray as xr
 from pathlib import Path
@@ -106,7 +106,256 @@ class GridData:
         )
 
 
-def parse_cell_sizes(lines: List[str], start_index: int, count: int) -> Tuple[List[float], int]:
+def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing_value: Optional[float],
+                             attr_name: Optional[str]) -> StructuredData:
+    """
+    Read a structured grid mesh and values from streams and return a StructuredData object.
+
+    This function is designed to work with streams (e.g., from Azure blob storage)
+    rather than file paths.
+
+    Args:
+        grid_stream: TextIO stream containing the grid definition (.msh format)
+        values_stream: TextIO stream containing the property values (.mod format)
+
+    Returns:
+        StructuredData object containing the grid and property values
+
+    Raises:
+        ValueError: If the stream format is invalid
+    """
+    # Read all lines from the grid stream
+    lines = [line.strip() for line in grid_stream if line.strip()]
+
+    # Create metadata for the grid
+    metadata = {
+            'file_format': 'grav3d',
+            'source'     : 'stream'
+    }
+
+    # Parse grid information from lines
+    try:
+        grid = _parse_grid_from_lines(lines, metadata)
+    except ValueError as e:
+        # Add context about the stream to the error message
+        raise ValueError(f"Error parsing grid stream: {e}") from e
+
+    # Read values from the values stream
+    try:
+        # Read all values from the stream
+        lines = [line.strip() for line in values_stream if line.strip()]
+
+        model_array = _parse_mod_file(grid, lines, missing_value=missing_value)
+
+    except Exception as e:
+        # Add context to any errors
+        raise ValueError(f"Error reading model stream: {str(e)}") from e
+
+    # Create and return a StructuredData object
+    return structured_data_from(model_array, grid, data_name=attr_name)
+
+
+def read_msh_file(filepath: Union[str, Path]) -> GridData:
+    """
+    Read a structured grid mesh file and return a GridData object.
+
+    Currently supports Grav3D mesh file format (.msh):
+    - First line: NX NY NZ (number of cells in X, Y, Z directions)
+    - Second line: X Y Z (coordinates of origin in meters)
+    - Next section: X cell widths (either expanded or using N*value notation)
+    - Next section: Y cell widths (either expanded or using N*value notation)
+    - Next section: Z cell thicknesses (either expanded or using N*value notation)
+
+    Args:
+        filepath: Path to the mesh file
+
+    Returns:
+        GridData object containing the mesh information
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        ValueError: If the file format is invalid
+    """
+    filepath = Path(filepath)
+    if not filepath.exists():
+        raise FileNotFoundError(f"Mesh file not found: {filepath}")
+
+    with open(filepath, 'r') as f:
+        lines = [line.strip() for line in f.readlines() if line.strip()]
+
+    metadata = {
+            'file_format': 'grav3d',
+            'filepath'   : str(filepath)
+    }
+
+    try:
+        return _parse_grid_from_lines(lines, metadata)
+    except ValueError as e:
+        # Add context about the file to the error message
+        raise ValueError(f"Error parsing mesh file {filepath}: {e}") from e
+
+
+def read_mod_file(filepath: Union[str, Path], grid: GridData,
+                  missing_value: float = -99_999.0) -> np.ndarray:
+    """
+    Read a model file containing property values for a 3D grid.
+
+    Currently supports Grav3D model file format (.mod) where each line contains
+    a single property value. The values are ordered with the z-direction changing
+    fastest, then x, then y.
+
+    Args:
+        filepath: Path to the model file
+        grid: GridData object containing the grid dimensions
+        missing_value: Value to replace with NaN in the output array (default: -99_999.0)
+
+    Returns:
+        3D numpy array of property values with shape (ny, nx, nz)
+
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+        ValueError: If the number of values doesn't match the grid dimensions
+    """
+    filepath = Path(filepath)
+    if not filepath.exists():
+        raise FileNotFoundError(f"Model file not found: {filepath}")
+
+    try:
+        # Read all values from the file
+        with open(filepath, 'r') as f:
+            lines = [line.strip() for line in f if line.strip()]
+
+        model_array = _parse_mod_file(grid, lines, missing_value)
+
+        return model_array
+
+    except Exception as e:
+        # Add context to any errors
+        raise ValueError(f"Error reading model file {filepath}: {str(e)}") from e
+
+
+def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[float]) -> np.ndarray:
+    # Convert each line to a float
+    values = np.array([float(line) for line in lines], dtype=float)
+    # Calculate expected number of values based on grid dimensions
+    nx, ny, nz = grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz
+    expected_count = nx * ny * nz
+    if len(values) != expected_count:
+        raise ValueError(
+            f"Invalid model file: expected {expected_count} values, got {len(values)}"
+        )
+    # Reshape to (ny, nx, nz) with z changing fastest
+    model_array = values.reshape((ny, nx, nz))
+    # Replace missing values with NaN
+    if missing_value is not None:
+        model_array[model_array == missing_value] = np.nan
+    return model_array
+
+
+def structured_data_from(array: np.ndarray, grid: GridData,
+                         data_name: str = 'model') -> StructuredData:
+    """
+    Convert a 3D numpy array and grid information into a StructuredData object.
+
+    Args:
+        array: 3D numpy array of property values with shape (ny, nx, nz)
+        grid: GridData object containing grid dimensions, origin, and cell sizes
+        data_name: Name for the data array (default: 'model')
+
+    Returns:
+        StructuredData object containing the data array with proper coordinates
+
+    Raises:
+        ValueError: If array shape doesn't match grid dimensions
+    """
+    # Verify array shape matches grid dimensions
+    expected_shape = (grid.dimensions.ny, grid.dimensions.nx, grid.dimensions.nz)
+    if array.shape != expected_shape:
+        raise ValueError(
+            f"Array shape {array.shape} doesn't match grid dimensions {expected_shape}"
+        )
+
+    # Calculate cell center coordinates
+    centers = _calculate_cell_centers(grid)
+
+    # Create the xarray DataArray with proper coordinates
+    xr_data_array = xr.DataArray(
+        data=array,
+        dims=['y', 'x', 'z'],  # Dimensions in the order they appear in the array
+        coords={
+                'x': centers['x'],
+                'y': centers['y'],
+                'z': centers['z'],
+        },
+        name=data_name,
+        attrs=grid.metadata  # Include grid metadata in the data array
+    )
+
+    # Create a StructuredData instance from the xarray DataArray
+    struct = StructuredData.from_data_array(
+        data_array=xr_data_array,
+        data_array_name=data_name
+    )
+
+    return struct
+
+
+def _parse_grid_from_lines(lines: List[str], metadata: Dict[str, Any] = None) -> GridData:
+    """
+    Parse grid information from a list of lines.
+
+    Args:
+        lines: List of lines containing grid information
+        metadata: Optional metadata to include in the GridData object
+
+    Returns:
+        GridData object containing the parsed grid information
+
+    Raises:
+        ValueError: If the lines format is invalid
+    """
+    if len(lines) < 2:
+        raise ValueError("Invalid format: insufficient data")
+
+    # Parse dimensions (first line)
+    try:
+        dims = lines[0].split()
+        nx, ny, nz = int(dims[0]), int(dims[1]), int(dims[2])
+    except (IndexError, ValueError) as e:
+        raise ValueError(f"Invalid dimensions: {e}")
+
+    # Parse origin coordinates (second line)
+    try:
+        origin = lines[1].split()
+        x, y, z = float(origin[0]), float(origin[1]), float(origin[2])
+    except (IndexError, ValueError) as e:
+        raise ValueError(f"Invalid origin: {e}")
+
+    # Parse cell sizes
+    try:
+        current_line = 2
+        x_sizes, current_line = _parse_cell_sizes(lines, current_line, nx)
+        y_sizes, current_line = _parse_cell_sizes(lines, current_line, ny)
+        z_sizes, _ = _parse_cell_sizes(lines, current_line, nz)
+    except (IndexError, ValueError) as e:
+        raise ValueError(f"Error parsing cell sizes: {e}")
+
+    # Create a GridData object with the parsed information
+    grid_data_dict = {
+            'dimensions': {'nx': nx, 'ny': ny, 'nz': nz},
+            'origin'    : {'x': x, 'y': y, 'z': z},
+            'cell_sizes': {
+                    'x': x_sizes,
+                    'y': y_sizes,
+                    'z': z_sizes
+            },
+            'metadata'  : metadata or {}
+    }
+
+    return GridData.from_dict(grid_data_dict)
+
+
+def _parse_cell_sizes(lines: List[str], start_index: int, count: int) -> Tuple[List[float], int]:
     """
     Parse cell sizes from file lines, handling both compact (N*value) and expanded notation.
 
@@ -150,79 +399,7 @@ def parse_cell_sizes(lines: List[str], start_index: int, count: int) -> Tuple[Li
     return values[:count], line_index
 
 
-def read_msh_file(filepath: Union[str, Path]) -> GridData:
-    """
-    Read a structured grid mesh file and return a GridData object.
-
-    Currently supports Grav3D mesh file format (.msh):
-    - First line: NX NY NZ (number of cells in X, Y, Z directions)
-    - Second line: X Y Z (coordinates of origin in meters)
-    - Next section: X cell widths (either expanded or using N*value notation)
-    - Next section: Y cell widths (either expanded or using N*value notation)
-    - Next section: Z cell thicknesses (either expanded or using N*value notation)
-
-    Args:
-        filepath: Path to the mesh file
-
-    Returns:
-        GridData object containing the mesh information
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist
-        ValueError: If the file format is invalid
-    """
-    filepath = Path(filepath)
-    if not filepath.exists():
-        raise FileNotFoundError(f"Mesh file not found: {filepath}")
-
-    with open(filepath, 'r') as f:
-        lines = [line.strip() for line in f.readlines() if line.strip()]
-
-    if len(lines) < 2:
-        raise ValueError(f"Invalid mesh file format: {filepath}")
-
-    # Parse dimensions (first line)
-    try:
-        dims = lines[0].split()
-        nx, ny, nz = int(dims[0]), int(dims[1]), int(dims[2])
-    except (IndexError, ValueError) as e:
-        raise ValueError(f"Invalid dimensions in mesh file: {e}")
-
-    # Parse origin coordinates (second line)
-    try:
-        origin = lines[1].split()
-        x, y, z = float(origin[0]), float(origin[1]), float(origin[2])
-    except (IndexError, ValueError) as e:
-        raise ValueError(f"Invalid origin in mesh file: {e}")
-
-    # Parse cell sizes
-    try:
-        current_line = 2
-        x_sizes, current_line = parse_cell_sizes(lines, current_line, nx)
-        y_sizes, current_line = parse_cell_sizes(lines, current_line, ny)
-        z_sizes, _ = parse_cell_sizes(lines, current_line, nz)
-    except (IndexError, ValueError) as e:
-        raise ValueError(f"Error parsing cell sizes: {e}")
-
-    # Create a dictionary with all the parsed information
-    grid_data_dict = {
-            'dimensions': {'nx': nx, 'ny': ny, 'nz': nz},
-            'origin'    : {'x': x, 'y': y, 'z': z},
-            'cell_sizes': {
-                    'x': x_sizes,
-                    'y': y_sizes,
-                    'z': z_sizes
-            },
-            'metadata'  : {
-                    'file_format': 'grav3d',
-                    'filepath'   : str(filepath)
-            }
-    }
-
-    return GridData.from_dict(grid_data_dict)
-
-
-def calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
+def _calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
     """
     Calculate the center coordinates of each cell in the grid.
 
@@ -249,107 +426,3 @@ def calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
             'y': y_centers,
             'z': z_centers
     }
-
-
-def structured_data_from(array: np.ndarray, grid: GridData,
-                         data_name: str = 'model') -> StructuredData:
-    """
-    Convert a 3D numpy array and grid information into a StructuredData object.
-
-    Args:
-        array: 3D numpy array of property values with shape (ny, nx, nz)
-        grid: GridData object containing grid dimensions, origin, and cell sizes
-        data_name: Name for the data array (default: 'model')
-
-    Returns:
-        StructuredData object containing the data array with proper coordinates
-
-    Raises:
-        ValueError: If array shape doesn't match grid dimensions
-    """
-    # Verify array shape matches grid dimensions
-    expected_shape = (grid.dimensions.ny, grid.dimensions.nx, grid.dimensions.nz)
-    if array.shape != expected_shape:
-        raise ValueError(
-            f"Array shape {array.shape} doesn't match grid dimensions {expected_shape}"
-        )
-
-    # Calculate cell center coordinates
-    centers = calculate_cell_centers(grid)
-
-    # Create the xarray DataArray with proper coordinates
-    xr_data_array = xr.DataArray(
-        data=array,
-        dims=['y', 'x', 'z'],  # Dimensions in the order they appear in the array
-        coords={
-                'x': centers['x'],
-                'y': centers['y'],
-                'z': centers['z'],
-        },
-        name=data_name,
-        attrs=grid.metadata  # Include grid metadata in the data array
-    )
-
-    # Create a StructuredData instance from the xarray DataArray
-    struct = StructuredData.from_data_array(
-        data_array=xr_data_array,
-        data_array_name=data_name
-    )
-
-    return struct
-
-
-def read_mod_file(filepath: Union[str, Path], grid: GridData,
-                  missing_value: float = -99_999.0) -> np.ndarray:
-    """
-    Read a model file containing property values for a 3D grid.
-
-    Currently supports Grav3D model file format (.mod) where each line contains
-    a single property value. The values are ordered with the z-direction changing
-    fastest, then x, then y.
-
-    Args:
-        filepath: Path to the model file
-        grid: GridData object containing the grid dimensions
-        missing_value: Value to replace with NaN in the output array (default: -99_999.0)
-
-    Returns:
-        3D numpy array of property values with shape (ny, nx, nz)
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist
-        ValueError: If the number of values doesn't match the grid dimensions
-    """
-    filepath = Path(filepath)
-    if not filepath.exists():
-        raise FileNotFoundError(f"Model file not found: {filepath}")
-
-    try:
-        # Read all values from the file
-        with open(filepath, 'r') as f:
-            lines = [line.strip() for line in f if line.strip()]
-
-        # Convert each line to a float
-        values = np.array([float(line) for line in lines], dtype=float)
-
-        # Calculate expected number of values based on grid dimensions
-        nx, ny, nz = grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz
-        expected_count = nx * ny * nz
-
-        if len(values) != expected_count:
-            raise ValueError(
-                f"Invalid model file: expected {expected_count} values, got {len(values)}"
-            )
-
-        # Reshape to (ny, nx, nz) with z changing fastest
-        model_array = values.reshape((ny, nx, nz))
-
-        # Replace missing values with NaN
-        if missing_value is not None:
-            model_array[model_array == missing_value] = np.nan
-
-        return model_array
-
-    except Exception as e:
-        # Add context to any errors
-        raise ValueError(f"Error reading model file {filepath}: {str(e)}") from e
