@@ -47,7 +47,7 @@ def load_with_trimesh(path_to_file_or_buffer, file_type: Optional[str] = None,
         case TriMeshTransformations.RIGHT_HANDED_Z_UP_Y_REVERSED:
             # * Forward Z Up Y
             transform=np.array([
-                    [1, 0, 0, 0],
+                    [-1, 0, 0, 0],
                     [0, 0, 1, 0],
                     [0, 1, 0, 0],
                     [0, 0, 0, 1],
@@ -109,6 +109,10 @@ class LoadWithTrimesh:
             # If there's already an image reference in the material, let the user know
             if hasattr(material, 'image') and material.image is not None:
                 print("  -> Material already has an image:", material.image)
+            
+            if geometry.visual.uv is None:
+                raise ValueError("Geometry does not have UV coordinates for texture mapping, despite having a material."
+                                 "This can also happen if the geometry is given in quads instead of triangles.")
         else:
             print("No material found or no 'material' attribute on this geometry.")
 
