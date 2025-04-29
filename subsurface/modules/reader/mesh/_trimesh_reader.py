@@ -109,6 +109,10 @@ class LoadWithTrimesh:
             # If there's already an image reference in the material, let the user know
             if hasattr(material, 'image') and material.image is not None:
                 print("  -> Material already has an image:", material.image)
+            
+            if geometry.visual.uv is None:
+                raise ValueError("Geometry does not have UV coordinates for texture mapping, despite having a material."
+                                 "This can also happen if the geometry is given in quads instead of triangles.")
         else:
             print("No material found or no 'material' attribute on this geometry.")
 
