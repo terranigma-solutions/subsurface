@@ -47,7 +47,7 @@ def load_with_trimesh(path_to_file_or_buffer, file_type: Optional[str] = None,
         case TriMeshTransformations.RIGHT_HANDED_Z_UP_Y_REVERSED:
             # * Forward Z Up Y
             transform=np.array([
-                    [1, 0, 0, 0],
+                    [-1, 0, 0, 0],
                     [0, 0, 1, 0],
                     [0, 1, 0, 0],
                     [0, 0, 0, 1],

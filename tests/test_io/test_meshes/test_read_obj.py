@@ -49,7 +49,15 @@ def test_trimesh_load_obj_with_mtl_submeshes_II():
 
 def test_trimesh_load_obj_with_jpg_texture():
     path_to_obj = os.getenv("TERRA_PATH_DEVOPS") + "/meshes/OBJ/Portugal outcrop decimated/textured_output.obj"
-    load_with_trimesh(path_to_obj)
+    trimesh_obj = load_with_trimesh(
+        path_to_file_or_buffer=path_to_obj,
+        coordinate_system=TriMeshTransformations.RIGHT_HANDED_Z_UP_Y_REVERSED,
+    )
+
+    ts = trimesh_to_unstruct(trimesh_obj)
+
+    s = to_pyvista_mesh(ts)
+    pv_plot([s], image_2d=True)
 
 
 def test_trimesh_load_obj_with_face_I():
@@ -92,8 +100,7 @@ def test_trimesh_three_element_no_texture_to_unstruct():
     path_to_obj = os.getenv("PATH_TO_OBJ_MULTIMATERIAL_II")
     trimesh_obj = load_with_trimesh(
         path_to_file_or_buffer=path_to_obj,
-        # coordinate_system=TriMeshTransformations.RIGHT_HANDED_Z_UP_Y_REVERSED,
-    coordinate_system = TriMeshTransformations.RIGHT_HANDED_Z_UP
+        coordinate_system=TriMeshTransformations.RIGHT_HANDED_Z_UP_Y_REVERSED,
     )
 
     ts = trimesh_to_unstruct(trimesh_obj)
@@ -119,7 +126,10 @@ def test_trimesh_three_element_texture_to_unstruct():
     multiple images as structured objects
     """
     path_to_obj = os.getenv("PATH_TO_OBJ_SCANS")
-    trimesh_obj = load_with_trimesh(path_to_obj, coordinate_system=TriMeshTransformations.ORIGINAL)
+    trimesh_obj = load_with_trimesh(
+        path_to_obj,
+        coordinate_system=TriMeshTransformations.ORIGINAL
+    )
 
     ts = trimesh_to_unstruct(trimesh_obj)
 
