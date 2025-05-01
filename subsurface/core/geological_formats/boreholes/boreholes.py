@@ -91,7 +91,10 @@ class BoreholeSet:
     def get_bottom_coords_for_each_lith(self) -> dict[Hashable, np.ndarray]:
         merged_df = self._merge_vertex_data_arrays_to_dataframe()
         component_lith_arrays = {}
-        for lith, group in merged_df.groupby('component lith'):
+        groupby = merged_df.groupby('lith_ids')
+        if groupby.ngroups == 0:
+            raise ValueError("No components found")
+        for lith, group in groupby:
             lith = int(lith)
             first_vertices = group.groupby('well_id').last().reset_index()
             array = first_vertices[['X', 'Y', 'Z']].values
