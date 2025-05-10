@@ -2,7 +2,7 @@
 import pandas as pd
 import xarray as xr
 from scipy.interpolate import interp1d
-from typing import Tuple, Optional, Union, List
+from typing import Tuple, Optional, Union, List, Any
 
 from ...structs.base_structures import UnstructuredData
 from ...structs.base_structures._unstructured_data_constructor import raw_attributes_to_dict_data_arrays
@@ -96,6 +96,41 @@ def _get_interpolation_locations(attrs_well: pd.DataFrame, well_name: str) -> np
         return ((attrs_well['top'] + attrs_well['base']) / 2).values
 
 
+def _nearest_neighbor_categorical_interpolation(
+    x_locations: np.ndarray,
+    y_values: np.ndarray,
+    target_depths: np.ndarray
+) -> np.ndarray:
+    """
+    Custom nearest neighbor interpolation for categorical data.
+
+    This function finds the nearest source point for each target point
+    and assigns the corresponding categorical value.
+
+    Args:
+        x_locations: Array of source locations
+        y_values: Array of categorical values at source locations
+        target_depths: Array of target depths for interpolation
+
+    Returns:
+        Array of interpolated categorical values
+    """
+    # Initialize output array with NaN or None values
+    result = np.full(target_depths.shape, np.nan, dtype=object)
+
+    # For each target depth, find the nearest source location
+    for i, depth in enumerate(target_depths):
+        # Calculate distances to all source locations
+        distances = np.abs(x_locations - depth)
+
+        # Find the index of the minimum distance
+        if len(distances) > 0:
+            nearest_idx = np.argmin(distances)
+            result[i] = y_values[nearest_idx]
+
+    return result
+
+
 def _interpolate_attribute(
     attr_values: pd.Series, 
     x_locations: np.ndarray, 
@@ -116,23 +151,23 @@ def _interpolate_attribute(
     Returns:
         Array of interpolated values
     """
-    # For categorical data or specific columns, use nearest neighbor interpolation
+    # For categorical data or specific columns, use custom nearest neighbor interpolation
     if is_categorical or column_name in ['lith_ids', 'component lith']:
-        interp_kind = 'nearest'
+        return _nearest_neighbor_categorical_interpolation(
+            x_locations=x_locations,
+            y_values=attr_values.values,
+            target_depths=target_depths
+        )
     else:
-        interp_kind = 'linear'
-
-    # Create interpolation function
-    interp_func = interp1d(
-        x=x_locations,
-        y=attr_values.values,
-        bounds_error=False,
-        fill_value=np.nan,
-        kind=interp_kind
-    )
-
-    # Return interpolated values
-    return interp_func(target_depths)
+        # For numerical data, use scipy's interp1d with linear interpolation
+        interp_func = interp1d(
+            x=x_locations,
+            y=attr_values.values,
+            bounds_error=False,
+            fill_value=np.nan,
+            kind='linear'
+        )
+        return interp_func(target_depths)
 
 
 def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSet, well_id_mapper: dict[str, int]) -> pd.DataFrame:
