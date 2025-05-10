@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<build-type xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" uuid="c15fb876-7044-47cd-a3b0-676767e4ca63" xsi:noNamespaceSchemaLocation="https://www.jetbrains.com/teamcity/schemas/2021.1/project-config.xsd">
+<build-type xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" uuid="c15fb876-7044-47cd-a3b0-676767e4ca63" xsi:noNamespaceSchemaLocation="https://www.jetbrains.com/teamcity/schemas/2025.3/project-config.xsd">
   <name>Release Subsurface</name>
   <description />
   <settings ref="ReleasePythonPackage">
-    <parameters />
     <build-runners order="Git_Tagging, Build, Push_to_PyPi, Push_To_GitHub">
       <runner id="Build" name="Build" type="simpleRunner">
         <parameters>
@@ -29,9 +28,6 @@ python -m build]]></param>
     <vcs-settings>
       <vcs-entry-ref root-id="Subsurface_HttpsGithubComTerranigmaSolutionsSubsurfaceRefsHeadsMain1" />
     </vcs-settings>
-    <requirements />
-    <build-triggers />
-    <cleanup />
   </settings>
 </build-type>
 
