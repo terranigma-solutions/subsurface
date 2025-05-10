@@ -3,22 +3,20 @@ import pandas as pd
 import xarray as xr
 
 from ...structs.base_structures import UnstructuredData
+from ...structs.base_structures._unstructured_data_constructor import raw_attributes_to_dict_data_arrays
+from ...structs.unstructured_elements import LineSet
 
 
-def combine_survey_and_attrs(attrs: pd.DataFrame, survey: Survey) -> UnstructuredData:
+def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet,well_id_mapper: dict[str, int]) -> UnstructuredData:
     # Import moved to top for clarity and possibly avoiding repeated imports if called multiple times
-    from ...structs.base_structures._unstructured_data_constructor import raw_attributes_to_dict_data_arrays
 
-    # Accessing trajectory data more succinctly
-    trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
     # Ensure all columns in lith exist in new_attrs, if not, add them as NaN
-
-    new_attrs = _map_attrs_to_measured_depths(attrs, survey)
+    new_attrs = _map_attrs_to_measured_depths(attrs, survey_trajectory, well_id_mapper)
 
     # Construct the final xarray dict without intermediate variable
-    points_attributes_xarray_dict = raw_attributes_to_dict_data_arrays(
+    points_attributes_xarray_dict: dict[str, xr.DataArray] = raw_attributes_to_dict_data_arrays(
         default_attributes_name="vertex_attrs",
-        n_items=trajectory.shape[0],  # TODO: Can I look this on new_attrs to remove line 11?
+        n_items=survey_trajectory.data.data["vertex_attrs"].shape[0],  # TODO: Can I look this on new_attrs to remove line 11?
         dims=["points", "vertex_attr"],
         raw_attributes=new_attrs
     )
@@ -26,23 +24,23 @@ def combine_survey_and_attrs(attrs: pd.DataFrame, survey: Survey) -> Unstructure
     # Inline construction of UnstructuredData
     return UnstructuredData.from_data_arrays_dict(
         xarray_dict={
-                "vertex"      : survey.survey_trajectory.data.data["vertex"],
-                "cells"       : survey.survey_trajectory.data.data["cells"],
+                "vertex"      : survey_trajectory.data.data["vertex"],
+                "cells"       : survey_trajectory.data.data["cells"],
                 "vertex_attrs": points_attributes_xarray_dict["vertex_attrs"],
-                "cell_attrs"  : survey.survey_trajectory.data.data["cell_attrs"]
+                "cell_attrs"  : survey_trajectory.data.data["cell_attrs"]
         },
-        xarray_attributes=survey.survey_trajectory.data.data.attrs,
-        default_cells_attributes_name=survey.survey_trajectory.data.cells_attr_name,
-        default_points_attributes_name=survey.survey_trajectory.data.vertex_attr_name
+        xarray_attributes=survey_trajectory.data.data.attrs,
+        default_cells_attributes_name=survey_trajectory.data.cells_attr_name,
+        default_points_attributes_name=survey_trajectory.data.vertex_attr_name
     )
 
-def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.DataFrame:
-    trajectory: xr.DataArray = survey.survey_trajectory.data.data["vertex_attrs"]
+def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSet, well_id_mapper: dict[str, int]) -> pd.DataFrame:
+    trajectory: xr.DataArray = survey_trajectory.data.data["vertex_attrs"]
     trajectory_well_id: xr.DataArray = trajectory.sel({'vertex_attr': 'well_id'})
     measured_depths: np.ndarray = trajectory.sel({'vertex_attr': 'measured_depths'}).values.astype(np.float64)
 
     # Start with a copy of the existing attributes DataFrame
-    new_attrs = survey.survey_trajectory.data.points_attributes.copy()
+    new_attrs = survey_trajectory.data.points_attributes.copy()
     if 'component lith' in attrs.columns and 'lith_ids' not in attrs.columns:
         # Factorize lith components directly in-place
         attrs['lith_ids'], _ = pd.factorize(attrs['component lith'], use_na_sentinel=True)
@@ -55,7 +53,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
 
     # Align well IDs between attrs and trajectory, perform interpolation, and map the attributes
     # Loop dict
-    for survey_well_name in survey.well_id_mapper:
+    for survey_well_name in well_id_mapper:
         # Select rows corresponding to the current well ID
 
         # use the well_id to get all the elements of attrs that have the well_id as index
@@ -66,7 +64,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey: Survey) -> pd.Dat
             print(f"Well '{survey_well_name}' does not exist in the attributes DataFrame.")
             continue
 
-        survey_well_id = survey.get_well_num_id(survey_well_name)
+        survey_well_id = well_id_mapper.get(survey_well_name, None)
         trajectory_well_mask = (trajectory_well_id == survey_well_id).values
 
         # Apply mask to measured depths for the current well

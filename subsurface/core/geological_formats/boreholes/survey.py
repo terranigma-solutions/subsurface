@@ -58,11 +58,12 @@ class Survey:
         return self.well_id_mapper.get(well_string_id, None)
 
     def update_survey_with_lith(self, lith: pd.DataFrame):
-        unstruct: UnstructuredData = combine_survey_and_attrs(lith, self)
+        unstruct: UnstructuredData = combine_survey_and_attrs(lith, self.survey_trajectory, self.well_id_mapper)
         self.survey_trajectory.data = unstruct
 
     def update_survey_with_attr(self, attrs: pd.DataFrame):
-        self.survey_trajectory.data = combine_survey_and_attrs(attrs, self)
+        self.survey_trajectory.data = combine_survey_and_attrs(attrs, self.survey_trajectory, self.well_id_mapper)
+
 
 def _correct_angles(df: pd.DataFrame) -> pd.DataFrame:
     def correct_inclination(inc: float) -> float:
@@ -83,9 +84,3 @@ def _correct_angles(df: pd.DataFrame) -> pd.DataFrame:
     df['azi'] = df['azi'].apply(correct_azimuth)
 
     return df
-
-
-
-
-
-
