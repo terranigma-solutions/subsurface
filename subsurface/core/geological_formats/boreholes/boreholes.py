@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from typing import Hashable
+from typing import Hashable, Literal
 
 from ._combine_trajectories import create_combined_trajectory, MergeOptions
 from .collars import Collars
@@ -69,10 +69,10 @@ class BoreholeSet:
         # I need to implement the survey to and then name the files accordingly
         bytearray_le_collars: bytes = self.collars.data.to_binary()
         bytearray_le_trajectory: bytes = self.combined_trajectory.data.to_binary()
-        
+
         new_file = open(f"{path}_collars.le", "wb")
         new_file.write(bytearray_le_collars)
-        
+
         new_file = open(f"{path}_trajectory.le", "wb")
         new_file.write(bytearray_le_trajectory)
         return True
@@ -88,13 +88,37 @@ class BoreholeSet:
 
         return component_lith_arrays
 
-    def get_bottom_coords_for_each_lith(self) -> dict[Hashable, np.ndarray]:
+    def get_bottom_coords_for_each_lith(self, group_by: Literal['component lith', 'lith_ids'] = 'lith_ids') -> dict[Hashable, np.ndarray]:
+        """
+        Retrieves the bottom coordinates for each lithological component or lith ID from
+        the merged vertex data arrays.
+
+        This function groups the merged data by either 'component lith' or 'lith_ids',
+        then extracts the coordinates of the bottommost vertices for each well. It
+        returns a dictionary where keys are either lithological component identifiers
+        or lith IDs, and values are arrays of 3D coordinates representing the bottom
+        vertices.
+
+        Args:
+            group_by (Literal['component lith', 'lith_ids']): Specifies the grouping
+                column to use for lithological components. Acceptable values are either
+                'component lith' or 'lith_ids'. Defaults to 'lith_ids'.
+
+        Returns:
+            dict[Hashable, np.ndarray]: A dictionary mapping the lithological component
+            or lith ID to an array of 3D coordinates ([X, Y, Z]) corresponding to the
+            bottom vertices for each well.
+
+        Raises:
+            ValueError: If no groups are found from the specified `group_by` column.
+        """
         merged_df = self._merge_vertex_data_arrays_to_dataframe()
         component_lith_arrays = {}
-        groupby = merged_df.groupby('lith_ids')
-        if groupby.ngroups == 0:
+        group = merged_df.groupby(group_by)
+
+        if group.ngroups == 0:
             raise ValueError("No components found")
-        for lith, group in groupby:
+        for lith, group in group:
             lith = int(lith)
             first_vertices = group.groupby('well_id').last().reset_index()
             array = first_vertices[['X', 'Y', 'Z']].values
