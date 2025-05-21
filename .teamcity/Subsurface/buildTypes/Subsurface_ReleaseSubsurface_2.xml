@@ -17,13 +17,6 @@ python -m build]]></param>
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
-      <runner id="Push_To_GitHub" name="Push To GitHub" type="simpleRunner">
-        <parameters>
-          <param name="script.content" value="gh release create %env.PACKAGE_VERSION% dist/*  --notes &quot;Release notes here&quot; --repo terranigma-solutions/subsurface" />
-          <param name="teamcity.step.mode" value="default" />
-          <param name="use.custom.script" value="true" />
-        </parameters>
-      </runner>
     </build-runners>
     <vcs-settings>
       <vcs-entry-ref root-id="Subsurface_HttpsGithubComTerranigmaSolutionsSubsurfaceRefsHeadsMain1" />
