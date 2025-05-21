@@ -3,6 +3,9 @@
   <name>Release Subsurface</name>
   <description />
   <settings ref="ReleasePythonPackage">
+    <parameters>
+      <param name="env.org/repo" value="terranigma-solutions/subsurface" />
+    </parameters>
     <build-runners order="Git_Tagging, Build, Push_to_PyPi, Push_To_GitHub">
       <runner id="Build" name="Build" type="simpleRunner">
         <parameters>
