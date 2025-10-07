@@ -178,10 +178,8 @@ def __pv_convert_unstructured_to_explicit(unstr_grid):
         raise ValueError(f"Failed to convert unstructured grid to explicit structured grid: {e}")
     
 def __pv_convert_rectilinear_to_explicit(rectl_grid):
-
     pv = optional_requirements.require_pyvista()
 
-    # Extract the coordinate arrays from the input RectilinearGrid.
     x = np.asarray(rectl_grid.x)
     y = np.asarray(rectl_grid.y)
     z = np.asarray(rectl_grid.z)
@@ -196,35 +194,34 @@ def __pv_convert_rectilinear_to_explicit(rectl_grid):
     ycorn = doubled_coords(y)
     zcorn = doubled_coords(z)
 
-    # Build a complete grid of corner points via meshgrid. Fortran ('F') order ensures
-    # the connectivity ordering aligns with VTK's expectations.
-    xx, yy, zz = np.meshgrid(xcorn, ycorn, zcorn, indexing='ij')
-    corners = np.column_stack((xx.ravel(order='F'),
-                               yy.ravel(order='F'),
-                               zz.ravel(order='F')))
+    nx2, ny2, nz2 = len(xcorn), len(ycorn), len(zcorn)
+    slab = ny2 * nz2
+    N = nx2 * slab
 
-    # The dimensions to pass to the ExplicitStructuredGrid constructor should be
-    # the counts of unique coordinates in each direction.
-    dims = (len(np.unique(xcorn)),
-            len(np.unique(ycorn)),
-            len(np.unique(zcorn)))
+    # Precompute compact Y/Z slab once (size ~ 2 * ny2*nz2 << N for balanced grids)
+    yz = np.empty((slab, 2), dtype=np.result_type(xcorn, ycorn, zcorn))
+    yz[:, 0] = np.repeat(ycorn, nz2)  # Y
+    yz[:, 1] = np.tile(zcorn, ny2)  # Z
 
-    # Create the ExplicitStructuredGrid.
+    # Allocate the final corners (dominant 3N array)
+    corners = np.empty((N, 3), dtype=yz.dtype)
+    for i, xv in enumerate(xcorn):
+        start = i * slab
+        end = start + slab
+        corners[start:end, 0] = xv
+        corners[start:end, 1:3] = yz
+
+    dims = (len(x), len(y), len(z))
+
     explicit_grid = pv.ExplicitStructuredGrid(dims, corners)
     explicit_grid.compute_connectivity()
 
-    # --- Copy associated data arrays ---
-
-    # Transfer all cell data arrays.
-    for name, array in rectl_grid.cell_data.items():
-        explicit_grid.cell_data[name] = array.copy()
-
-    # Transfer all point data arrays.
-    for name, array in rectl_grid.point_data.items():
-        explicit_grid.point_data[name] = array.copy()
-
-    # (Optional) Transfer field data as well.
-    for name, array in rectl_grid.field_data.items():
-        explicit_grid.field_data[name] = array.copy()
+    # Copy data arrays (shallow copy to avoid extra peak)
+    for name, arr in rectl_grid.cell_data.items():
+        explicit_grid.cell_data[name] = arr
+    for name, arr in rectl_grid.point_data.items():
+        explicit_grid.point_data[name] = arr
+    for name, arr in rectl_grid.field_data.items():
+        explicit_grid.field_data[name] = arr
 
     return explicit_grid
