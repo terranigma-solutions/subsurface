@@ -280,5 +280,48 @@ def __pv_convert_rectilinear_to_explicit(rectl_grid, *, temp_dtype=None):
     for name, arr in rectl_grid.field_data.items():
         explicit.field_data[name] = arr
 
+    __validate_rectilinear_to_explicit_conversion(rectl_grid, explicit)
+
     return explicit
 
+
+def __validate_rectilinear_to_explicit_conversion(rectl_grid, explicit_grid, *, atol=1e-6, rtol=1e-8) -> None:
+    """
+    Validate core equivalence between a RectilinearGrid and its ExplicitStructuredGrid.
+    Raises ValueError on mismatch. Avoids large 3D uniques / big temporaries.
+    """
+    import numpy as np
+
+    # dims & counts
+    nx, ny, nz = map(int, rectl_grid.dimensions)
+    if tuple(map(int, explicit_grid.dimensions)) != (nx, ny, nz):
+        raise ValueError(f"Dimensions differ: explicit {tuple(explicit_grid.dimensions)} vs rect {tuple(rectl_grid.dimensions)}")
+
+    expected_cells = (nx - 1) * (ny - 1) * (nz - 1)
+    if explicit_grid.n_cells != expected_cells:
+        raise ValueError(f"Cell count mismatch: explicit {explicit_grid.n_cells} vs expected {expected_cells}")
+
+    expected_points = nx * ny * nz
+    if explicit_grid.n_points != expected_points:
+        raise ValueError(f"Point count mismatch: explicit {explicit_grid.n_points} vs expected {expected_points}")
+
+    # bounds
+    if not np.allclose(explicit_grid.bounds, rectl_grid.bounds, rtol=rtol, atol=atol):
+        raise ValueError(f"Bounds differ: explicit {explicit_grid.bounds} vs rect {rectl_grid.bounds}")
+
+    # axis coordinates (order-independent)
+    pts = explicit_grid.points  # shape (M,3), M = nx*ny*nz (already deduped/sorted by unique)
+    x_exp = np.unique(pts[:, 0])
+    y_exp = np.unique(pts[:, 1])
+    z_exp = np.unique(pts[:, 2])
+
+    x_rect = np.asarray(rectl_grid.x)
+    y_rect = np.asarray(rectl_grid.y)
+    z_rect = np.asarray(rectl_grid.z)
+
+    if len(x_exp) != len(x_rect) or not np.allclose(x_exp, x_rect, rtol=rtol, atol=atol):
+        raise ValueError("X axis coordinates differ.")
+    if len(y_exp) != len(y_rect) or not np.allclose(y_exp, y_rect, rtol=rtol, atol=atol):
+        raise ValueError("Y axis coordinates differ.")
+    if len(z_exp) != len(z_rect) or not np.allclose(z_exp, z_rect, rtol=rtol, atol=atol):
+        raise ValueError("Z axis coordinates differ.")
