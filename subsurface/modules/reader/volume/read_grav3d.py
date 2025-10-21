@@ -106,8 +106,10 @@ class GridData:
         )
 
 
+from typing import Literal
+
 def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing_value: Optional[float],
-                             attr_name: Optional[str]) -> StructuredData:
+                             attr_name: Optional[str], ordering: Literal['ijk', 'xyz'] = 'ijk') -> StructuredData:
     """
     Read a structured grid mesh and values from streams and return a StructuredData object.
 
@@ -117,6 +119,10 @@ def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing
     Args:
         grid_stream: TextIO stream containing the grid definition (.msh format)
         values_stream: TextIO stream containing the property values (.mod format)
+        missing_value: Value to replace with NaN in the output array
+        attr_name: Name for the data attribute
+        ordering: Data ordering in the file. 'ijk' means i (x) varies fastest, then j (y), then k (z).
+                  'xyz' means z varies fastest, then x, then y. Default is 'ijk'.
 
     Returns:
         StructuredData object containing the grid and property values
@@ -145,7 +151,7 @@ def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing
         # Read all values from the stream
         lines = [line.strip() for line in values_stream if line.strip()]
 
-        model_array = _parse_mod_file(grid, lines, missing_value=missing_value)
+        model_array = _parse_mod_file(grid, lines, missing_value=missing_value, ordering=ordering)
 
     except Exception as e:
         # Add context to any errors
@@ -196,18 +202,22 @@ def read_msh_file(filepath: Union[str, Path]) -> GridData:
 
 
 def read_mod_file(filepath: Union[str, Path], grid: GridData,
-                  missing_value: float = -99_999.0) -> np.ndarray:
+                  missing_value: float = -99_999.0,
+                  ordering: Literal['ijk', 'xyz'] = 'ijk') -> np.ndarray:
     """
     Read a model file containing property values for a 3D grid.
 
     Currently supports Grav3D model file format (.mod) where each line contains
-    a single property value. The values are ordered with the z-direction changing
-    fastest, then x, then y.
+    a single property value.
 
     Args:
         filepath: Path to the model file
         grid: GridData object containing the grid dimensions
         missing_value: Value to replace with NaN in the output array (default: -99_999.0)
+        ordering: Data ordering in the file. Options:
+                  - 'ijk': i (x) varies fastest, then j (y), then k (z) - standard VTK/Fortran ordering
+                  - 'xyz': z varies fastest, then x, then y - legacy Grav3D ordering
+                  Default is 'ijk'.
 
     Returns:
         3D numpy array of property values with shape (ny, nx, nz)
@@ -225,31 +235,13 @@ def read_mod_file(filepath: Union[str, Path], grid: GridData,
         with open(filepath, 'r') as f:
             lines = [line.strip() for line in f if line.strip()]
 
-        model_array = _parse_mod_file(grid, lines, missing_value)
+        model_array = _parse_mod_file(grid, lines, missing_value, ordering)
 
         return model_array
 
     except Exception as e:
         # Add context to any errors
         raise ValueError(f"Error reading model file {filepath}: {str(e)}") from e
-
-
-def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[float]) -> np.ndarray:
-    # Convert each line to a float
-    values = np.array([float(line) for line in lines], dtype=float)
-    # Calculate expected number of values based on grid dimensions
-    nx, ny, nz = grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz
-    expected_count = nx * ny * nz
-    if len(values) != expected_count:
-        raise ValueError(
-            f"Invalid model file: expected {expected_count} values, got {len(values)}"
-        )
-    # Reshape to (ny, nx, nz) with z changing fastest
-    model_array = values.reshape((ny, nx, nz))
-    # Replace missing values with NaN
-    if missing_value is not None:
-        model_array[model_array == missing_value] = np.nan
-    return model_array
 
 
 def structured_data_from(array: np.ndarray, grid: GridData,
@@ -426,3 +418,49 @@ def _calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
             'y': y_centers,
             'z': z_centers
     }
+
+
+def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[float],
+                   ordering: Literal['ijk', 'xyz'] = 'ijk') -> np.ndarray:
+    """
+    Parse model file values into a 3D numpy array.
+
+    Args:
+        grid: GridData object containing grid dimensions
+        lines: List of lines containing the values
+        missing_value: Value to replace with NaN
+        ordering: Data ordering in the file ('ijk' or 'xyz')
+
+    Returns:
+        3D numpy array with shape (ny, nx, nz)
+    """
+    # Convert each line to a float
+    values = np.array([float(line) for line in lines], dtype=float)
+    
+    # Calculate expected number of values based on grid dimensions
+    nx, ny, nz = grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz
+    expected_count = nx * ny * nz
+    
+    if len(values) != expected_count:
+        raise ValueError(
+            f"Invalid model file: expected {expected_count} values, got {len(values)}"
+        )
+    
+    # Reshape based on ordering
+    if ordering == 'ijk':
+        # i (x) varies fastest, then j (y), then k (z)
+        # This is standard VTK/Fortran ordering: (k, j, i) in array dimensions
+        model_array = values.reshape((nz, ny, nx), order='C')
+        # Transpose to (ny, nx, nz) to match expected output shape
+        model_array = np.transpose(model_array, (1, 2, 0))
+    elif ordering == 'xyz':
+        # z varies fastest, then x, then y (legacy Grav3D ordering)
+        model_array = values.reshape((ny, nx, nz))
+    else:
+        raise ValueError(f"Invalid ordering: {ordering}. Must be 'ijk' or 'xyz'")
+    
+    # Replace missing values with NaN
+    if missing_value is not None:
+        model_array[model_array == missing_value] = np.nan
+    
+    return model_array
