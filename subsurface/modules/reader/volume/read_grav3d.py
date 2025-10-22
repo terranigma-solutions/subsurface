@@ -109,7 +109,7 @@ class GridData:
 from typing import Literal
 
 def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing_value: Optional[float],
-                             attr_name: Optional[str], ordering: Literal['ijk', 'xyz'] = 'ijk') -> StructuredData:
+                             attr_name: Optional[str], ordering: Literal['ijk', 'xyz', 'xyz_reverse'] = 'ijk') -> StructuredData:
     """
     Read a structured grid mesh and values from streams and return a StructuredData object.
 
@@ -121,8 +121,11 @@ def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing
         values_stream: TextIO stream containing the property values (.mod format)
         missing_value: Value to replace with NaN in the output array
         attr_name: Name for the data attribute
-        ordering: Data ordering in the file. 'ijk' means i (x) varies fastest, then j (y), then k (z).
-                  'xyz' means z varies fastest, then x, then y. Default is 'ijk'.
+        ordering: Data ordering in the file:
+                  - 'ijk': i (x) varies fastest, then j (y), then k (z)
+                  - 'xyz': z varies fastest, then x, then y
+                  - 'xyz_reverse': z varies fastest (reversed), then x, then y
+                  Default is 'ijk'.
 
     Returns:
         StructuredData object containing the grid and property values
@@ -203,7 +206,7 @@ def read_msh_file(filepath: Union[str, Path]) -> GridData:
 
 def read_mod_file(filepath: Union[str, Path], grid: GridData,
                   missing_value: float = -99_999.0,
-                  ordering: Literal['ijk', 'xyz'] = 'ijk') -> np.ndarray:
+                  ordering: Literal['ijk', 'xyz', 'xyz_reverse'] = 'ijk') -> np.ndarray:
     """
     Read a model file containing property values for a 3D grid.
 
@@ -217,6 +220,7 @@ def read_mod_file(filepath: Union[str, Path], grid: GridData,
         ordering: Data ordering in the file. Options:
                   - 'ijk': i (x) varies fastest, then j (y), then k (z) - standard VTK/Fortran ordering
                   - 'xyz': z varies fastest, then x, then y - legacy Grav3D ordering
+                  - 'xyz_reverse': z varies fastest (reversed direction), then x, then y
                   Default is 'ijk'.
 
     Returns:
@@ -421,7 +425,7 @@ def _calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
 
 
 def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[float],
-                   ordering: Literal['ijk', 'xyz'] = 'ijk') -> np.ndarray:
+                   ordering: Literal['ijk', 'xyz', 'xyz_reverse'] = 'ijk') -> np.ndarray:
     """
     Parse model file values into a 3D numpy array.
 
@@ -429,7 +433,10 @@ def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[fl
         grid: GridData object containing grid dimensions
         lines: List of lines containing the values
         missing_value: Value to replace with NaN
-        ordering: Data ordering in the file ('ijk' or 'xyz')
+        ordering: Data ordering in the file:
+                  - 'ijk': i (x) varies fastest, then j (y), then k (z)
+                  - 'xyz': z varies fastest, then x, then y
+                  - 'xyz_reverse': z varies fastest (reversed), then x, then y
 
     Returns:
         3D numpy array with shape (ny, nx, nz)
@@ -456,8 +463,13 @@ def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[fl
     elif ordering == 'xyz':
         # z varies fastest, then x, then y (legacy Grav3D ordering)
         model_array = values.reshape((ny, nx, nz))
+    elif ordering == 'xyz_reverse':
+        # z varies fastest (but in reverse direction), then x, then y
+        model_array = values.reshape((ny, nx, nz))
+        # Reverse the z-axis (last dimension)
+        model_array = np.flip(model_array, axis=2)
     else:
-        raise ValueError(f"Invalid ordering: {ordering}. Must be 'ijk' or 'xyz'")
+        raise ValueError(f"Invalid ordering: {ordering}. Must be 'ijk', 'xyz', or 'xyz_reverse'")
     
     # Replace missing values with NaN
     if missing_value is not None:

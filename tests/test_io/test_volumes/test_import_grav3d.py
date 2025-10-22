@@ -170,7 +170,7 @@ def test_import_grav3d_IV():
     array: np.ndarray = read_mod_file(
         filepath=pathlib.Path(os.getenv("PATH_TO_GRAV3D_MOD_SIMPLE")),
         grid=grid,  # Using the new parameter name
-        ordering='ijk'
+        ordering='xyz_reverse'
     )
 
     # Convert the array and grid to a structured data format
@@ -185,7 +185,8 @@ def test_import_grav3d_IV():
     p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
     p.add_volume(
         sg.active_attributes,
-        opacity='linear'
+        opacity=1,
+        # opacity='linear'
     )
     p.add_axes()
     p.add_bounding_box()
