@@ -35,7 +35,7 @@
       <param name="env.PATH_TO_SPREMBERG_STRATIGRAPHY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_stratigraphy.csv" />
       <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
       <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
-      <param name="env.TERRA_PATH_DEVOPS" value="D:\OneDrive - Terranigma Solutions GmbH/Documents - Terranigma Base/DevOps/SubsurfaceTestData/" />
+      <param name="env.TERRA_PATH_DEVOPS" value="/home/leguark/DevOps/DevOps/SubsurfaceTestData/" />
     </parameters>
     <build-runners>
       <runner id="Setup" name="Setup" type="simpleRunner">
