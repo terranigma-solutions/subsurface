@@ -43,69 +43,34 @@
           <param name="script.content"><![CDATA[#!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== filtering PATH & env ==="
-# start from a clean-ish PATH (keep system dirs; drop mise/rtx/pyenv/asdf shims)
-CLEAN_PATH="/usr/bin:/bin"
-IFS=':' read -r -a PARTS <<< "${PATH:-}"
-for p in "${PARTS[@]}"; do
-  case "$p" in
-    *mise*|*rtx*|*.pyenv*|*.asdf*|*conda*|*mamba*) : ;;  # skip
-    *) CLEAN_PATH="$CLEAN_PATH:$p" ;;
-  esac
-done
-export PATH="$CLEAN_PATH"
+# Helpful debug: see if PYTHON* is set by the agent
+env | sort | grep -E '^PYTHON' || true
 
-# neutralize variables that break Python startup
-unset PYTHONHOME PYTHONPATH VIRTUAL_ENV CONDA_PREFIX CONDA_DEFAULT_ENV PYENV_ROOT MAMBA_ROOT_PREFIX
-# (for shells that export RTX_/MISE_ variables — unsetting glob-safe)
-env | grep -E '^(RTX|MISE)_' | cut -d= -f1 | xargs -r -I{} bash -lc 'unset {}' || true
-
-echo "PATH=$PATH"
-env | sort | grep -E '^(PYTHON|CONDA|VIRTUAL|RTX|MISE|PYENV|MAMBA)' || true
-
-echo "=== choosing python ==="
-if command -v /usr/bin/python3.13 >/dev/null 2>&1; then
-  PY=/usr/bin/python3.13
-elif command -v /usr/bin/python3 >/dev/null 2>&1; then
-  PY=/usr/bin/python3
+# Prefer Python 3.13 if present
+if command -v python3.13 >/dev/null 2>&1; then
+  PYTHON=python3.13
 else
-  PY=$(command -v python3)
+  PYTHON=python3
 fi
-echo "Using: $PY"
-$PY -E -s -V
 
-echo "=== creating venv ==="
-$PY -E -s -m venv venv
-VENVPY="$(pwd)/venv/bin/python -E -s"
-VENVPIP="$(pwd)/venv/bin/python -E -s -m pip"
+# Create venv while ignoring PYTHON* and user site
+$PYTHON -E -s -m venv venv
 
-# make venv tools available to later steps via TeamCity parameters
-echo "##teamcity[setParameter name='env.VENVPY' value='$VENVPY']"
-echo "##teamcity[setParameter name='env.VENVPIP' value='$VENVPIP']"
+# Always call venv python with -E -s as well
+VENVPY="venv/bin/python -E -s"
+VENVPIP="venv/bin/python -E -s -m pip"
 
-echo "=== bootstrap pip & deps ==="
 $VENVPIP install --upgrade pip setuptools wheel
 $VENVPIP install --verbose -r requirements/requirements_dev.txt
 $VENVPIP install --verbose teamcity-messages
 
-echo "=== sanity probe ==="
-$VENVPY - <<'PY'
+# Sanity probe
+venv/bin/python -E -s - <<'PY'
 import sys, encodings
 print("OK python:", sys.version)
 print("encodings:", encodings.__file__)
 print("prefix:", sys.prefix)
-PY
-
-
-# Sanity checks
-$VENVPY - <<'PY'
-import sys, encodings, site
-print("OK python:", sys.version)
-print("encodings at:", encodings.__file__)
-print("prefix:", sys.prefix)
-PY
-
-ls -la]]></param>
+PY]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
