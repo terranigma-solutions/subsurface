@@ -81,12 +81,15 @@ python -m pytest --teamcity -v -m core]]></param>
       </runner>
       <runner id="Run_Test_2" name="Run Test: Mesh" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_mesh.txt
+          <param name="script.content"><![CDATA[set -euo pipefail
+source venv/bin/activate
 
-@echo on
-set REQUIREMENT_LEVEL=READ_MESH
-echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
-venv\Scripts\python -m pytest --teamcity -v]]></param>
+pip install --verbose -r requirements/requirements_mesh.txt
+
+export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_MESH}"
+echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
+
+python -m pytest --teamcity -v]]></param>
           <param name="teamcity.step.mode" value="execute_if_failed" />
           <param name="use.custom.script" value="true" />
         </parameters>
