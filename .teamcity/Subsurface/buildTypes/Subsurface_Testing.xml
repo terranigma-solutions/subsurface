@@ -79,9 +79,10 @@ PY]]></param>
         <parameters>
           <param name="script.content"><![CDATA[#!/usr/bin/env bash
 set -euo pipefail
-VENVPY="%env.VENVPY%"
-VENVPIP="%env.VENVPIP%"
+VENVPY="venv/bin/python -E -s"
+VENVPIP="venv/bin/python -E -s -m pip"
 
+# (Core / Plot)
 $VENVPIP install --verbose -r requirements/requirements_plot.txt || true
 export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_MESH}"
 echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
