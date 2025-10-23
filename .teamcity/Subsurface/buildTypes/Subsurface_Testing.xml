@@ -43,22 +43,23 @@
           <param name="script.content"><![CDATA[#!/usr/bin/env bash
 set -euo pipefail
 
-# Create & activate venv (python3 preferred)
-python3 -m venv venv || python -m venv venv
+# Prefer Python 3.13 explicitly if installed
+if command -v python3.13 >/dev/null 2>&1; then
+  PYTHON=python3.13
+else
+  PYTHON=python3
+fi
+
+# Create & activate virtual environment
+$PYTHON -m venv venv
 source venv/bin/activate
 
-python -m pip install --upgrade pip setuptools wheel
+# Upgrade tooling
+$PYTHON -m pip install --upgrade pip setuptools wheel
 
-echo "Checking directory..."
-ls -la
-ls -la requirements || true
-
-# Core/dev deps
-pip install --verbose -r requirements/requirements_dev.txt
-pip install --verbose teamcity-messages
-
-python -V
-pip -V]]></param>
+# Proceed with requirements
+pip install -r requirements/requirements_dev.txt
+pip install teamcity-messages]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
