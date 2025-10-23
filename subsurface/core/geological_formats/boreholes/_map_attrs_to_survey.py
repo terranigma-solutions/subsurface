@@ -1,9 +1,9 @@
 ﻿import numpy as np
 import pandas as pd
 import xarray as xr
-from scipy.interpolate import interp1d
 from typing import Tuple, Optional, Union, List, Any
 
+from subsurface import optional_requirements
 from ...structs.base_structures import UnstructuredData
 from ...structs.base_structures._unstructured_data_constructor import raw_attributes_to_dict_data_arrays
 from ...structs.unstructured_elements import LineSet
@@ -35,6 +35,7 @@ def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet,wel
         default_cells_attributes_name=survey_trajectory.data.cells_attr_name,
         default_points_attributes_name=survey_trajectory.data.vertex_attr_name
     )
+
 
 def _prepare_categorical_data(attrs: pd.DataFrame) -> pd.DataFrame:
     """
@@ -160,7 +161,8 @@ def _interpolate_attribute(
         )
     else:
         # For numerical data, use scipy's interp1d with linear interpolation
-        interp_func = interp1d(
+        scipy = optional_requirements.require_scipy()
+        interp_func = scipy.interpolate.interp1d(
             x=x_locations,
             y=attr_values.values,
             bounds_error=False,
