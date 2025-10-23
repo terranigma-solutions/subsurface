@@ -65,12 +65,16 @@ pip -V]]></param>
       </runner>
       <runner id="Run_Test" name="Run Test: Core" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_plot.txt
+          <param name="script.content"><![CDATA[set -euo pipefail
+source venv/bin/activate
 
-@echo on
-set REQUIREMENT_LEVEL=READ_MESH
-echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
-venv\Scripts\python -m pytest --teamcity -v -m core]]></param>
+# optional extra deps for plotting
+pip install --verbose -r requirements/requirements_plot.txt || true
+
+export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_MESH}"
+echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
+
+python -m pytest --teamcity -v -m core]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
