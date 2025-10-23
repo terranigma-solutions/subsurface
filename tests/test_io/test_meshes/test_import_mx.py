@@ -22,9 +22,9 @@ def test_read_gocad_from_file():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
 
     devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
-    filepath = devops_path.joinpath('meshes\GOCAD\mix\horizons_faults.mx')
+    filepath = devops_path / 'meshes' / 'GOCAD' / 'mix' / 'horizons_faults.mx'
 
-    unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(filepath)
+    unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(str(filepath))
     ts = TriSurf(mesh=unstruct)
     s = sb_viz.to_pyvista_mesh(ts)
     sb_viz.pv_plot([s], image_2d=True)
@@ -48,7 +48,7 @@ def test_read_mx_from_file__gen11818__idn64():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
 
     devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
-    filepath = devops_path.joinpath('meshes\GOCAD\IDN-64\mx_ubc\muon_only.mx')
+    filepath = devops_path / 'meshes' / 'GOCAD' / 'IDN-64' / 'mx_ubc' / 'muon_only.mx'
         # muon_only.mx uses the PVRTX vertex definition but does not actually provide any property values.
 
     unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(str(filepath))
@@ -61,7 +61,7 @@ def test_read_mx_from_file__gen11818__idn64_2():
     from subsurface.modules.reader.mesh.mx_reader import mx_to_unstruct_from_file
 
     devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
-    filepath = devops_path.joinpath(r"meshes\GOCAD\IDN-64\mx_ubc\U60A_surf.mx")
+    filepath = devops_path / 'meshes' / 'GOCAD' / 'IDN-64' / 'mx_ubc' / 'U60A_surf.mx'
         # U60A_surf.mx actually provides property values in the last column of PVRTX
 
     unstruct: subsurface.UnstructuredData = mx_to_unstruct_from_file(str(filepath))
