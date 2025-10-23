@@ -96,12 +96,15 @@ python -m pytest --teamcity -v]]></param>
       </runner>
       <runner id="Run_Test_wells" name="Run Test: Wells" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_wells.txt
+          <param name="script.content"><![CDATA[set -euo pipefail
+source venv/bin/activate
 
-@echo on
-set REQUIREMENT_LEVEL=READ_WELL
-echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
-venv\Scripts\python -m pytest --teamcity -v]]></param>
+pip install --verbose -r requirements/requirements_wells.txt
+
+export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_WELL}"
+echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
+
+python -m pytest --teamcity -v]]></param>
           <param name="teamcity.step.mode" value="execute_if_failed" />
           <param name="use.custom.script" value="true" />
         </parameters>
