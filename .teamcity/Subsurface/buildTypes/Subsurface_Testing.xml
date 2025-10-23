@@ -43,23 +43,30 @@
           <param name="script.content"><![CDATA[#!/usr/bin/env bash
 set -euo pipefail
 
-# Prefer Python 3.13 explicitly if installed
-if command -v python3.13 >/dev/null 2>&1; then
-  PYTHON=python3.13
-else
-  PYTHON=python3
-fi
+# Prefer 3.13 if present
+if command -v python3.13 >/dev/null 2>&1; then PYTHON=python3.13; else PYTHON=python3; fi
 
-# Create & activate virtual environment
 $PYTHON -m venv venv
-source venv/bin/activate
 
-# Upgrade tooling
-$PYTHON -m pip install --upgrade pip setuptools wheel
+# Use venv *without* activation to avoid PATH shenanigans
+VENVPY="venv/bin/python"
 
-# Proceed with requirements
-pip install -r requirements/requirements_dev.txt
-pip install teamcity-messages]]></param>
+# Clean env that can break Python startup
+unset PYTHONHOME PYTHONPATH
+
+$VENVPY -m pip install --upgrade pip setuptools wheel
+$VENVPY -m pip install --verbose -r requirements/requirements_dev.txt
+$VENVPY -m pip install --verbose teamcity-messages
+
+# Sanity checks
+$VENVPY - <<'PY'
+import sys, encodings, site
+print("OK python:", sys.version)
+print("encodings at:", encodings.__file__)
+print("prefix:", sys.prefix)
+PY
+
+ls -la]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
