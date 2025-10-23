@@ -10,6 +10,7 @@ from subsurface import StructuredGrid
 from subsurface.modules.reader.volume.read_grav3d import (
     GridData, read_msh_file, read_mod_file, structured_data_from
 )
+
 from subsurface.modules.visualization import init_plotter, pyvista_to_matplotlib
 
 dotenv.load_dotenv()
@@ -152,3 +153,44 @@ def test_import_grav3d_III():
 
 
 
+def test_import_grav3d_IV():
+    """
+    Test importing and visualizing a Grav3D model.
+
+    This test reads a Grav3D mesh and model file, converts them to a StructuredGrid,
+    and visualizes the result using PyVista.
+    """
+    # Read the mesh file to get grid information
+    grid: GridData = read_msh_file(os.getenv("PATH_TO_GRAV3D_MSH_SIMPLE"))
+
+    # Verify the grid was loaded correctly
+    assert grid is not None
+
+    # Read the model file to get property values
+    array: np.ndarray = read_mod_file(
+        filepath=pathlib.Path(os.getenv("PATH_TO_GRAV3D_MOD_SIMPLE")),
+        grid=grid,  # Using the new parameter name
+        ordering='xyz_reverse'
+    )
+
+    # Convert the array and grid to a structured data format
+    struct = structured_data_from(array, grid)
+
+    # Create a StructuredGrid from the structured data
+    sg: subsurface.StructuredGrid = StructuredGrid(struct)
+
+    # Visualize the grid
+
+    image_2d = True
+    p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
+    p.add_volume(
+        sg.active_attributes,
+        opacity=1,
+        # opacity='linear'
+    )
+    p.add_axes()
+    p.add_bounding_box()
+    if image_2d is False:
+        p.show()
+    else:
+        pyvista_to_matplotlib(p)
