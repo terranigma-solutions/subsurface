@@ -4,6 +4,7 @@
   <description />
   <settings>
     <options>
+      <option name="cleanBuild" value="true" />
       <option name="shouldFailBuildOnBadExitCode" value="false" />
     </options>
     <parameters>
