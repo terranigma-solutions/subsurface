@@ -9,10 +9,10 @@
     <build-runners order="Git_Tagging, Build, Push_to_PyPi, Push_To_GitHub">
       <runner id="Build" name="Build" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[echo Cleaning build artifacts...
-rmdir /s /q dist
-rmdir /s /q build
-echo Clean complete.
+          <param name="script.content"><![CDATA[echo "Cleaning build artifacts..."
+rm -rf dist
+rm -rf build
+echo "Clean complete."
 
 python -m pip install --upgrade build
 python -m build]]></param>
