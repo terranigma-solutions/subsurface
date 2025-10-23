@@ -44,7 +44,7 @@ def test_import_grav3d():
 
     # Visualize the grid
 
-    image_2d = False
+    image_2d = True
     p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
     p.add_volume(
         sg.active_attributes,
@@ -181,7 +181,7 @@ def test_import_grav3d_IV():
 
     # Visualize the grid
 
-    image_2d = False
+    image_2d = True
     p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
     p.add_volume(
         sg.active_attributes,
