@@ -18,6 +18,7 @@
       <param name="env.PATH_TO_GRAV3D_MOD" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/19_simpeg_inv_result_25ft_7.62m_psi2_Sep.mod" />
       <param name="env.PATH_TO_GRAV3D_MSH" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/client_voxel.msh" />
       <param name="env.PATH_TO_GRAV3D_MSH_II" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/IDN-65/ubc_mesh_mod" />
+      <param name="env.PATH_TO_GRAV3D_MSH_SIMPLE" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/test_simple.msh" />
       <param name="env.PATH_TO_INTERPRETATION" value="%env.TERRA_PATH_DEVOPS%/meshes/Seismic/Anl2-1.tif" />
       <param name="env.PATH_TO_MAGNETIC_INTERPRETATION" value="%env.TERRA_PATH_DEVOPS%/meshes/Magnetic/Plate 2a - Profile 1 2D inversion.pdf" />
       <param name="env.PATH_TO_MTL" value="%env.TERRA_PATH_DEVOPS%/meshes/OBJ/Broadhaven_Obj/model/model.mtl" />
