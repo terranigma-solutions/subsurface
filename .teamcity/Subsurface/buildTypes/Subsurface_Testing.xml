@@ -40,17 +40,25 @@
     <build-runners>
       <runner id="Setup" name="Setup" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[@echo on
-python -m venv venv
-call venv\Scripts\activate
-venv\Scripts\python -m pip install --upgrade pip
+          <param name="script.content"><![CDATA[#!/usr/bin/env bash
+set -euo pipefail
 
-echo Checking directory...
-dir
-dir .requirements
+# Create & activate venv (python3 preferred)
+python3 -m venv venv || python -m venv venv
+source venv/bin/activate
 
-venv\Scripts\pip install --verbose -r requirements/requirements_dev.txt
-venv\Scripts\pip install --verbose teamcity-messages]]></param>
+python -m pip install --upgrade pip setuptools wheel
+
+echo "Checking directory..."
+ls -la
+ls -la requirements || true
+
+# Core/dev deps
+pip install --verbose -r requirements/requirements_dev.txt
+pip install --verbose teamcity-messages
+
+python -V
+pip -V]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
