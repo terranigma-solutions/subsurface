@@ -16,6 +16,7 @@
       <param name="env.PATH_TO_GLB" value="%env.TERRA_PATH_DEVOPS%/meshes/GLB - GLTF/Duck.glb" />
       <param name="env.PATH_TO_GLB_COMPLEX" value="%env.TERRA_PATH_DEVOPS%/meshes/GLB - GLTF/GlbFile.glb" />
       <param name="env.PATH_TO_GRAV3D_MOD" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/19_simpeg_inv_result_25ft_7.62m_psi2_Sep.mod" />
+      <param name="env.PATH_TO_GRAV3D_MOD_SIMPLE" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/test_simple.mod" />
       <param name="env.PATH_TO_GRAV3D_MSH" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/client_voxel.msh" />
       <param name="env.PATH_TO_GRAV3D_MSH_II" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/IDN-65/ubc_mesh_mod" />
       <param name="env.PATH_TO_GRAV3D_MSH_SIMPLE" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/test_simple.msh" />
