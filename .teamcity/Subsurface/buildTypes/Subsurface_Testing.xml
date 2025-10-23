@@ -4,6 +4,7 @@
   <description />
   <settings>
     <options>
+      <option name="cleanBuild" value="true" />
       <option name="shouldFailBuildOnBadExitCode" value="false" />
     </options>
     <parameters>
@@ -35,58 +36,88 @@
       <param name="env.PATH_TO_SPREMBERG_STRATIGRAPHY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_stratigraphy.csv" />
       <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
       <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
-      <param name="env.TERRA_PATH_DEVOPS" value="D:\OneDrive - Terranigma Solutions GmbH/Documents - Terranigma Base/DevOps/SubsurfaceTestData/" />
+      <param name="env.TERRA_PATH_DEVOPS" value="/home/leguark/DevOps/DevOps/SubsurfaceTestData/" />
     </parameters>
     <build-runners>
       <runner id="Setup" name="Setup" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[@echo on
-python -m venv venv
-call venv\Scripts\activate
-venv\Scripts\python -m pip install --upgrade pip
+          <param name="script.content"><![CDATA[#!/usr/bin/env bash
+set -euo pipefail
 
-echo Checking directory...
-dir
-dir .requirements
+# Helpful debug: see if PYTHON* is set by the agent
+env | sort | grep -E '^PYTHON' || true
 
-venv\Scripts\pip install --verbose -r requirements/requirements_dev.txt
-venv\Scripts\pip install --verbose teamcity-messages]]></param>
+# Prefer Python 3.13 if present
+if command -v python3.13 >/dev/null 2>&1; then
+  PYTHON=python3.13
+else
+  PYTHON=python3
+fi
+
+# Create venv while ignoring PYTHON* and user site
+$PYTHON -E -s -m venv venv
+
+# Always call venv python with -E -s as well
+VENVPY="venv/bin/python -E -s"
+VENVPIP="venv/bin/python -E -s -m pip"
+
+$VENVPIP install --upgrade pip setuptools wheel
+$VENVPIP install --verbose -r requirements/requirements_dev.txt
+$VENVPIP install --verbose teamcity-messages
+
+# Sanity probe
+venv/bin/python -E -s - <<'PY'
+import sys, encodings
+print("OK python:", sys.version)
+print("encodings:", encodings.__file__)
+print("prefix:", sys.prefix)
+PY]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
       <runner id="Run_Test" name="Run Test: Core" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_plot.txt
+          <param name="script.content"><![CDATA[#!/usr/bin/env bash
+set -euo pipefail
+VENVPY="venv/bin/python -E -s"
+VENVPIP="venv/bin/python -E -s -m pip"
 
-@echo on
-set REQUIREMENT_LEVEL=READ_MESH
-echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
-venv\Scripts\python -m pytest --teamcity -v -m core]]></param>
+# (Core / Plot)
+$VENVPIP install --verbose -r requirements/requirements_plot.txt || true
+export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_MESH}"
+echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
+$VENVPY -m pytest --teamcity -v -m core]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
       <runner id="Run_Test_2" name="Run Test: Mesh" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_mesh.txt
+          <param name="script.content"><![CDATA[set -euo pipefail
+source venv/bin/activate
 
-@echo on
-set REQUIREMENT_LEVEL=READ_MESH
-echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
-venv\Scripts\python -m pytest --teamcity -v]]></param>
+pip install --verbose -r requirements/requirements_mesh.txt
+
+export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_MESH}"
+echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
+
+python -m pytest --teamcity -v]]></param>
           <param name="teamcity.step.mode" value="execute_if_failed" />
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
       <runner id="Run_Test_wells" name="Run Test: Wells" type="simpleRunner">
         <parameters>
-          <param name="script.content"><![CDATA[venv\Scripts\pip install --verbose -r requirements/requirements_wells.txt
+          <param name="script.content"><![CDATA[set -euo pipefail
+source venv/bin/activate
 
-@echo on
-set REQUIREMENT_LEVEL=READ_WELL
-echo REQUIREMENT_LEVEL is %REQUIREMENT_LEVEL%
-venv\Scripts\python -m pytest --teamcity -v]]></param>
+pip install --verbose -r requirements/requirements_wells.txt
+
+export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_WELL}"
+echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
+
+python -m pytest --teamcity -v]]></param>
           <param name="teamcity.step.mode" value="execute_if_failed" />
           <param name="use.custom.script" value="true" />
         </parameters>
