@@ -114,16 +114,12 @@ ls -la]]></param>
         <parameters>
           <param name="script.content"><![CDATA[#!/usr/bin/env bash
 set -euo pipefail
+VENVPY="%env.VENVPY%"
+VENVPIP="%env.VENVPIP%"
 
-VENVPY="venv/bin/python"
-unset PYTHONHOME PYTHONPATH
-
-$VENVPY -m pip install --verbose -r requirements/requirements_plot.txt || true
-
+$VENVPIP install --verbose -r requirements/requirements_plot.txt || true
 export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_MESH}"
 echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
-
-# Use venv python explicitly
 $VENVPY -m pytest --teamcity -v -m core]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
