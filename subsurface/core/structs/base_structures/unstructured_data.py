@@ -278,15 +278,27 @@ class UnstructuredData:
         return file
 
     def _set_binary_header(self):
+        from subsurface.core.structs.base_structures._aux import safe_convert_to_float32
+        
+        # Get the filtered dataframes (same as in _to_bytearray)
+        filtered_cell_attrs = safe_convert_to_float32(
+            self.attributes,
+            error_handling='drop'
+        )
+        filtered_vertex_attrs = safe_convert_to_float32(
+            self.points_attributes,
+            error_handling='drop'
+        )
+        
         header = {
                 "vertex_shape"     : self.vertex.shape,
                 "cell_shape"       : self.cells.shape,
-                "cell_attr_shape"  : self.attributes.shape,
-                "vertex_attr_shape": self.points_attributes.shape,
-                "cell_attr_names"  : self.attributes.columns.to_list(),
-                "cell_attr_types"  : self.attributes.dtypes.astype(str).to_list(),
-                "vertex_attr_names": self.points_attributes.columns.to_list(),
-                "vertex_attr_types": self.attributes.dtypes.astype(str).to_list(),
+                "cell_attr_shape"  : filtered_cell_attrs.shape,
+                "vertex_attr_shape": filtered_vertex_attrs.shape,
+                "cell_attr_names"  : filtered_cell_attrs.columns.to_list(),
+                "cell_attr_types"  : filtered_cell_attrs.dtypes.astype(str).to_list(),
+                "vertex_attr_names": filtered_vertex_attrs.columns.to_list(),
+                "vertex_attr_types": filtered_vertex_attrs.dtypes.astype(str).to_list(),
                 "xarray_attrs"     : self.data.attrs
         }
         return header
