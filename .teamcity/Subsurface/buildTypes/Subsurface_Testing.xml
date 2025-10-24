@@ -150,6 +150,7 @@ python -m pytest --teamcity -v]]></param>
           <param name="github_host" value="https://api.github.com" />
           <param name="publisherId" value="githubStatusPublisher" />
           <param name="secure:github_access_token" value="credentialsJSON:4df4bdb0-1278-4834-a702-18ae3a286003" />
+          <param name="vcsRootId" value="Subsurface_HttpsGithubComTerranigmaSolutionsSubsurfaceRefsHeadsMain2" />
         </parameters>
       </extension>
       <extension id="BUILD_EXT_6" type="pullRequests">
