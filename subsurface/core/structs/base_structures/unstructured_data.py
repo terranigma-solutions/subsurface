@@ -299,6 +299,25 @@ class UnstructuredData:
         bytearray_le = vertex + cells + cell_attribute + vertex_attribute
         return bytearray_le
 
+    def _to_bytearray(self, order):
+        from subsurface.core.structs.base_structures._aux import safe_convert_to_float32
+        vertex = self.vertex.astype('float32').tobytes(order)
+        cells = self.cells.astype('int32').tobytes(order)
+
+        # Only include numeric columns
+        cell_attribute = safe_convert_to_float32(
+            self.attributes,
+            error_handling='drop'
+        ).values.tobytes(order)
+
+        vertex_attribute = safe_convert_to_float32(
+            self.points_attributes,
+            error_handling='drop'
+        ).values.tobytes(order)
+
+        bytearray_le = vertex + cells + cell_attribute + vertex_attribute
+        return bytearray_le
+
     def _validate(self):
         try:
             _ = self.data[self.cells_attr_name]['cell']
