@@ -44,7 +44,7 @@ def test_import_grav3d():
 
     # Visualize the grid
 
-    image_2d = True
+    image_2d = True 
     p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
     p.add_volume(
         sg.active_attributes,
@@ -86,7 +86,7 @@ def test_import_grav3d_II():
     plt.show()
 
     assert array is not None
-    assert array.shape == (139, 100, 46)  # Check the shape of the array
+    assert array.shape == (100, 139, 46)  # Check the shape of the array
 
     # Create a StructuredGrid from the structured data
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
@@ -129,7 +129,7 @@ def test_import_grav3d_III():
         grid=grid  # Using the new parameter name
     )
     assert array is not None
-    assert array.shape == (139, 100, 46)  # Check the shape of the array
+    assert array.shape == (100, 139, 46)  # Check the shape of the array
     # Convert the array and grid to a structured data format
     struct = structured_data_from(array, grid)
 
@@ -169,8 +169,7 @@ def test_import_grav3d_IV():
     # Read the model file to get property values
     array: np.ndarray = read_mod_file(
         filepath=pathlib.Path(os.getenv("PATH_TO_GRAV3D_MOD_SIMPLE")),
-        grid=grid,  # Using the new parameter name
-        ordering='xyz_reverse'
+        grid=grid  # Using the new parameter name
     )
 
     # Convert the array and grid to a structured data format
@@ -186,7 +185,6 @@ def test_import_grav3d_IV():
     p.add_volume(
         sg.active_attributes,
         opacity=1,
-        # opacity='linear'
     )
     p.add_axes()
     p.add_bounding_box()
