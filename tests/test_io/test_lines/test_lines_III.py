@@ -27,6 +27,7 @@ pytestmark = pytest.mark.skipif(
     reason="Need to set the READ_MESH"
 )
 
+
 @pytest.mark.liquid_earth
 def test_read_kim():
     collar_df: pd.DataFrame = read_collar(
@@ -73,6 +74,9 @@ def test_read_kim():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
+    
+    borehole_set.collars.data.to_binary()
+    borehole_set.combined_trajectory.data.to_binary()
 
     _plot(
         scalar="lith_ids",
