@@ -44,7 +44,7 @@ def test_import_grav3d():
 
     # Visualize the grid
 
-    image_2d = False 
+    image_2d = True 
     p = init_plotter(image_2d=image_2d, ve=1, plotter_kwargs=None)
     p.add_volume(
         sg.active_attributes,
@@ -86,7 +86,7 @@ def test_import_grav3d_II():
     plt.show()
 
     assert array is not None
-    assert array.shape == (139, 100, 46)  # Check the shape of the array
+    assert array.shape == (100, 139, 46)  # Check the shape of the array
 
     # Create a StructuredGrid from the structured data
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
@@ -129,7 +129,7 @@ def test_import_grav3d_III():
         grid=grid  # Using the new parameter name
     )
     assert array is not None
-    assert array.shape == (139, 100, 46)  # Check the shape of the array
+    assert array.shape == (100, 139, 46)  # Check the shape of the array
     # Convert the array and grid to a structured data format
     struct = structured_data_from(array, grid)
 
