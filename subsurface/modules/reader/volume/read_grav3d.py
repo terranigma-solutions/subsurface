@@ -106,10 +106,9 @@ class GridData:
         )
 
 
-from typing import Literal
 
 def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing_value: Optional[float],
-                             attr_name: Optional[str], ordering: Literal['ijk', 'xyz', 'xyz_reverse', 'yx-z'] = 'yx-z') -> StructuredData:
+                             attr_name: Optional[str]) -> StructuredData:
     """
     Read a structured grid mesh and values from streams and return a StructuredData object.
 
@@ -121,13 +120,7 @@ def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing
         values_stream: TextIO stream containing the property values (.mod format)
         missing_value: Value to replace with NaN in the output array
         attr_name: Name for the data attribute
-        ordering: Data ordering in the file:
-                  - 'ijk': i (x) varies fastest, then j (y), then k (z)
-                  - 'xyz': z varies fastest, then x, then y
-                  - 'xyz_reverse': z varies fastest (reversed), then x, then y
-                  - 'yx-z': y varies fastest, then x, then z (reversed) - Fortran order
-                  Default is 'yx-z'.
-
+        
     Returns:
         StructuredData object containing the grid and property values
 
@@ -155,7 +148,7 @@ def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing
         # Read all values from the stream
         lines = [line.strip() for line in values_stream if line.strip()]
 
-        model_array = _parse_mod_file(grid, lines, missing_value=missing_value, ordering=ordering)
+        model_array = _parse_mod_file(grid, lines, missing_value=missing_value)
 
     except Exception as e:
         # Add context to any errors
@@ -207,7 +200,7 @@ def read_msh_file(filepath: Union[str, Path]) -> GridData:
 
 def read_mod_file(filepath: Union[str, Path], grid: GridData,
                   missing_value: float = -99_999.0,
-                  ordering: Literal['ijk', 'xyz', 'xyz_reverse', 'yx-z'] = 'yx-z') -> np.ndarray:
+                  ) -> np.ndarray:
     """
     Read a model file containing property values for a 3D grid.
 
@@ -218,12 +211,6 @@ def read_mod_file(filepath: Union[str, Path], grid: GridData,
         filepath: Path to the model file
         grid: GridData object containing the grid dimensions
         missing_value: Value to replace with NaN in the output array (default: -99_999.0)
-        ordering: Data ordering in the file. Options:
-                  - 'ijk': i (x) varies fastest, then j (y), then k (z) - standard VTK/Fortran ordering
-                  - 'xyz': z varies fastest, then x, then y - legacy Grav3D ordering
-                  - 'xyz_reverse': z varies fastest (reversed direction), then x, then y
-                  - 'yx-z': y varies fastest, then x, then z (reversed) 
-                  Default is 'yx-z'.
 
     Returns:
         3D numpy array of property values with shape (ny, nx, nz)
@@ -241,7 +228,7 @@ def read_mod_file(filepath: Union[str, Path], grid: GridData,
         with open(filepath, 'r') as f:
             lines = [line.strip() for line in f if line.strip()]
 
-        model_array = _parse_mod_file(grid, lines, missing_value, ordering)
+        model_array = _parse_mod_file(grid, lines, missing_value)
 
         return model_array
 
@@ -267,7 +254,7 @@ def structured_data_from(array: np.ndarray, grid: GridData,
         ValueError: If array shape doesn't match grid dimensions
     """
     # Verify array shape matches grid dimensions
-    expected_shape = (grid.dimensions.ny, grid.dimensions.nx, grid.dimensions.nz)
+    expected_shape = (grid.dimensions.nx, grid.dimensions.ny, grid.dimensions.nz)
     if array.shape != expected_shape:
         raise ValueError(
             f"Array shape {array.shape} doesn't match grid dimensions {expected_shape}"
@@ -279,7 +266,7 @@ def structured_data_from(array: np.ndarray, grid: GridData,
     # Create the xarray DataArray with proper coordinates
     xr_data_array = xr.DataArray(
         data=array,
-        dims=['y', 'x', 'z'],  # Dimensions in the order they appear in the array
+        dims=['x', 'y', 'z'],  # Dimensions in the order they appear in the array
         coords={
                 'x': centers['x'],
                 'y': centers['y'],
@@ -426,8 +413,7 @@ def _calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
     }
 
 
-def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[float],
-                   ordering: Literal['ijk', 'xyz', 'xyz_reverse', 'yx-z'] = 'yx-z') -> np.ndarray:
+def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[float]) -> np.ndarray:
     """
     Parse model file values into a 3D numpy array.
 
@@ -435,14 +421,9 @@ def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[fl
         grid: GridData object containing grid dimensions
         lines: List of lines containing the values
         missing_value: Value to replace with NaN
-        ordering: Data ordering in the file:
-                  - 'ijk': i (x) varies fastest, then j (y), then k (z)
-                  - 'xyz': z varies fastest, then x, then y
-                  - 'xyz_reverse': z varies fastest (reversed), then x, then y
-                  - 'yx-z': y varies fastest, then x, then z (reversed) 
 
     Returns:
-        3D numpy array with shape (ny, nx, nz)
+        3D numpy array with shape (nx, ny, nz)
     """
     # Convert each line to a float
     values = np.array([float(line) for line in lines], dtype=float)
@@ -456,26 +437,8 @@ def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[fl
             f"Invalid model file: expected {expected_count} values, got {len(values)}"
         )
     
-    # Reshape based on ordering
-    if ordering == 'ijk':
-        # i (x) varies fastest, then j (y), then k (z)
-        # This is standard VTK/Fortran ordering: (k, j, i) in array dimensions
-        model_array = values.reshape((nz, ny, nx), order='C')
-        # Transpose to (ny, nx, nz) to match expected output shape
-        model_array = np.transpose(model_array, (1, 2, 0))
-    elif ordering == 'xyz':
-        # z varies fastest, then x, then y (legacy Grav3D ordering)
-        model_array = values.reshape((ny, nx, nz))
-    elif ordering == 'xyz_reverse':
-        # z varies fastest (but in reverse direction), then x, then y
-        model_array = values.reshape((ny, nx, nz))
-        # Reverse the z-axis (last dimension)
-        model_array = np.flip(model_array, axis=2)
-    elif ordering == 'yx-z':
-        model_array = values.reshape((nz, nx, ny), order='F')
-        model_array = np.transpose(model_array, (1, 2, 0))[:, :, ::-1]
-    else:
-        raise ValueError(f"Invalid ordering: {ordering}. Must be 'ijk', 'xyz', 'xyz_reverse', or 'yx-z'")
+    model_array = values.reshape((nz, nx, ny), order='F')
+    model_array = np.transpose(model_array, (1, 2, 0))[:, :, ::-1]
     
     # Replace missing values with NaN
     if missing_value is not None:
