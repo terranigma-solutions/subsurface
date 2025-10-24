@@ -109,7 +109,7 @@ class GridData:
 from typing import Literal
 
 def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing_value: Optional[float],
-                             attr_name: Optional[str], ordering: Literal['ijk', 'xyz', 'xyz_reverse'] = 'ijk') -> StructuredData:
+                             attr_name: Optional[str], ordering: Literal['ijk', 'xyz', 'xyz_reverse', 'yx-z'] = 'yx-z') -> StructuredData:
     """
     Read a structured grid mesh and values from streams and return a StructuredData object.
 
@@ -125,7 +125,8 @@ def read_msh_structured_grid(grid_stream: TextIO, values_stream: TextIO, missing
                   - 'ijk': i (x) varies fastest, then j (y), then k (z)
                   - 'xyz': z varies fastest, then x, then y
                   - 'xyz_reverse': z varies fastest (reversed), then x, then y
-                  Default is 'ijk'.
+                  - 'yx-z': y varies fastest, then x, then z (reversed) - Fortran order
+                  Default is 'yx-z'.
 
     Returns:
         StructuredData object containing the grid and property values
@@ -206,7 +207,7 @@ def read_msh_file(filepath: Union[str, Path]) -> GridData:
 
 def read_mod_file(filepath: Union[str, Path], grid: GridData,
                   missing_value: float = -99_999.0,
-                  ordering: Literal['ijk', 'xyz', 'xyz_reverse'] = 'ijk') -> np.ndarray:
+                  ordering: Literal['ijk', 'xyz', 'xyz_reverse', 'yx-z'] = 'yx-z') -> np.ndarray:
     """
     Read a model file containing property values for a 3D grid.
 
@@ -221,7 +222,8 @@ def read_mod_file(filepath: Union[str, Path], grid: GridData,
                   - 'ijk': i (x) varies fastest, then j (y), then k (z) - standard VTK/Fortran ordering
                   - 'xyz': z varies fastest, then x, then y - legacy Grav3D ordering
                   - 'xyz_reverse': z varies fastest (reversed direction), then x, then y
-                  Default is 'ijk'.
+                  - 'yx-z': y varies fastest, then x, then z (reversed) 
+                  Default is 'yx-z'.
 
     Returns:
         3D numpy array of property values with shape (ny, nx, nz)
@@ -425,7 +427,7 @@ def _calculate_cell_centers(grid: GridData) -> Dict[str, np.ndarray]:
 
 
 def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[float],
-                   ordering: Literal['ijk', 'xyz', 'xyz_reverse'] = 'ijk') -> np.ndarray:
+                   ordering: Literal['ijk', 'xyz', 'xyz_reverse', 'yx-z'] = 'yx-z') -> np.ndarray:
     """
     Parse model file values into a 3D numpy array.
 
@@ -437,6 +439,7 @@ def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[fl
                   - 'ijk': i (x) varies fastest, then j (y), then k (z)
                   - 'xyz': z varies fastest, then x, then y
                   - 'xyz_reverse': z varies fastest (reversed), then x, then y
+                  - 'yx-z': y varies fastest, then x, then z (reversed) 
 
     Returns:
         3D numpy array with shape (ny, nx, nz)
@@ -468,8 +471,11 @@ def _parse_mod_file(grid: GridData, lines: List[str], missing_value: Optional[fl
         model_array = values.reshape((ny, nx, nz))
         # Reverse the z-axis (last dimension)
         model_array = np.flip(model_array, axis=2)
+    elif ordering == 'yx-z':
+        model_array = values.reshape((nz, nx, ny), order='F')
+        model_array = np.transpose(model_array, (1, 2, 0))[:, :, ::-1]
     else:
-        raise ValueError(f"Invalid ordering: {ordering}. Must be 'ijk', 'xyz', or 'xyz_reverse'")
+        raise ValueError(f"Invalid ordering: {ordering}. Must be 'ijk', 'xyz', 'xyz_reverse', or 'yx-z'")
     
     # Replace missing values with NaN
     if missing_value is not None:

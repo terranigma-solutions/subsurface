@@ -169,8 +169,7 @@ def test_import_grav3d_IV():
     # Read the model file to get property values
     array: np.ndarray = read_mod_file(
         filepath=pathlib.Path(os.getenv("PATH_TO_GRAV3D_MOD_SIMPLE")),
-        grid=grid,  # Using the new parameter name
-        ordering='xyz_reverse'
+        grid=grid  # Using the new parameter name
     )
 
     # Convert the array and grid to a structured data format
