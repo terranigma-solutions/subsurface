@@ -156,12 +156,35 @@ def test_vtk_file_to_structured_data__gen11818__idn63() -> subsurface.Structured
     return struct
 
 
-def test_vtk_file_to_structured_data__gen12023__idn69() -> subsurface.StructuredData:
+def test_vtk_file_to_structured_data__idn69__gen12023() -> subsurface.StructuredData:
 
     pv = optional_requirements.require_pyvista()
 
     devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
     filepath = devops_path.joinpath(r"volume/VTK/IDN-69/idn69.vtk")
+
+    pyvista_obj: pv.DataSet = pv.read(filepath)
+
+    pyvista_struct = pv_cast_to_explicit_structured_grid(pyvista_obj)
+
+    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
+        grid=pyvista_struct,
+        data_array_name="density"
+    )
+
+    sg: subsurface.StructuredGrid = StructuredGrid(struct)
+
+    mesh = to_pyvista_grid(sg)
+    pv_plot([mesh], image_2d=True)
+    return struct
+
+
+def test_vtk_file_to_structured_data__idn69_small_subset__gen13660() -> subsurface.StructuredData:
+
+    pv = optional_requirements.require_pyvista()
+
+    devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
+    filepath = devops_path.joinpath(r"volume/VTK/IDN-69/idn69-subseti4j4k4.vtk")
 
     pyvista_obj: pv.DataSet = pv.read(filepath)
 
