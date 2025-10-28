@@ -7,9 +7,6 @@
       <option name="cleanBuild" value="true" />
       <option name="shouldFailBuildOnBadExitCode" value="false" />
     </options>
-    <disabled-settings>
-      <setting-ref ref="Run_Test_wells" />
-    </disabled-settings>
     <parameters>
       <param name="REQUIREMENT_LEVEL" value="READ_MESH" />
       <param name="env.MPLBACKEND" value="Agg" />
