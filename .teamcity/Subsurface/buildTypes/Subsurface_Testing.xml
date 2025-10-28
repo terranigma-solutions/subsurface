@@ -43,7 +43,10 @@
       <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
       <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
       <param name="env.PATH_TO_SEISMIC_3D" value="%env.TERRA_PATH_DEVOPS%/volume/3D-SPRB-11-depth-converted.segy"/>
-      <param name="env.TERRA_PATH_DEVOPS" value="/home/leguark/DevOps/DevOps/SubsurfaceTestData/" />
+      <param name="env.PATH_TO_VOLUME_NUMPY" value="%env.TERRA_PATH_DEVOPS%/volume/numpy/"/>
+      <param name="env.PATH_TO_GRAV3D_MSH_SIMPLE" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/test_simple.msh"/>
+      <param name="env.PATH_TO_GRAV3D_MOD_SIMPLE" value="%env.TERRA_PATH_DEVOPS%/volume/MSH/test_simple.mod"/>
+      <param name="env.TERRA_PATH_DEVOPS" value="/home/leguark/DevOps/DevOps/SubsurfaceTestData/"/>
     </parameters>
     <build-runners>
       <runner id="Setup" name="Setup" type="simpleRunner">
