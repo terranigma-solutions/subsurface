@@ -129,9 +129,9 @@ python -m pytest --teamcity -v]]></param>
           <param name="script.content"><![CDATA[set -euo pipefail
 source venv/bin/activate
 
-pip install --verbose -r requirements/requirements_wells.txt
+pip install --verbose -r requirements/requirements_volume.txt
 
-export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_WELL}"
+export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_VOLUME}"
 echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
 
 python -m pytest --teamcity -v]]></param>
