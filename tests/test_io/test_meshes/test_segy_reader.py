@@ -1,6 +1,4 @@
-
 import os
-import tempfile
 import time
 from pathlib import Path
 from typing import List
@@ -57,24 +55,6 @@ def get_images() -> List[str]:
     return image_array
 
 
-@pytest.fixture(scope="module")
-def temp_netcdf_file():
-    """Create a temporary file path for the 3D seismic data that persists across tests in the module."""
-    # Create a temporary directory instead of a file
-    temp_dir = tempfile.mkdtemp()
-    temp_path = os.path.join(temp_dir, '3D_seismic.nc')
-    
-    yield temp_path
-    
-    # Cleanup after all tests in the module are done
-    if os.path.exists(temp_path):
-        os.unlink(temp_path)
-    if os.path.exists(temp_dir):
-        os.rmdir(temp_dir)
-
-
-# ... existing code ...
-
 def test_converted_to_structured_data(get_structured_data):
     for x in get_structured_data:
         assert isinstance(x, StructuredData)
@@ -84,7 +64,6 @@ def test_converted_to_structured_data(get_structured_data):
 
 def test_pyvista_grid(get_structured_data, get_images):
     for s, t in zip(get_structured_data, get_images):
-
         x = s.data['x']
         y = s.data['y']
 
@@ -92,18 +71,15 @@ def test_pyvista_grid(get_structured_data, get_images):
         print(x2, y2)
         tex = pv.read_texture(t)
         z = np.zeros((len(y), len(x)))
-        # z.reshape(z, (-1, 1101))
         print(x2.shape, y2.shape, z.shape)
 
-        # create a surface to host this texture
         surf = pv.StructuredGrid(z, x2, y2)
         print(surf)
 
         surf.texture_map_to_plane(inplace=True)
-        if False:  # Taking screenshots of pyvista is not handle well by pycharm
+        if True:
             pv_plot([surf], image_2d=True)
             time.sleep(2)
-        # use Trisurf with Structured Data for texture and UnstructuredData for geometry
 
 
 def test_read_segy_to_struct_data_imageio(get_structured_data, get_images):
@@ -123,7 +99,7 @@ def test_read_segy_to_struct_data_imageio(get_structured_data, get_images):
 
         s = to_pyvista_mesh(ts)
 
-        if False:  # Taking screenshots of pyvista is not handle well by pycharm
+        if True:
             pv_plot([s], image_2d=True)
             time.sleep(2)
 
@@ -139,7 +115,7 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
         v[:, 0] = + i * 1000
 
         struct = StructuredData.from_numpy(np.array(imageio.imread(image)))
-        print(struct)  # normalize to number of samples
+        print(struct)
         unstruct = UnstructuredData.from_array(v, e)
 
         origin = [float(coords['x'][0]), float(coords['y'][0]), zmin]
@@ -161,14 +137,14 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
         time.sleep(2)
 
 
-@pytest.mark.skip(reason="This test should only being run explicitly")
-def test_segy_3d_segy_seg() -> None:
+#@pytest.mark.skip(reason="This test should only being run explicitly")
+def test_segy_3d_segy_seg(tmp_path) -> None:
+    """tmp_path is pytest's built-in fixture for function-scoped temp directory."""
     import xarray as xr
     from segysak.segy import segy_header_scan
 
-    # default just needs the file name
     scan = segy_header_scan(os.getenv("PATH_TO_SEISMIC_3D"))
-    scan
+    print(scan)
 
     V3D = xr.open_dataset(
         filename_or_obj=os.getenv("PATH_TO_SEISMIC_3D"),
@@ -189,101 +165,79 @@ def test_segy_3d_segy_seg() -> None:
     plt.xlabel("XLINE")
     plt.show()
 
-    # Use temp directory
-    with tempfile.NamedTemporaryFile(suffix='.nc', delete=False) as tmp:
-        V3D.to_netcdf(tmp.name)
-        print(f"Saved to: {tmp.name}")
+    # Use pytest's tmp_path
+    if False: # ! This part is very finicky. Depends on the OS
+        output_file = tmp_path / "V3D.nc"
+        V3D.to_netcdf(output_file)
+        print(f"Saved to: {output_file}")
 
 
-# @pytest.mark.skip(reason="This test should only being run explicitly")
 def test_segy_3d_segy__volume_segsak_II() -> None:
-    import os
     import xarray as xr
     from segysak.segy import segy_header_scan
 
-    # Scan the SEG-Y file headers
     scan = segy_header_scan(os.getenv("PATH_TO_SEISMIC_3D"))
     print(scan)
 
-    # Read the SEG-Y into an xarray Dataset
-    # Adjust these byte positions (dim_byte_fields, extra_byte_fields) to match your file
     V3D = xr.open_dataset(
         filename_or_obj=os.getenv("PATH_TO_SEISMIC_3D"),
-        dim_byte_fields={"iline": 189, "xline": 193},  # might differ for your data
-        extra_byte_fields={"cdp_x": 73, "cdp_y": 77},  # might differ for your data
+        dim_byte_fields={"iline": 189, "xline": 193},
+        extra_byte_fields={"cdp_x": 73, "cdp_y": 77},
     )
 
-    # Quick sanity check: plot one inline
     import matplotlib.pyplot as plt
 
     iline_sel = 10093
-    # Note: "data" may be named differently in your xarray
     V3D.data.transpose("samples", "iline", "xline", transpose_coords=True).sel(
         iline=iline_sel,
         method="nearest"
-    ).plot(yincrease=False, cmap="seismic_r"
-           )
+    ).plot(yincrease=False, cmap="seismic_r")
     plt.grid("grey")
     plt.ylabel("TWT (samples)")
     plt.xlabel("XLINE")
     plt.title(f"Inline = {iline_sel}")
     plt.show()
 
-    # Step II
-
     if PLOT:=False:
-        # Ensure the order is (samples, iline, xline)
-        # Some xarray objects might already be in that order
         data_da = V3D.data.transpose("samples", "iline", "xline")
-
-        # Convert to a NumPy array
-        data_3d = data_da.values  # shape: (nz, ny, nx)
+        data_3d = data_da.values
         nz, ny, nx = data_3d.shape
         print("3D Data Shape:", data_3d.shape)
 
         import pyvista as pv
 
-        # Spacing in each dimension (index spacing = 1 by default, or define actual spacing if known)
-        dx = 1.0  # spacing along xline
-        dy = 1.0  # spacing along iline
-        dz = 1.0  # spacing along samples (e.g., 2 ms, or convert to depth if you have a velocity model)
-
-        # Origin (0,0,0) or shift as needed
+        dx = 1.0
+        dy = 1.0
+        dz = 1.0
         origin = (0, 0, 0)
 
-        # Create the UniformGrid
         grid = pv.UniformGrid()
-        grid.origin = origin  # bottom-left of the dataset
-        grid.spacing = (dx, dy, dz)  # distance between points along each axis
-        grid.dimensions = (nx, ny, nz)  # note the order: (x, y, z)
-        # Flatten the data in x-fastest order (Fortran order) if needed
+        grid.origin = origin
+        grid.spacing = (dx, dy, dz)
+        grid.dimensions = (nx, ny, nz)
         grid.point_data["Amplitude"] = data_3d.ravel(order="F")
 
-        # Volume Rendering
         plotter = pv.Plotter()
         plotter.add_volume(grid, cmap="seismic", opacity="sigmoid")
         plotter.show_grid()
         plotter.show()
 
 
-# @pytest.mark.skip(reason="This test should only being run explicitly")
-def test_segy_3d_segy_segsak_III(temp_netcdf_file) -> None:
+def test_segy_3d_segy_segsak_III() -> None:
     """This test creates the 3D seismic data file."""
     import xarray as xr
     from segysak.segy import segy_header_scan
     import matplotlib.pyplot as plt
 
-    # 1. (Optional) Scan headers to find byte fields
     scan_info = segy_header_scan(os.getenv("PATH_TO_SEISMIC_3D"))
     print(scan_info)
 
-    # 2. Open SEG-Y as an xarray Dataset
     V3D = xr.open_dataset(
         filename_or_obj=os.getenv("PATH_TO_SEISMIC_3D"),
-        dim_byte_fields={"iline": 189, "xline": 193},  # may differ for your file
-        extra_byte_fields={"cdp_x": 73, "cdp_y": 77},  # may differ for your file
+        dim_byte_fields={"iline": 189, "xline": 193},
+        extra_byte_fields={"cdp_x": 73, "cdp_y": 77},
     )
-    # 2) Coarsen that region by a factor of 2 in each dimension
+
     coarsen_factor = 10
     V3D_coarse = V3D.coarsen(
         samples=coarsen_factor,
@@ -295,32 +249,26 @@ def test_segy_3d_segy_segsak_III(temp_netcdf_file) -> None:
     V3D.close()
     V3D = V3D_coarse
 
-    # 3. Quick check: Plot a single inline
-    inline_example = V3D.iline.values[0]  # pick first or any inline
+    inline_example = V3D.iline.values[0]
     V3D.data.transpose("samples", "iline", "xline").sel(
         iline=inline_example,
         method="nearest"
-    ).plot(
-        yincrease=False, cmap="seismic_r"
-    )
+    ).plot(yincrease=False, cmap="seismic_r")
     plt.title(f"Inline = {inline_example}")
     plt.show()
 
-    # Extract data in a consistent order: (samples, iline, xline)
     data_da = V3D.data.transpose("samples", "iline", "xline")
-    data_3d = data_da.values  # shape: (nz, ny, nx)
+    data_3d = data_da.values
 
     nz, ny, nx = data_3d.shape
     print("Seismic cube shape:", data_3d.shape)
 
-    # Extract the sample values (e.g., time in ms or sample indices)
-    samples_1d = V3D.samples.values  # shape (nz,)
+    samples_1d = V3D.samples.values
+    cdp_x_2d = V3D.cdp_x.values
+    cdp_y_2d = V3D.cdp_y.values
 
-    # Extract cdp_x, cdp_y (2D arrays for each (iline, xline))
-    cdp_x_2d = V3D.cdp_x.values  # shape: (ny, nx)
-    cdp_y_2d = V3D.cdp_y.values  # shape: (ny, nx)
     struct = StructuredData.from_numpy(
-        array=data_3d,  # data_3d is shape (nz, ny, nx)
+        array=data_3d,
         coords={
                 'z': np.linspace(
                     start=samples_1d.min(),
@@ -338,44 +286,30 @@ def test_segy_3d_segy_segsak_III(temp_netcdf_file) -> None:
                     num=nx
                 ),
         },
-        dim_names=["z", "y", "x"]  # IMPORTANT: match the shape (nz, ny, nx)
+        dim_names=["z", "y", "x"]
     )
 
-    # Save to the temporary file
-    struct.to_netcdf(temp_netcdf_file)
-    print(f"Saved 3D seismic data to: {temp_netcdf_file}")
-
-
-# @pytest.mark.skip(reason="This test should only being run explicitly")
-def test_segy_3d_segy_viz(temp_netcdf_file) -> None:
-    """This test depends on test_segy_3d_segy_segsak_III creating the file."""
     import subsurface
-    
-    # Check if the file exists (in case test order is wrong)
-    if not os.path.exists(temp_netcdf_file):
-        pytest.skip(f"Test file {temp_netcdf_file} not found. Run test_segy_3d_segy_segsak_III first.")
-    
-    struct = StructuredData.from_netcdf(temp_netcdf_file)
     sg: subsurface.StructuredGrid = subsurface.StructuredGrid(struct)
     grid = to_pyvista_grid(sg)
 
-    plotter = pv.Plotter()
+    plotter = pv.Plotter(off_screen=True)
 
     plotter.add_volume(
         grid,
         cmap="seismic",
-        opacity="sigmoid_20",  # or "linear", "exp", etc.
-        shade=False,         # sometimes turning shading off is clearer for seismic
-        # Add min max to 50 -50
+        opacity="sigmoid_20",
+        shade=False,
         clim=(-50, 50)
     )
-    
+
     p = plotter
 
-    if image_2d := True is False:
+    if image_2d := False:
         p.show()
         return p
     else:
         from subsurface.modules.visualization import to_pyvista
         fig = to_pyvista.pyvista_to_matplotlib(p)
         return fig
+
