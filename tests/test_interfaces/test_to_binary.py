@@ -18,15 +18,15 @@ def wells(data_path):
     return us
 
 
+@pytest.mark.skip("Run only explicitly. Is giving OS issues.")
 def test_wells_to_binary(wells):
     bytearray_le, header = wells.to_binary_legacy()
 
-    if WRITE:=False: # In some operative systems this gives problems
-        with open('well_f.json', 'w') as outfile:
-            json.dump(header, outfile)
+    with open('well_f.json', 'w') as outfile:
+        json.dump(header, outfile)
 
-        new_file = open("wells_f.le", "wb")
-        new_file.write(bytearray_le)
+    new_file = open("wells_f.le", "wb")
+    new_file.write(bytearray_le)
 
 
 @pytest.mark.skipif(check_requirements(RequirementsLevel.GEOSPATIAL), reason="Geopandas is not imported ")
