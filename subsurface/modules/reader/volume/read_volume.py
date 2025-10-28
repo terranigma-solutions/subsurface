@@ -35,7 +35,7 @@ def read_VTK_structured_grid(file_or_buffer: Union[str, BytesIO], active_scalars
     try:
         pyvista_struct: pv.ExplicitStructuredGrid = pv_cast_to_explicit_structured_grid(pyvista_obj)
     except Exception as e:
-        raise f"The file is not a structured grid: {e}"
+        raise ValueError(f"The file is not a structured grid: {e}")
 
     if PLOT := False:
         pyvista_struct.set_active_scalars(active_scalars)

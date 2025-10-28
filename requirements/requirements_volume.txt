@@ -1,3 +1,4 @@
 segyio
+segysak
 imageio
 scipy

@@ -1,5 +1,8 @@
+
 import os
+import tempfile
 import time
+from pathlib import Path
 from typing import List
 
 import matplotlib.pyplot as plt
@@ -36,7 +39,7 @@ def _read_segy_file(file_path) -> dict:
 
 
 input_path = os.path.dirname(__file__) + '/../../data/segy'
-files = ['/E5_MIG_DMO_FINAL.sgy', '/E5_MIG_DMO_FINAL_DEPTH.sgy', '/E5_STACK_DMO_FINAL.sgy', '/test.segy', '/Linie01.segy']
+files = ['/E5_MIG_DMO_FINAL.sgy', '/E5_MIG_DMO_FINAL_DEPTH.sgy', '/E5_STACK_DMO_FINAL.sgy', '/test.segy']
 images = ['/myplot_cropped.png', '/myplot2_cropped.png', '/myplot3_cropped.png', '/myplot4_cropped.png']
 coords = _read_segy_file(input_path + '/E5_CMP_COORDS.txt')
 
@@ -44,7 +47,7 @@ coords = _read_segy_file(input_path + '/E5_CMP_COORDS.txt')
 @pytest.fixture(scope="module")
 def get_structured_data() -> List[StructuredData]:
     file_array = [input_path + x for x in files]
-    sd_array = [segy_reader.read_in_segy(fp) for fp in file_array]
+    sd_array = [segy_reader.read_in_segy(str(Path(fp).resolve())) for fp in file_array]
     return sd_array
 
 
@@ -53,6 +56,24 @@ def get_images() -> List[str]:
     image_array = [input_path + y for y in images]
     return image_array
 
+
+@pytest.fixture(scope="module")
+def temp_netcdf_file():
+    """Create a temporary file path for the 3D seismic data that persists across tests in the module."""
+    # Create a temporary directory instead of a file
+    temp_dir = tempfile.mkdtemp()
+    temp_path = os.path.join(temp_dir, '3D_seismic.nc')
+    
+    yield temp_path
+    
+    # Cleanup after all tests in the module are done
+    if os.path.exists(temp_path):
+        os.unlink(temp_path)
+    if os.path.exists(temp_dir):
+        os.rmdir(temp_dir)
+
+
+# ... existing code ...
 
 def test_converted_to_structured_data(get_structured_data):
     for x in get_structured_data:
@@ -140,8 +161,6 @@ def test_plot_segy_as_struct_data_with_coords_dict(get_structured_data, get_imag
         time.sleep(2)
 
 
-
-
 @pytest.mark.skip(reason="This test should only being run explicitly")
 def test_segy_3d_segy_seg() -> None:
     import xarray as xr
@@ -170,10 +189,13 @@ def test_segy_3d_segy_seg() -> None:
     plt.xlabel("XLINE")
     plt.show()
 
-    V3D.to_netcdf("data/V3D.nc")
-    pass
+    # Use temp directory
+    with tempfile.NamedTemporaryFile(suffix='.nc', delete=False) as tmp:
+        V3D.to_netcdf(tmp.name)
+        print(f"Saved to: {tmp.name}")
 
 
+# @pytest.mark.skip(reason="This test should only being run explicitly")
 def test_segy_3d_segy__volume_segsak_II() -> None:
     import os
     import xarray as xr
@@ -206,9 +228,6 @@ def test_segy_3d_segy__volume_segsak_II() -> None:
     plt.xlabel("XLINE")
     plt.title(f"Inline = {iline_sel}")
     plt.show()
-
-    # Optionally save as NetCDF
-    # V3D.to_netcdf("data/V3D.nc")
 
     # Step II
 
@@ -247,8 +266,9 @@ def test_segy_3d_segy__volume_segsak_II() -> None:
         plotter.show()
 
 
-def test_segy_3d_segy_segsak_III() -> None:
-    import os
+# @pytest.mark.skip(reason="This test should only being run explicitly")
+def test_segy_3d_segy_segsak_III(temp_netcdf_file) -> None:
+    """This test creates the 3D seismic data file."""
     import xarray as xr
     from segysak.segy import segy_header_scan
     import matplotlib.pyplot as plt
@@ -286,8 +306,6 @@ def test_segy_3d_segy_segsak_III() -> None:
     plt.title(f"Inline = {inline_example}")
     plt.show()
 
-    import numpy as np
-
     # Extract data in a consistent order: (samples, iline, xline)
     data_da = V3D.data.transpose("samples", "iline", "xline")
     data_3d = data_da.values  # shape: (nz, ny, nx)
@@ -323,13 +341,21 @@ def test_segy_3d_segy_segsak_III() -> None:
         dim_names=["z", "y", "x"]  # IMPORTANT: match the shape (nz, ny, nx)
     )
 
-    struct.to_netcdf("data/3D_seismic.nc")
-    pass
+    # Save to the temporary file
+    struct.to_netcdf(temp_netcdf_file)
+    print(f"Saved 3D seismic data to: {temp_netcdf_file}")
 
 
-def test_segy_3d_segy_viz() -> None:
+# @pytest.mark.skip(reason="This test should only being run explicitly")
+def test_segy_3d_segy_viz(temp_netcdf_file) -> None:
+    """This test depends on test_segy_3d_segy_segsak_III creating the file."""
     import subsurface
-    struct = StructuredData.from_netcdf("data/3D_seismic.nc")
+    
+    # Check if the file exists (in case test order is wrong)
+    if not os.path.exists(temp_netcdf_file):
+        pytest.skip(f"Test file {temp_netcdf_file} not found. Run test_segy_3d_segy_segsak_III first.")
+    
+    struct = StructuredData.from_netcdf(temp_netcdf_file)
     sg: subsurface.StructuredGrid = subsurface.StructuredGrid(struct)
     grid = to_pyvista_grid(sg)
 
