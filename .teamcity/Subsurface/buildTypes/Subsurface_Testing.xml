@@ -42,6 +42,7 @@
       <param name="env.PATH_TO_SPREMBERG_STRATIGRAPHY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_stratigraphy.csv" />
       <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
       <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
+      <param name="env.PATH_TO_SEISMIC_3D" value="%env.TERRA_PATH_DEVOPS%/volume/3D-SPRB-11-depth-converted.segy"/>
       <param name="env.TERRA_PATH_DEVOPS" value="/home/leguark/DevOps/DevOps/SubsurfaceTestData/" />
     </parameters>
     <build-runners>
