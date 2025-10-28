@@ -301,16 +301,20 @@ def __validate_rectilinear_to_explicit_conversion(rectl_grid, explicit_grid, *, 
     if explicit_grid.n_cells != expected_cells:
         raise ValueError(f"Cell count mismatch: explicit {explicit_grid.n_cells} vs expected {expected_cells}")
 
-    expected_points = nx * ny * nz
-    if explicit_grid.n_points != expected_points:
-        raise ValueError(f"Point count mismatch: explicit {explicit_grid.n_points} vs expected {expected_points}")
+    # Accept either nodes (M) or corners (N) for n_points, depending on PyVista/VTK version
+    M = nx * ny * nz
+    N = (2 * (nx - 1)) * (2 * (ny - 1)) * (2 * (nz - 1))
+    if explicit_grid.n_points not in (M, N):
+        raise ValueError(
+            f"Point count unexpected: explicit {explicit_grid.n_points}; expected either nodes {M} or corners {N}"
+        )
 
     # bounds
     if not np.allclose(explicit_grid.bounds, rectl_grid.bounds, rtol=rtol, atol=atol):
         raise ValueError(f"Bounds differ: explicit {explicit_grid.bounds} vs rect {rectl_grid.bounds}")
 
-    # axis coordinates (order-independent)
-    pts = explicit_grid.points  # shape (M,3), M = nx*ny*nz (already deduped/sorted by unique)
+    # axis coordinates (order-independent, light memory use: 1D uniques per axis)
+    pts = explicit_grid.points  # may be M×3 (unique nodes) or N×3 (corner lattice)
     x_exp = np.unique(pts[:, 0])
     y_exp = np.unique(pts[:, 1])
     z_exp = np.unique(pts[:, 2])
