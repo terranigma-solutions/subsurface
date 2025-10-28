@@ -6,6 +6,7 @@ from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pytest
+from matplotlib import pyplot as plt
 
 import subsurface
 from subsurface import StructuredGrid, optional_requirements
@@ -111,7 +112,12 @@ def test_vtk_from_numpy():
     with NamedTemporaryFile(suffix='.vtk', delete=False) as temp_file:
         grid.save(temp_file.name)
         print(f"VTK file saved to: {temp_file.name}")
-    grid.plot(show_edges=True)
+    img = grid.plot(show_edges=True, off_screen=True, screenshot=True)
+
+    fig = plt.imshow(img)
+    plt.axis('off')
+    plt.show(block=False)
+    pass
 
 
 
