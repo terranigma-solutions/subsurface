@@ -124,7 +124,7 @@ python -m pytest --teamcity -v]]></param>
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
-      <runner id="Run_Test_Volumes" name="Run Test: Wells (1)" type="simpleRunner">
+      <runner id="Run_Test_Volumes" name="Run Test: Volume" type="simpleRunner">
         <parameters>
           <param name="script.content"><![CDATA[set -euo pipefail
 source venv/bin/activate
