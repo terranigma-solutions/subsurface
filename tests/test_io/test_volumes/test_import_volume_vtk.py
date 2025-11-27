@@ -77,6 +77,13 @@ def test_vtk_uniform_to_structured_data() -> subsurface.StructuredData:
 
     mesh = to_pyvista_grid(sg)
     pv_plot([mesh], image_2d=True)
+
+    assert struct.shape == (9, 9, 9)
+    assert struct.bounds == {'x': (0.0, 8.0), 'y': (0.0, 8.0), 'z': (0.0, 8.0)}
+    assert struct.values.min() == 0
+    assert struct.values.max() == 728
+    assert struct.values[2][4][6] == 524
+
     return struct
 
 
@@ -117,6 +124,10 @@ def test_vtk_file_to_structured_data__gen11818__idn63() -> subsurface.Structured
 
     mesh = to_pyvista_grid(sg)
     pv_plot([mesh], image_2d=True)
+
+    assert struct.shape == (100, 139, 46)
+    assert round((struct.bounds['x'][1] + struct.values.max()) / struct.values[50][70][20], 4) == 1.6388
+
     return struct
 
 
@@ -140,4 +151,8 @@ def test_vtk_file_to_structured_data__idn69__gen12023() -> subsurface.Structured
 
     mesh = to_pyvista_grid(sg)
     pv_plot([mesh], image_2d=True)
+
+    assert struct.shape == (175, 112, 163)
+    assert round((struct.bounds['y'][0]/1000000 + struct.values.max()) / struct.values[90][60][80], 4) == 3.7342
+
     return struct
