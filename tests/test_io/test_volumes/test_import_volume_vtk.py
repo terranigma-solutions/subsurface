@@ -6,6 +6,7 @@ from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pytest
+import hashlib
 
 import subsurface
 from subsurface import StructuredGrid, optional_requirements
@@ -94,8 +95,12 @@ def test_vtk_file_to_binary():
     struct.active_data_array_name = "Cell Number"
     binary_cell_number = struct.to_binary()
 
+    assert hashlib.sha256(binary_cell_number).hexdigest() == '7e39ee3c3f753038e6232ebd0aeffcd77f2b1be899bba6c6e09441db82590edc'
+
     struct.active_data_array_name = "Random"
     binary_random = struct.to_binary()
+
+    assert hashlib.sha256(binary_random).hexdigest() == 'f320e65c1ba4396766ae4c1653fea8c1b2bde2407b4ceaed6f11c04247b8f1c7'
 
     if WRITE_TO_DISK := False:
         new_file = open("test_volume_Cell Number.le", "wb")
