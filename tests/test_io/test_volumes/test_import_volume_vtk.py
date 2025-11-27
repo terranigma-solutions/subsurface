@@ -6,7 +6,6 @@ from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pytest
-from matplotlib import pyplot as plt
 
 import subsurface
 from subsurface import StructuredGrid, optional_requirements
