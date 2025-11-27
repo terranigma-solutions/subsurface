@@ -23,16 +23,21 @@ def test_import_grav3d():
     This test reads a Grav3D mesh and model file, converts them to a StructuredGrid,
     and visualizes the result using PyVista.
     """
+
+    devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
+
     # Read the mesh file to get grid information
-    grid: GridData = read_msh_file(os.getenv("PATH_TO_GRAV3D_MSH"))
+    msh_filepath = devops_path.joinpath(r"volume/MSH/IDN-0/grav3d.msh")
+    grid: GridData = read_msh_file(msh_filepath)
 
     # Verify the grid was loaded correctly
     assert grid is not None
     assert grid.dimensions.nx == 250  # Using the new property name
 
     # Read the model file to get property values
+    mod_filepath = devops_path.joinpath(r"volume/MSH/IDN-0/grav3d.mod")
     array: np.ndarray = read_mod_file(
-        filepath=pathlib.Path(os.getenv("PATH_TO_GRAV3D_MOD")),
+        filepath=mod_filepath,
         grid=grid  # Using the new parameter name
     )
 
@@ -65,17 +70,22 @@ def test_import_grav3d_II():
     This test reads a Grav3D mesh and model file, converts them to a StructuredGrid,
     and visualizes the result using PyVista.
     """
+
+    devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
+    folder_path = devops_path.joinpath(r"volume/MSH/IDN-65/ubc_mesh_mod/")
+
     # Read the mesh file to get grid information
-    path_to_folder = os.getenv("PATH_TO_GRAV3D_MSH_II")
-    grid: GridData = read_msh_file(path_to_folder + "/mesh.msh")
+    msh_filepath = folder_path.joinpath(r"mesh.msh")
+    grid: GridData = read_msh_file(msh_filepath)
 
     # Verify the grid was loaded correctly
     assert grid is not None
     assert grid.dimensions.nx == 100  # Using the new property name
 
     # Read the model file to get property values
+    den_filepath = folder_path.joinpath(r"grav.den")
     array: np.ndarray = read_mod_file(
-        filepath=pathlib.Path(path_to_folder + "/grav.den"),
+        filepath=den_filepath,
         grid=grid,  # Using the new parameter name
         missing_value= -1e+08
     )
@@ -115,17 +125,22 @@ def test_import_grav3d_III():
     This test reads a Grav3D mesh and model file, converts them to a StructuredGrid,
     and visualizes the result using PyVista.
     """
+
+    devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
+    folder_path = devops_path.joinpath(r"volume/MSH/IDN-65/ubc_mesh_mod/")
+
     # Read the mesh file to get grid information
-    path_to_folder = os.getenv("PATH_TO_GRAV3D_MSH_II")
-    grid: GridData = read_msh_file(path_to_folder + "/mesh.msh")
+    msh_filepath = folder_path.joinpath(r"mesh.msh")
+    grid: GridData = read_msh_file(msh_filepath)
 
     # Verify the grid was loaded correctly
     assert grid is not None
     assert grid.dimensions.nx == 100  # Using the new property name
 
     # Read the model file to get property values
+    den_filepath = folder_path.joinpath(r"muon.den")
     array: np.ndarray = read_mod_file(
-        filepath=pathlib.Path(path_to_folder + "/muon.den"),
+        filepath=pathlib.Path(den_filepath),
         grid=grid  # Using the new parameter name
     )
     assert array is not None
@@ -160,15 +175,21 @@ def test_import_grav3d_IV():
     This test reads a Grav3D mesh and model file, converts them to a StructuredGrid,
     and visualizes the result using PyVista.
     """
+
+    devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
+    folder_path = devops_path.joinpath(r"volume/MSH/")
+
     # Read the mesh file to get grid information
-    grid: GridData = read_msh_file(os.getenv("PATH_TO_GRAV3D_MSH_SIMPLE"))
+    msh_filepath = folder_path.joinpath(r"test_simple.msh")
+    grid: GridData = read_msh_file(msh_filepath)
 
     # Verify the grid was loaded correctly
     assert grid is not None
 
     # Read the model file to get property values
+    mod_filepath = folder_path.joinpath(r"test_simple.mod")
     array: np.ndarray = read_mod_file(
-        filepath=pathlib.Path(os.getenv("PATH_TO_GRAV3D_MOD_SIMPLE")),
+        filepath=mod_filepath,
         grid=grid  # Using the new parameter name
     )
 
