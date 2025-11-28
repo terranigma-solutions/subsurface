@@ -44,6 +44,11 @@ def test_import_grav3d():
     # Convert the array and grid to a structured data format
     struct = structured_data_from(array, grid)
 
+    assert struct.shape == (250, 222, 70)
+    assert round(10 * struct.bounds['x'][0] / struct.bounds['y'][1], 4) == 1.6245
+    real_values = struct.values[~np.isnan(struct.values)]
+    assert round(real_values.max() / real_values.min(), 4) == 1.4025
+
     # Create a StructuredGrid from the structured data
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
 
@@ -97,6 +102,9 @@ def test_import_grav3d_II():
 
     assert array is not None
     assert array.shape == (100, 139, 46)  # Check the shape of the array
+    assert round(100 * struct.bounds['x'][0] / struct.bounds['y'][1], 4) == 5.1575
+    real_values = struct.values[~np.isnan(struct.values)]
+    assert round(real_values.max() / real_values.min(), 4) == 1.1209
 
     # Create a StructuredGrid from the structured data
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
@@ -147,6 +155,11 @@ def test_import_grav3d_III():
     assert array.shape == (100, 139, 46)  # Check the shape of the array
     # Convert the array and grid to a structured data format
     struct = structured_data_from(array, grid)
+
+    assert struct.shape == (100, 139, 46)  # Check the shape of the array
+    assert round(100 * struct.bounds['x'][0] / struct.bounds['y'][1], 4) == 5.1575
+    real_values = struct.values[~np.isnan(struct.values)]
+    assert round(real_values.max()/real_values.min(), 4) == 5.2809
 
     # Create a StructuredGrid from the structured data
     sg: subsurface.StructuredGrid = StructuredGrid(struct)
