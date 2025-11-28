@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pytest
-from matplotlib import pyplot as plt
+import hashlib
 
 import subsurface
 from subsurface import StructuredGrid, optional_requirements
@@ -78,6 +78,13 @@ def test_vtk_uniform_to_structured_data() -> subsurface.StructuredData:
 
     mesh = to_pyvista_grid(sg)
     pv_plot([mesh], image_2d=True)
+
+    assert struct.shape == (9, 9, 9)
+    assert struct.bounds == {'x': (0.0, 8.0), 'y': (0.0, 8.0), 'z': (0.0, 8.0)}
+    assert struct.values.min() == 0
+    assert struct.values.max() == 728
+    assert struct.values[2][4][6] == 524
+
     return struct
 
 
@@ -88,8 +95,12 @@ def test_vtk_file_to_binary():
     struct.active_data_array_name = "Cell Number"
     binary_cell_number = struct.to_binary()
 
+    assert hashlib.sha256(binary_cell_number).hexdigest() == '7e39ee3c3f753038e6232ebd0aeffcd77f2b1be899bba6c6e09441db82590edc'
+
     struct.active_data_array_name = "Random"
     binary_random = struct.to_binary()
+
+    assert hashlib.sha256(binary_random).hexdigest() == 'f320e65c1ba4396766ae4c1653fea8c1b2bde2407b4ceaed6f11c04247b8f1c7'
 
     if WRITE_TO_DISK := False:
         new_file = open("test_volume_Cell Number.le", "wb")
@@ -118,6 +129,10 @@ def test_vtk_file_to_structured_data__gen11818__idn63() -> subsurface.Structured
 
     mesh = to_pyvista_grid(sg)
     pv_plot([mesh], image_2d=True)
+
+    assert struct.shape == (100, 139, 46)
+    assert round((struct.bounds['x'][1] + struct.values.max()) / struct.values[50][70][20], 4) == 1.6388
+
     return struct
 
 
@@ -141,27 +156,8 @@ def test_vtk_file_to_structured_data__idn69__gen12023() -> subsurface.Structured
 
     mesh = to_pyvista_grid(sg)
     pv_plot([mesh], image_2d=True)
-    return struct
 
+    assert struct.shape == (175, 112, 163)
+    assert round((struct.bounds['y'][0]/1000000 + struct.values.max()) / struct.values[90][60][80], 4) == 3.7342
 
-def test_vtk_file_to_structured_data__idn69_small_subset__gen13660() -> subsurface.StructuredData:
-
-    pv = optional_requirements.require_pyvista()
-
-    devops_path = pathlib.Path(os.getenv('TERRA_PATH_DEVOPS'))
-    filepath = devops_path.joinpath(r"volume/VTK/IDN-69/idn69-subseti4j4k4.vtk")
-
-    pyvista_obj: pv.DataSet = pv.read(filepath)
-
-    pyvista_struct = pv_cast_to_structured_grid(pyvista_obj)
-
-    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
-        grid=pyvista_struct,
-        data_array_name="density"
-    )
-
-    sg: subsurface.StructuredGrid = StructuredGrid(struct)
-
-    mesh = to_pyvista_grid(sg)
-    pv_plot([mesh], image_2d=True)
     return struct
