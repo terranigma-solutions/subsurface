@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 
 import subsurface
 from subsurface import StructuredGrid, optional_requirements
-from subsurface.modules.reader.volume.read_volume import pv_cast_to_explicit_structured_grid
+from subsurface.modules.reader.volume.read_volume import pv_cast_to_structured_grid
 from subsurface.modules.visualization import to_pyvista_grid, pv_plot
 from tests.conftest import RequirementsLevel
 
@@ -20,16 +20,28 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def generate_vtk_struct():
+def generate_vtk_rectilinear():
     """ Use this function only to generate vtk files for testing purposes """
     pyvista = optional_requirements.require_pyvista()
-    grid: pyvista.ExplicitStructuredGrid = pyvista.examples.load_explicit_structured()
+    grid: pyvista.RectilinearGrid = pyvista.examples.load_rectilinear()
     grid.cell_data['Cell Number'] = range(grid.n_cells)
     grid.cell_data['Random'] = np.random.rand(grid.n_cells)
     grid.plot(scalars='Random')
 
     # Write vtk
-    grid.save("test_structured.vtk")
+    grid.save("test_rectilinear.vtk")
+
+
+def generate_vtk_uniform():
+    """ Use this function only to generate vtk files for testing purposes """
+    pyvista = optional_requirements.require_pyvista()
+    grid: pyvista.ImageData = pyvista.examples.load_uniform()
+    grid.cell_data['Cell Number'] = range(grid.n_cells)
+    grid.cell_data['Random'] = np.random.rand(grid.n_cells)
+    grid.plot(scalars='Random')
+
+    # Write vtk
+    grid.save("test_uniform.vtk")
 
 
 # TODO: [x] Make vtk reader using probably pyvista
@@ -41,15 +53,15 @@ data_path = pf.joinpath('../../data/volume/')
 
 
 @pytest.mark.liquid_earth
-def test_vtk_file_to_structured_data() -> subsurface.StructuredData:
+def test_vtk_uniform_to_structured_data() -> subsurface.StructuredData:
     # read vtk file with pyvista
     NamedTemporaryFile()
     pv = optional_requirements.require_pyvista()
-    joinpath = data_path.joinpath('test_structured.vtk')
+    joinpath = data_path.joinpath('test_uniform.vtk')
     pyvista_obj: pv.DataSet = pv.read(joinpath)
     pv.examples.download_angular_sector()
 
-    pyvista_struct: pv.ExplicitStructuredGrid = pv_cast_to_explicit_structured_grid(pyvista_obj)
+    pyvista_struct: pv.ImageData = pv_cast_to_structured_grid(pyvista_obj)
 
     active_scalars = "Cell Number"
 
@@ -69,61 +81,8 @@ def test_vtk_file_to_structured_data() -> subsurface.StructuredData:
     return struct
 
 
-def test_vtk_from_numpy():
-
-    import numpy as np
-    import pyvista as pv
-
-    ni, nj, nk = 4, 5, 6
-    si, sj, sk = 20, 10, 1
-
-    xcorn = np.arange(0, (ni + 1) * si, si)
-    xcorn = np.repeat(xcorn, 2)
-    xcorn = xcorn[1:-1]
-    xcorn = np.tile(xcorn, 4 * nj * nk)
-
-    ycorn = np.arange(0, (nj + 1) * sj, sj)
-    ycorn = np.repeat(ycorn, 2)
-    ycorn = ycorn[1:-1]
-    ycorn = np.tile(ycorn, (2 * ni, 2 * nk))
-    ycorn = np.transpose(ycorn)
-    ycorn = ycorn.flatten()
-
-    zcorn = np.arange(0, (nk + 1) * sk, sk)
-    zcorn = np.repeat(zcorn, 2)
-    zcorn = zcorn[1:-1]
-    zcorn = np.repeat(zcorn, (4 * ni * nj))
-
-    corners = np.stack((xcorn, ycorn, zcorn))
-    corners = corners.transpose()
-
-    dims = np.asarray((ni, nj, nk)) + 1
-    print("Dims: ", dims)
-    print("Corners: ", corners.shape)
-    print("Corners: ", corners)
-
-    grid = pv.ExplicitStructuredGrid(dims, corners)
-    grid = grid.compute_connectivity()
-
-    # * Attributes
-    grid.cell_data['Cell Number'] = range(grid.n_cells)
-
-    # Temp file save
-    with NamedTemporaryFile(suffix='.vtk', delete=False) as temp_file:
-        grid.save(temp_file.name)
-        print(f"VTK file saved to: {temp_file.name}")
-    img = grid.plot(show_edges=True, off_screen=True, screenshot=True)
-
-    fig = plt.imshow(img)
-    plt.axis('off')
-    plt.show(block=False)
-    pass
-
-
-
-
 def test_vtk_file_to_binary():
-    struct: subsurface.StructuredData = test_vtk_file_to_structured_data()
+    struct: subsurface.StructuredData = test_vtk_uniform_to_structured_data()
     print(struct.bounds)
 
     struct.active_data_array_name = "Cell Number"
@@ -148,7 +107,7 @@ def test_vtk_file_to_structured_data__gen11818__idn63() -> subsurface.Structured
 
     pyvista_obj: pv.DataSet = pv.read(filepath)
 
-    pyvista_struct = pv_cast_to_explicit_structured_grid(pyvista_obj)
+    pyvista_struct = pv_cast_to_structured_grid(pyvista_obj)
 
     struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
         grid=pyvista_struct,
@@ -171,7 +130,7 @@ def test_vtk_file_to_structured_data__idn69__gen12023() -> subsurface.Structured
 
     pyvista_obj: pv.DataSet = pv.read(filepath)
 
-    pyvista_struct = pv_cast_to_explicit_structured_grid(pyvista_obj)
+    pyvista_struct = pv_cast_to_structured_grid(pyvista_obj)
 
     struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
         grid=pyvista_struct,
@@ -194,7 +153,7 @@ def test_vtk_file_to_structured_data__idn69_small_subset__gen13660() -> subsurfa
 
     pyvista_obj: pv.DataSet = pv.read(filepath)
 
-    pyvista_struct = pv_cast_to_explicit_structured_grid(pyvista_obj)
+    pyvista_struct = pv_cast_to_structured_grid(pyvista_obj)
 
     struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
         grid=pyvista_struct,
