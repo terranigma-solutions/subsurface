@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import pathlib
-from tempfile import NamedTemporaryFile
 
 import numpy as np
 import pytest
@@ -65,11 +64,9 @@ data_path = pf.joinpath('../../data/volume/')
 @pytest.mark.liquid_earth
 def test_vtk_uniform_to_structured_data() -> subsurface.StructuredData:
     # read vtk file with pyvista
-    NamedTemporaryFile()
     pv = optional_requirements.require_pyvista()
-    joinpath = data_path.joinpath('test_uniform.vtk')
-    pyvista_obj: pv.DataSet = pv.read(joinpath)
-    pv.examples.download_angular_sector()
+    filepath = data_path.joinpath('test_uniform.vtk')
+    pyvista_obj: pv.DataSet = pv.read(filepath)
 
     pyvista_struct: pv.ImageData = pv_cast_to_structured_grid(pyvista_obj)
 
@@ -109,6 +106,7 @@ def test_vtk_file_to_binary():
 
     struct.active_data_array_name = "Random"
     binary_random = struct.to_binary()
+        # "Random" here is from how the file was originally created, but that file has been committed, is not randomly generated again.
 
     assert hashlib.sha256(binary_random).hexdigest() == 'f320e65c1ba4396766ae4c1653fea8c1b2bde2407b4ceaed6f11c04247b8f1c7'
 
