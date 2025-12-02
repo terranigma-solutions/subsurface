@@ -76,8 +76,8 @@ def test_vtk_uniform_to_structured_data() -> subsurface.StructuredData:
         pyvista_struct.set_active_scalars(active_scalars)
         pyvista_struct.plot()
 
-    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
-        grid=pyvista_struct,
+    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista(
+        pyvista_object=pyvista_obj,
         data_array_name=active_scalars
     )
 
@@ -93,6 +93,31 @@ def test_vtk_uniform_to_structured_data() -> subsurface.StructuredData:
     assert struct.values[2][4][6] == 524
 
     return struct
+
+
+@pytest.mark.liquid_earth
+def test_vtk_nonuniform_rectilinear_to_structured_data():
+    # read vtk file with pyvista
+    pv = optional_requirements.require_pyvista()
+    filepath = data_path.joinpath('test_rectilinear.vtk')
+    pyvista_obj: pv.DataSet = pv.read(filepath)
+
+    pyvista_struct: pv.StructuredGrid = pv_cast_to_structured_grid(pyvista_obj)
+
+    active_scalars = "Cell Number"
+
+    if PLOT := False:
+        pyvista_struct.set_active_scalars(active_scalars)
+        pyvista_struct.plot()
+
+    try:
+        struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista(
+            pyvista_object=pyvista_obj,
+            data_array_name=active_scalars
+        )
+        raise ValueError("A NotImplementedError should have been raised.")
+    except NotImplementedError as e:
+        assert "Non-uniform rectilinear grid conversion is not yet implemented." in e.args[0]
 
 
 def test_vtk_file_to_binary():
@@ -128,8 +153,8 @@ def test_vtk_file_to_structured_data__gen11818__idn63() -> subsurface.Structured
 
     pyvista_struct = pv_cast_to_structured_grid(pyvista_obj)
 
-    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
-        grid=pyvista_struct,
+    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista(
+        pyvista_object=pyvista_obj,
         data_array_name="model_name"
     )
 
@@ -155,8 +180,8 @@ def test_vtk_file_to_structured_data__idn69__gen12023() -> subsurface.Structured
 
     pyvista_struct = pv_cast_to_structured_grid(pyvista_obj)
 
-    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista_structured_grid(
-        grid=pyvista_struct,
+    struct: subsurface.StructuredData = subsurface.StructuredData.from_pyvista(
+        pyvista_object=pyvista_obj,
         data_array_name="density"
     )
 
