@@ -44,6 +44,16 @@ def generate_vtk_uniform():
     grid.save("test_uniform.vtk")
 
 
+def generate_vtk_unstructured():
+    """ Use this function only to generate vtk files for testing purposes """
+    pyvista = optional_requirements.require_pyvista()
+    grid: pyvista.ImageData = pyvista.examples.load_hexbeam()
+    grid.cell_data['Cell Number'] = range(grid.n_cells)
+
+    # Write vtk
+    grid.save("test_unstruct.vtk")
+
+
 # TODO: [x] Make vtk reader using probably pyvista
 # TODO: [x] Convert to structured data
 # TODO: [ ] Export to le file
@@ -161,3 +171,15 @@ def test_vtk_file_to_structured_data__idn69__gen12023() -> subsurface.Structured
     assert round((struct.bounds['y'][0]/1000000 + struct.values.max()) / struct.values[90][60][80], 4) == 3.7342
 
     return struct
+
+
+def test_vtk_unstructured():
+    pv = optional_requirements.require_pyvista()
+    filepath = data_path.joinpath('test_unstruct.vtk')
+    pyvista_obj: pv.DataSet = pv.read(filepath)
+
+    try:
+        pv_cast_to_structured_grid(pyvista_obj)
+        raise Exception("The above cast to structured grid should have raised an exception.")
+    except ValueError as e:
+        assert e.args[0] == "Cannot generally convert unstructured grids to structured grids."
