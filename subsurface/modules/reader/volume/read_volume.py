@@ -32,19 +32,14 @@ def read_VTK_structured_grid(file_or_buffer: Union[str, BytesIO], active_scalars
     else:
         # If it's a file path, read directly
         pyvista_obj = pv.read(file_or_buffer)
+
     try:
-        pyvista_struct: pv.StructuredGrid = pv_cast_to_structured_grid(pyvista_obj)
+        struct: StructuredData = StructuredData.from_pyvista(
+            pyvista_object=pyvista_obj,
+            data_array_name=active_scalars
+        )
     except Exception as e:
-        raise ValueError(f"Failed to convert to StructuredGrid: {e}")
-
-    if PLOT := False:
-        pyvista_struct.set_active_scalars(active_scalars)
-        pyvista_struct.plot()
-
-    struct: StructuredData = StructuredData.from_pyvista_structured_grid(
-        grid=pyvista_struct,
-        data_array_name=active_scalars
-    )
+        raise ValueError(f"Failed to convert to StructuredData: {e}")
 
     return struct
 

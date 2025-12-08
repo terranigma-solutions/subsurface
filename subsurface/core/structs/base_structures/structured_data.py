@@ -14,6 +14,10 @@ class StructuredDataType(enum.Enum):
     IRREGULAR_AXIS_ALIGNED = 2  #: Irregular axis aligned grid. Distance between consecutive points is not constant
     IRREGULAR_AXIS_UNALIGNED = 3  #: Irregular axis unaligned grid. Distance between consecutive points is not constant
 
+    # [CLN] This terminology looks odd to me.
+    # "Uniform" vs. "non-uniform" is what PyVista uses instead of "regular" vs. "irregular".
+    # "Rectilinear" vs. "curvilinear" is what Pyvista uses instead of "axis-aligned" vs "axis-unaligned".
+    # As of right now it's not clear to me that anything other than REGULAR_AXIS_ALIGNED is actually valid in this file.
 
 @dataclass(frozen=False)
 class StructuredData:
@@ -85,12 +89,49 @@ class StructuredData:
         return cls(dataset, data_array_name)
 
     @classmethod
-    def from_pyvista_structured_grid(
+    def from_pyvista(
             cls,
-            grid: Union["pyvista.ExplicitStructuredGrid", "pyvista.StructuredGrid"],
+            pyvista_object: 'pyvista.DataSet',
             data_array_name: str = "data_array"
     ):
         pyvista = require_pyvista()
+
+        def rectilinear_is_uniform(
+                rectilinear_grid: pyvista.RectilinearGrid,
+                relative_tolerance: float = 1e-6,
+                absolute_tolerance: float = 1e-12,
+            ) -> bool:
+
+            def axis_is_uniform(v: np.ndarray) -> bool:
+                v = np.asarray(v, dtype=float)
+                if v.size <= 2:
+                    # 0, 1 or 2 points → treat as uniform for our purposes
+                    return True
+                diffs = np.diff(v)
+                first = diffs[0]
+                return np.allclose(diffs, first, rtol=relative_tolerance, atol=absolute_tolerance)
+
+            return (axis_is_uniform(rectilinear_grid.x)
+                and axis_is_uniform(rectilinear_grid.y)
+                and axis_is_uniform(rectilinear_grid.z))
+
+        extended_help_message = "Only uniform rectilinear grids are currently supported. The VTK format is developed by KitWare and you can use their free software ParaView to further inspect your file. In ParaView, in Information > Data Statistics, the Type must be Image (Uniform Rectilinear Grid). Furthermore, you can use ParaView to interpolate your data on to a uniform rectilinear grid and to export it as Image type."
+
+        match pyvista_object:
+            case pyvista.UnstructuredGrid():
+                # In a previous version of Subsurface there was an ill-formed attempt at supporting some unstructured grids here.
+                # I've left this function to minimize downstream changes and also in case we decide to revive anything in that direction.
+                raise ValueError(f"Cannot generally convert unstructured grids to structured grids. {extended_help_message}")
+            case pyvista.ImageData():
+                pass
+            case pyvista.RectilinearGrid() as rectilinear:
+                if not rectilinear_is_uniform(rectilinear):
+                    raise NotImplementedError(f"Non-uniform rectilinear grid conversion is not yet implemented. {extended_help_message}")
+            case _:
+                raise ValueError(f"Unexpected VTK grid type. {extended_help_message}")
+
+        grid = pyvista_object.cast_to_structured_grid()
+
         # Extract p
 
         # Extract cell data and point data (if any)
