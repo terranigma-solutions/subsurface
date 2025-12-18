@@ -216,7 +216,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
                 continue
 
             attr_values = attrs_well[col]
-            is_categorical = attr_values.dtype == 'O' or isinstance(attr_values.dtype, pd.CategoricalDtype)
+            is_categorical = attr_values.dtype == 'O' or isinstance(attr_values.dtype, pd.CategoricalDtype) or isinstance(attr_values.dtype, pd.StringDtype)
 
             # Skip columns that can't be interpolated and aren't categorical
             if is_categorical and col not in ['lith_ids', 'component lith']:

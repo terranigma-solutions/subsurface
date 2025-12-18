@@ -28,7 +28,7 @@ class GenericReaderFilesHelper(BaseModel):
     col_names: Optional[List[Union[str, int]]] = None
     drop_cols: Optional[List[str]] = None
     format: Optional[SupportedFormats] = None
-    separator: Optional[str] = ","
+    separator: Optional[str] = None
     index_map: Optional[dict] = None  # Adjusted for serialization
     columns_map: Optional[dict] = None  # Adjusted for serialization
     additional_reader_kwargs: dict = Field(default_factory=dict)
