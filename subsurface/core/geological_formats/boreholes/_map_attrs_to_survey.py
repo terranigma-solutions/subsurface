@@ -231,6 +231,11 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
                 is_categorical
             )
 
+            # Convert to appropriate dtype to avoid pandas 3.0 dtype coercion errors
+            target_dtype = new_attrs[col].dtype
+            if pd.api.types.is_numeric_dtype(target_dtype) and not is_categorical:
+                interpolated_values = np.asarray(interpolated_values, dtype=target_dtype)
+                
             new_attrs.loc[well_mask, col] = interpolated_values
 
     return new_attrs
