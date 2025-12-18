@@ -82,7 +82,7 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
     in_header = False
     in_coord_sys = False
     in_property_class_header = False
-    in_tface = False
+    in_geometry = False
     current_property_class_header = {}
     vertex_list = []
     vertex_indices = []
@@ -152,11 +152,16 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
                         current_property_class_header[line.strip()] = None
             continue
 
-        if line == 'TFACE':
-            in_tface = True
-            continue
+        if not in_geometry:
+            if line == 'TFACE':
+                in_geometry = True
+                continue
+            if line.startswith(("VRTX", "PVRTX", "ATOM", "TRGL", "BSTONE", "BORDER")):
+                # Some TSurf files omit TFACE; geometry can start immediately.
+                in_geometry = True
+                # Do not `continue`. The geometry is already in the current line.
 
-        if in_tface:
+        if in_geometry:
             if line.startswith('VRTX') or line.startswith('PVRTX'):
                 # Parse vertex line
                 parts = line.split()
@@ -207,7 +212,7 @@ def _process_mesh(mesh_lines) -> Optional[GOCADMesh]:
                     mesh.borders.append({'id': int(bid), 'v1': int(v1), 'v2': int(v2)})
                 continue
             elif line == 'END':
-                in_tface = False
+                in_geometry = False
                 continue
             else:
                 pass
