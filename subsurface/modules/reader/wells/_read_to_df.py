@@ -15,7 +15,6 @@ def check_format_and_read_to_df(reader_helper: GenericReaderFilesHelper) -> pd.D
             reader: Callable = _get_reader(reader_helper.format)
             d = reader(
                 filepath_or_buffer=reader_helper.file_or_buffer,
-                sep=reader_helper.separator,
                 **reader_helper.pandas_reader_kwargs
             )
         case (bytes() | io.BytesIO() | io.StringIO() | io.TextIOWrapper()), _:
