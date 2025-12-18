@@ -66,7 +66,7 @@ VENVPY="venv/bin/python -E -s"
 VENVPIP="venv/bin/python -E -s -m pip"
 
 $VENVPIP install --upgrade pip setuptools wheel
-$VENVPIP install --verbose -r --pre requirements/requirements_dev.txt
+$VENVPIP install --verbose --pre -r requirements/requirements_dev.txt
 $VENVPIP install --verbose teamcity-messages
 
 # Sanity probe
