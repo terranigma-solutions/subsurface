@@ -65,6 +65,7 @@ def test_read_survey():
                 'dip'    : 'dip',
                 'azimuth': 'azi'
         },
+        encoding="ISO-8859-1"
     )
     df = read_survey(reader)
 
@@ -90,6 +91,7 @@ def test_add_auxiliary_fields_to_survey():
                 'dip'    : 'dip',
                 'azimuth': 'azi'
         },
+        encoding="ISO-8859-1"
     )
     survey: Survey = Survey.from_df(read_survey(reader))
     import xarray as xr
@@ -118,6 +120,7 @@ def test_read_assay():
                 'dip'    : 'dip',
                 'azimuth': 'azi'
         },
+        encoding="ISO-8859-1"
     )
 
     reader_attr: GenericReaderFilesHelper = GenericReaderFilesHelper(
@@ -129,7 +132,8 @@ def test_read_assay():
         },
         additional_reader_kwargs={
                 'na_values': [-9999]
-        }
+        },
+        encoding="ISO-8859-1"
     )
     
     borehole_set: BoreholeSet = read_wells(
@@ -240,6 +244,8 @@ def test_merge_collar_survey():
                 'dip'    : 'dip',
                 'azimuth': 'azi'
         },
+        encoding="ISO-8859-1"
+        
     )
 
     survey = Survey.from_df(read_survey(reader_survey))
