@@ -32,7 +32,7 @@ class GenericReaderFilesHelper(BaseModel):
     index_map: Optional[dict] = None  # Adjusted for serialization
     columns_map: Optional[dict] = None  # Adjusted for serialization
     additional_reader_kwargs: dict = Field(default_factory=dict)
-    encoding: str = "ISO-8859-1"
+    encoding: str = "utf-8"
     index_col: Optional[Union[int, str, bool]] = False
     header: Union[None, int, List[int]] = 0
 
