@@ -11,7 +11,7 @@ from ....core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
 from ..mesh.surfaces_api import read_2d_mesh_to_unstruct
 
 
-def read_structured_topography(path, crop_to_extent: Optional[Sequence]=None) -> StructuredData:
+def read_structured_topography(path, crop_to_extent: Optional[Sequence] = None) -> StructuredData:
     rasterio = require_rasterio()
 
     extension = get_extension(path)
@@ -31,8 +31,10 @@ def read_structured_topography_to_unstructured(path) -> UnstructuredData:
     return topography_to_unstructured_data(structured_data)
 
 
-def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequence]=None):
-    if crop_to_extent is not None: 
+def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequence] = None):
+    rasterio = require_rasterio()
+
+    if crop_to_extent is not None:
         window = _get_raster_window(crop_to_extent, dataset)
     else:
         window = None
@@ -40,30 +42,54 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
     data = dataset.read(1, window=window)
     data = np.fliplr(data.T)
     shape = data.shape
-    
-    # TODO: ===================
-    # TODO: Add the option to crop
-    # TODO: Resample
-    
+
+    # Use window bounds if cropping, otherwise use full dataset bounds
+    if window is not None:
+        left, bottom, right, top = rasterio.windows.bounds(window, dataset.transform)
+    else:
+        left, bottom, right, top = dataset.bounds.left, dataset.bounds.bottom, dataset.bounds.right, dataset.bounds.top
+
     coords = {
-        'x': np.linspace(
-            dataset.bounds.left,
-            dataset.bounds.right,
-            shape[0]
-        ),
-        'y': np.linspace(
-            dataset.bounds.bottom,
-            dataset.bounds.top,
-            shape[1]
-        )
+            'x': np.linspace(left, right, shape[0]),
+            'y': np.linspace(bottom, top, shape[1])
     }
     structured_data = StructuredData.from_numpy(data, data_array_name='topography', coords=coords)
     return structured_data
 
 
-def read_unstructured_topography(path, additional_reader_kwargs: Optional[dict]=None) -> UnstructuredData:
+def rasterio_dataset_to_structured_data_(dataset, crop_to_extent: Optional[Sequence] = None):
+    if crop_to_extent is not None:
+        window = _get_raster_window(crop_to_extent, dataset)
+    else:
+        window = None
+
+    data = dataset.read(1, window=window)
+    data = np.fliplr(data.T)
+    shape = data.shape
+
+    # TODO: ===================
+    # TODO: Add the option to crop
+    # TODO: Resample
+
+    coords = {
+            'x': np.linspace(
+                dataset.bounds.left,
+                dataset.bounds.right,
+                shape[0]
+            ),
+            'y': np.linspace(
+                dataset.bounds.bottom,
+                dataset.bounds.top,
+                shape[1]
+            )
+    }
+    structured_data = StructuredData.from_numpy(data, data_array_name='topography', coords=coords)
+    return structured_data
+
+
+def read_unstructured_topography(path, additional_reader_kwargs: Optional[dict] = None) -> UnstructuredData:
     """For example, a dxf file"""
-    
+
     additional_reader_kwargs = additional_reader_kwargs or {}
     helper = GenericReaderFilesHelper(
         file_or_buffer=path,
