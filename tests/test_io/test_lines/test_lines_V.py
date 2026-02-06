@@ -75,7 +75,33 @@ def test_read_survey():
             additional_reader_kwargs={"decimal": ","}
         )
     )
-    print(survey_df)
+
+
+    print("\nSurvey Dataframe Info:")
+    print(survey_df.info())
+    print("\nSurvey Dataframe Description:")
+    print(survey_df.describe())
+    print("\nNumber of unique boreholes:", survey_df.index.nunique())
+    print("\nBorehole IDs:", survey_df.index.unique().tolist())
+
+    # Calculate max MD per borehole
+    max_md = survey_df.groupby(level=0)['md'].max()
+    print("\nMax MD per borehole:")
+    print(max_md)
+
+    print("\nCollar Dataframe Info:")
+    print(collar_df.info())
+    print("\nCollar Coordinates Extent:")
+    print("Max:\n", extent_from_collar_max)
+    print("Min:\n", extent_from_collar_min)
+    
+    survey_df = survey_df.drop_duplicates()
+    survey: Survey = Survey.from_df(
+        survey_df=survey_df,
+        # attr_df=attributes,
+        number_nodes=10,
+        duplicate_attr_depths=True
+    )
 
 
 def test_read():
@@ -162,7 +188,7 @@ def test_read():
     survey_df = survey_df.drop_duplicates()
     survey: Survey = Survey.from_df(
         survey_df=survey_df,
-        attr_df=attributes,
+        attr_df=lith,
         number_nodes=10,
         duplicate_attr_depths=True
     )

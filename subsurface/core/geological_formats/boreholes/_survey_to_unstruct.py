@@ -47,7 +47,10 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
 
         this_well_vertex = np.vstack([pos.easting, pos.northing, pos.depth]).T
         cum_vertex = np.vstack([cum_vertex, this_well_vertex])
-        measured_depths = _calculate_distances(array_of_vertices=this_well_vertex)
+        measured_depths = _calculate_distances(
+            array_of_vertices=this_well_vertex,
+            start_md = depths[0]
+        )
 
         n_vertex_shift_0 = np.arange(0, len(pos.depth) - 1, dtype=np.int_)
         n_vertex_shift_1 = np.arange(1, len(pos.depth), dtype=np.int_)
@@ -152,12 +155,12 @@ def _grab_depths_from_attr(
     return attr_depths
 
 
-def _calculate_distances(array_of_vertices: np.ndarray) -> np.ndarray:
+def _calculate_distances(array_of_vertices: np.ndarray, start_md: float = 0) -> np.ndarray:
     # Calculate the differences between consecutive points
     differences = np.diff(array_of_vertices, axis=0)
 
     # Calculate the Euclidean distance for each pair of consecutive points
     distances = np.linalg.norm(differences, axis=1)
-    # Insert a 0 at the beginning to represent the starting point at the surface
-    measured_depths = np.insert(np.cumsum(distances), 0, 0)
+    # Start from start_md instead of 0
+    measured_depths = np.insert(np.cumsum(distances) + start_md, 0, start_md)
     return measured_depths
