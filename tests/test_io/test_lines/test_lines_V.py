@@ -26,7 +26,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_read():
+def test_read_survey():
     collar_df: pd.DataFrame = read_collar(
         GenericReaderFilesHelper(
             file_or_buffer=(data_folder + "boreholes/bgr/Stammdaten.CSV"),
@@ -44,7 +44,6 @@ def test_read():
     )
     extent_from_collar_max = collar_df[['x', 'y', 'z']].max()
     extent_from_collar_min = collar_df[['x', 'y', 'z']].min()
-    
 
     # Convert to UnstructuredData
     unstruc: ss.UnstructuredData = ss.UnstructuredData.from_array(
@@ -76,6 +75,61 @@ def test_read():
             additional_reader_kwargs={"decimal": ","}
         )
     )
+    print(survey_df)
+
+
+def test_read():
+    collar_df: pd.DataFrame = read_collar(
+        GenericReaderFilesHelper(
+            file_or_buffer=(data_folder + "boreholes/bgr/Stammdaten.CSV"),
+            index_col="LOCID",
+            usecols=["LOCID", 'RECHTSWERT', 'HOCHWERT', 'ANSATZH', "BOHRUNGSNAME"],
+            columns_map={
+                    "LOCID"     : "id",  # ? Index name is not mapped
+                    "RECHTSWERT": "x",
+                    "HOCHWERT"  : "y",
+                    "ANSATZH"   : "z"
+            },
+            encoding="latin-1",
+            additional_reader_kwargs={"decimal": ","}
+        )
+    )
+    extent_from_collar_max = collar_df[['x', 'y', 'z']].max()
+    extent_from_collar_min = collar_df[['x', 'y', 'z']].min()
+
+    # Convert to UnstructuredData
+    unstruc: ss.UnstructuredData = ss.UnstructuredData.from_array(
+        vertex=collar_df[["x", "y", "z"]].values,
+        cells=SpecialCellCase.POINTS
+    )
+
+    points = ss.PointSet(data=unstruc)
+    collars: Collars = Collars(
+        ids=collar_df.index.to_list(),
+        collar_loc=points
+    )
+
+    if PLOT and False:
+        s = to_pyvista_points(collars.collar_loc)
+        pv_plot([s], image_2d=False)
+
+    survey_df: pd.DataFrame = read_survey(
+        GenericReaderFilesHelper(
+            file_or_buffer=(data_folder + "boreholes/bgr/Schichtdaten.CSV"),
+            index_col="LOCID",
+            usecols=["LOCID", "TIEFE BIS"],
+            columns_map={
+                    'TIEFE BIS': 'md',
+                    'LOCID'    : 'Name'
+
+            },
+            encoding="latin-1",
+            additional_reader_kwargs={"decimal": ","}
+        )
+    )
+    
+    
+    
 
     attributes: pd.DataFrame = read_attributes(
         GenericReaderFilesHelper(
@@ -91,16 +145,17 @@ def test_read():
 
     lith: pd.DataFrame = read_lith(
         GenericReaderFilesHelper(
-            file_or_buffer=(data_folder + "boreholes/bgr/Schichtdaten.CSV"),
+            file_or_buffer=(data_folder + "boreholes/bgr/survey.csv"),
             index_col="LOCID",
             columns_map={
                     'LOCID'    : 'id',
                     'TIEFE BIS': 'base',
-                    'PETRO'    : 'component lith'
+                    'STRAT'    : 'component lith'
             },
             encoding="latin-1",
             additional_reader_kwargs={"decimal": ","}
         ))
+    lith['component lith'].unique()
 
     # sort survey_df by column Name and md 
     # remove duplicates
@@ -112,9 +167,10 @@ def test_read():
         duplicate_attr_depths=True
     )
 
-    survey.update_survey_with_attr(attributes)
+    # survey.update_survey_with_attr(attributes)
     survey.update_survey_with_lith(lith)
 
+    survey.survey_trajectory.data.points_attributes["lith_ids"].unique()
     borehole_set = BoreholeSet(
         collars=collars,
         survey=survey,
