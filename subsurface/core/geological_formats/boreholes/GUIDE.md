@@ -40,8 +40,8 @@ well_01,10,180,0
 well_01,20,175,10
 ```
 
-### C. Attributes/Lithology (`lithology.csv`)
-This file contains interval-based data, such as rock types or assay values.
+### C. Lithology (`lithology.csv`)
+This file contains interval-based geological data, such as rock types.
 
 - **Mandatory First Column**: `id` (Must match the IDs in the collars file)
 - **Required Columns**: 
@@ -56,9 +56,62 @@ well_01,0,15,Sandstone
 well_01,15,30,Shale
 ```
 
+### D. Assays (`assays.csv`)
+This file contains measurement-based data, such as geochemistry or geophysical logs. It can be either **interval-based** (like lithology) or **point-based**.
+
+- **Mandatory First Column**: `id` (Must match the IDs in the collars file)
+- **Required Columns**:
+  - `top` (Optional): Starting depth of the interval.
+  - `base`: Ending depth of the interval (or the exact depth for point-based data).
+  - Any number of attribute columns (e.g., `Cu`, `Au`, `Gamma`).
+
+**Example (Interval-based):**
+```csv
+id,top,base,Cu,Au
+well_01,0,10,0.5,0.1
+well_01,10,20,1.2,0.3
+```
+
+**Example (Point-based):**
+```csv
+id,base,Gamma
+well_01,5,120
+well_01,10,145
+```
+
 ---
 
-## 2. Step-by-Step Import Process
+## 2. Understanding the Difference: Lithology vs. Assays
+
+When importing data, you will see a parameter called `is_lith_attr`. Here is why it matters:
+
+| Feature | Lithology (`is_lith_attr=True`) | Assays (`is_lith_attr=False`) |
+| :--- | :--- | :--- |
+| **Data Type** | Categorical (Rock types, formations) | Numerical (Geochem, logs) or Categorical |
+| **Required Columns** | Must have `component lith` | Any column name is allowed |
+| **Validation** | Checks for `top`, `base`, and `component lith` | Only requires `base` column |
+| **Visualization** | Often used for 3D volumes or colored intervals | Often used for logs, point clouds, or heatmaps |
+| **Example File** | `lithology.csv` | `assays.csv` |
+
+---
+
+## 3. Key Arguments Explained
+
+### A. `number_nodes`
+- **What it is**: The number of sampling points used to reconstruct the 3D trajectory of the well.
+- **Why it matters**: A higher number of nodes results in a smoother, more accurate 3D curve for deviated wells, but increases memory usage. For vertical wells, a small number (e.g., 2-5) is sufficient.
+
+### B. `add_attrs_as_nodes`
+- **What it is**: A flag that tells Subsurface to create explicit nodes at the depths specified in your attribute file (`top` and `base`).
+- **Why it matters**: If you want your 3D trajectory to perfectly align with your data intervals (e.g., a node exactly at the boundary between two rock layers), set this to `True`.
+
+### C. `duplicate_attr_depths`
+- **What it is**: Controls how Subsurface handles nodes at the same depth.
+- **Why it matters**: When set to `True`, Subsurface ensures that interval boundaries are sharp. It creates two nodes at the same depth—one for the end of the previous interval and one for the start of the next—allowing attributes to change instantaneously without "bleeding" into each other in 3D visualization.
+
+---
+
+## 4. Step-by-Step Import Process
 
 Follow these steps to import your data into Subsurface:
 
@@ -88,7 +141,8 @@ borehole_set = read_wells(
     collars_reader=collars_reader,
     surveys_reader=surveys_reader,
     attrs_reader=attrs_reader,
-    is_lith_attr=True  # Set to True if reading lithology
+    is_lith_attr=False,  # Set to True if reading lithology, False for assays
+    add_attrs_as_nodes=True # Set to True to add nodes at assay/lithology depths
 )
 ```
 
@@ -107,7 +161,7 @@ If your data is NOT in the canonical format, you can use these parameters to hel
 
 ---
 
-## 4. Tips for Success
+# 5. Tips for Success
 
 1. **Consistent IDs**: Ensure the well IDs are spelled exactly the same in all three files.
 2. **Positive Depths**: `md`, `top`, and `base` should generally be positive values representing depth from the surface.
