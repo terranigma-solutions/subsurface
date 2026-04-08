@@ -37,7 +37,9 @@ def _create_survey_df(survey):
     survey_df_vertex = pd.DataFrame(survey.survey_trajectory.data.vertex, columns=['X', 'Y', 'Z'])
     vertex_attrs = survey.survey_trajectory.data.points_attributes
     id_int_vertex = vertex_attrs['well_id']
-    survey_df_vertex['well_id'] = id_int_vertex.map(pd.Series(survey.ids))
+    
+    # We want to keep well_id as integer to match the collar_df
+    survey_df_vertex['well_id'] = id_int_vertex
     return survey_df_vertex
 
 
@@ -59,7 +61,7 @@ class _Intersect:
             how='outer',
             indicator=True,
             on='well_id',
-            suffixes=('_collar', '_survey')
+            suffixes=('_survey', '_collar')
         )
         combined_df_vertex = combined_df_vertex[combined_df_vertex['_merge'].isin(['left_only', 'both']) ]
 
@@ -90,13 +92,14 @@ class _Intersect:
     def _generate_cells(combined_df_vertex: pd.DataFrame, survey: Survey) -> pd.DataFrame:
         combined_df_cells = []
         previous_index = 0
-        for e, well_id in enumerate(survey.ids):
-            df_vertex_well = combined_df_vertex[combined_df_vertex['well_id'] == well_id]
+        for e, well_id_str in enumerate(survey.ids):
+            well_id_int = survey.get_well_num_id(well_id_str)
+            df_vertex_well = combined_df_vertex[combined_df_vertex['well_id'] == well_id_int]
             indices = np.arange(len(df_vertex_well)) + previous_index
             previous_index += len(df_vertex_well)
             cells = np.array([indices[:-1], indices[1:]]).T
             df_cells_well = pd.DataFrame(cells, columns=['cell1', 'cell2'])
-            df_cells_well['well_id'] = well_id
+            df_cells_well['well_id'] = well_id_str
             df_cells_well['well_id_int'] = e
             combined_df_cells.append(df_cells_well)
 
@@ -114,4 +117,4 @@ class _Intersect:
             cells_attr=cell_attributes
         )
 
-        return LineSet(data=combined_trajectory_unstruct, radius=500)
+        return LineSet(data=combined_trajectory_unstruct, radius=survey.survey_trajectory.radius)

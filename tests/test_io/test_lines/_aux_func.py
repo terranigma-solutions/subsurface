@@ -3,11 +3,13 @@ import numpy as np
 from subsurface.modules.visualization import to_pyvista_line, init_plotter, to_pyvista_points, pyvista_to_matplotlib
 
 
-def _plot(scalar, trajectory, collars=None, lut: int = 100, image_2d=True):
+def _plot(scalar, trajectory, collars=None, lut: int = 100, image_2d=True, radius=None):
+    if radius is None:
+        radius = trajectory.radius
     s = to_pyvista_line(
         line_set=trajectory,
         active_scalar=scalar,
-        radius=10
+        radius=radius
     )
     
     if scalar is not None:

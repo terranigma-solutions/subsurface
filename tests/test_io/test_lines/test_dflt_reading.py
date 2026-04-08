@@ -2,7 +2,10 @@ import pytest
 import os
 from subsurface.api.reader.read_wells import read_wells
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
+from ._aux_func import _plot
 from ...conftest import RequirementsLevel
+
+PLOT = False
 
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
@@ -57,6 +60,14 @@ def test_read_dflt_borehole_data(data_path):
     # In default mode (add_attrs_as_nodes=False), attributes are interpolated 
     # and might not match the input values exactly at the nodes.
     # We just check that we have some data.
+
+    if PLOT:
+        _plot(
+            scalar="Cu",
+            trajectory=borehole_set.combined_trajectory,
+            collars=borehole_set.collars,
+            radius=0.01
+        )
 
 
 def test_read_dflt_as_lithology(data_path):
@@ -118,3 +129,12 @@ def test_read_dflt_with_mapping(data_path):
     # Check if some Cu values from dflt_space_attributes.csv are present
     # In this case, 1.0 is a value that appears in the input and should be preserved
     assert 1.0 in well_01_attrs["Cu"].values
+
+    if PLOT:
+        _plot(
+            scalar="Au",
+            trajectory=borehole_set.combined_trajectory,
+            collars=borehole_set.collars,
+            image_2d=False,
+            radius=0.01
+        )
