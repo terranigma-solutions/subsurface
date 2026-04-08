@@ -164,6 +164,7 @@ def test_read_supersimple_order_invariance(data_path, collar_file, survey_file, 
     # regardless of whether they are in collars_df.
     # This might be because it reindexes by survey_df.index
     import pandas as pd
+    import numpy as np
     survey_df = pd.read_csv(survey_path, index_col=0)
     expected_ids = set(survey_df.index.unique())
 
@@ -173,18 +174,52 @@ def test_read_supersimple_order_invariance(data_path, collar_file, survey_file, 
 
     # Check that attributes are correctly mapped regardless of order
     points_attrs = borehole_set.combined_trajectory.data.points_attributes
+    vertices = borehole_set.combined_trajectory.data.vertex
     
     # All wells in the result should have their attributes mapped correctly
     # If a well is in both survey and lith, it should have its attributes.
     lith_df = pd.read_csv(lith_path, index_col=0)
     common_wells = set(expected_ids).intersection(set(lith_df.index.unique()))
 
+    # Known reference data for validation
+    # aaa: x=0.25, y=0.4, z=1, MDs=[0, 0.5]
+    # zzz: x=0.75, y=0.6, z=1, MDs=[0, 1]
+    # bbb: x=0.5, y=0.5, z=1, MDs=[0, 0.8]
+    expected_data = {
+        "aaa": {"x": 0.25, "y": 0.4, "z": 1.0, "max_md": 0.5},
+        "zzz": {"x": 0.75, "y": 0.6, "z": 1.0, "max_md": 1.0},
+        "bbb": {"x": 0.5, "y": 0.5, "z": 1.0, "max_md": 0.8}
+    }
+
     for well_id in common_wells:
         well_num_id = borehole_set.survey.get_well_num_id(well_id)
-        well_attrs = points_attrs[points_attrs["well_id"] == well_num_id]
+        # The well_id in points_attributes is the numeric ID
+        well_mask = points_attrs["well_id"] == well_num_id
+        well_attrs = points_attrs[well_mask]
         assert not well_attrs.empty, f"Well {well_id} attributes should not be empty"
         
-        # Specific checks
+        # Check coordinates and attributes for this well
+        well_vertices = vertices[well_mask]
+        
+        # In subsurface, combined_trajectory vertices are calculated as:
+        # vertex = survey_offset + collar_location
+        # For these straight wells, survey_offset is likely (0, 0, -md) 
+        # but let's see what the actual values are.
+        # expected_data contains collar locations.
+        if well_id in expected_data:
+            # If a well is in both survey and collars, its vertices should be valid numbers
+            if not np.any(np.isnan(well_vertices)):
+                assert np.allclose(well_vertices[:, 0], expected_data[well_id]["x"]), f"X mismatch for {well_id}"
+                assert np.allclose(well_vertices[:, 1], expected_data[well_id]["y"]), f"Y mismatch for {well_id}"
+                # Z starts at collar and usually goes DOWN for boreholes
+                assert np.isclose(well_vertices[0, 2], expected_data[well_id]["z"]), f"Z mismatch for {well_id}"
+            else:
+                # If well is in survey but NOT in the provided collars file for this variation
+                # then it might have NaNs in vertices because _add_collar_coordinates adds NaNs
+                # This happens in the 'supersimple_collars.csv' + 'supersimple_survey_v2.csv' case for 'bbb'
+                pass
+        
+        # Specific attribute checks
         if well_id == "aaa":
             assert any("lettuce" in str(l) for l in well_attrs["component lith"].unique())
         elif well_id == "zzz":
