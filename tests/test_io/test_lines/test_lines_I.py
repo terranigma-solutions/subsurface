@@ -38,12 +38,17 @@ def test_read_collar():
         }
     )
     df = read_collar(reader)
+    assert not df.empty
+    assert "x" in df.columns
+    assert "y" in df.columns
+    assert "z" in df.columns
 
     # TODO: df to unstruct
     unstruc: UnstructuredData = UnstructuredData.from_array(
         vertex=df[["x", "y", "z"]].values,
         cells=SpecialCellCase.POINTS
     )
+    assert unstruc.n_points == len(df)
 
     points = PointSet(data=unstruc)
 
@@ -51,6 +56,8 @@ def test_read_collar():
         ids=df.index.to_list(),
         collar_loc=points
     )
+    assert len(collars.ids) == len(df)
+    assert collars.collar_loc.n_points == len(df)
 
     if PLOT:
         s = to_pyvista_points(collars.collar_loc)
@@ -68,8 +75,13 @@ def test_read_survey():
         encoding="ISO-8859-1"
     )
     df = read_survey(reader)
+    assert not df.empty
+    assert "md" in df.columns
+    assert "inc" in df.columns
+    assert "azi" in df.columns
 
     survey: Survey = Survey.from_df(df, None)
+    assert survey.survey_trajectory.data.n_points > 0
 
     if PLOT and False:
         s = to_pyvista_line(
@@ -97,6 +109,8 @@ def test_add_auxiliary_fields_to_survey():
     import xarray as xr
     data_array: UnstructuredData = survey.survey_trajectory.data
     data_set: xr.Dataset = data_array.data
+    assert "vertex" in data_set.data_vars
+    assert "cells" in data_set.data_vars
 
     pass
 
@@ -143,6 +157,9 @@ def test_read_assay():
         is_lith_attr=False,
         add_attrs_as_nodes=True
     )
+    assert borehole_set.collars.collar_loc.n_points > 0
+    assert borehole_set.survey.survey_trajectory.data.n_points > 0
+    assert "Cu(%)_GDR" in borehole_set.survey.survey_trajectory.data.points_attributes.columns
     
     _plot(
         scalar="Cu(%)_GDR",
@@ -165,6 +182,7 @@ def test_read_stratigraphy():
     )
 
     lith: pd.DataFrame = read_lith(reader)
+    assert not lith.empty
     survey: Survey = test_read_survey()
 
     survey.update_survey_with_lith(lith)
@@ -188,9 +206,12 @@ def test_read_stratigraphy():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
+    assert borehole_set.collars.collar_loc.n_points > 0
     borehole_set.get_bottom_coords_for_each_lith()
     
     foo = borehole_set._merge_vertex_data_arrays_to_dataframe()
+    assert not foo.empty
+    assert "lith_ids" in foo.columns
     well_id_mapper: dict[str, int] = borehole_set.survey.id_to_well_id
     # mapp well_id column to well_name
     foo["well_name"] = foo["well_id"].map(well_id_mapper)
@@ -255,6 +276,8 @@ def test_merge_collar_survey():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
+    assert borehole_set.collars.collar_loc.n_points > 0
+    assert borehole_set.survey.survey_trajectory.data.n_points > 0
 
     if PLOT:
         s = to_pyvista_line(line_set=borehole_set.combined_trajectory, radius=50)

@@ -37,13 +37,9 @@ def test_read_attr_into_borehole():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
-
-    if False:
-        borehole_set.to_binary("ascii_wells")
-
-    # Assert shape is 17378, 3
-    np.testing.assert_array_equal(borehole_set.combined_trajectory.data.vertex.shape, (17378, 3))
-    np.testing.assert_array_equal(borehole_set.collars.data.vertex.shape, (263, 3))
+    assert borehole_set.combined_trajectory.n_points == 17378
+    assert borehole_set.collars.collar_loc.n_points == 263
+    assert "MnO" in borehole_set.survey.survey_trajectory.data.points_attributes.columns
 
     _plot(
         scalar="MnO",
@@ -63,9 +59,8 @@ def test_read_geophys_attr():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
-
-    if True:
-        borehole_set.to_binary("ascii_wells_geophysics")
+    assert borehole_set.combined_trajectory.n_points > 0
+    assert "Gamma_TC" in borehole_set.survey.survey_trajectory.data.points_attributes.columns
 
     _4Q83 = borehole_set.combined_trajectory.data.vertex[13487:48000, :]
     if PLOT and True:
@@ -139,6 +134,8 @@ def test_read_stratigraphy():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
+    assert borehole_set.combined_trajectory.n_points > 0
+    assert borehole_set.collars.collar_loc.n_points > 0
     borehole_set.get_bottom_coords_for_each_lith()
 
     # ? Not sure what was this for
@@ -154,6 +151,7 @@ def test_read_stratigraphy():
 
 def test_read_collar():
     collars = _read_collars()
+    assert collars.collar_loc.n_points > 0
 
     point_cloud = collars.data.vertex
     # Find extent
@@ -179,11 +177,13 @@ def _read_collars() -> Collars:
         }
     )
     df = read_collar(reader)
+    assert not df.empty
     # TODO: df to unstruct
     unstruc: UnstructuredData = UnstructuredData.from_array(
         vertex=df[["x", "y", "z"]].values,
         cells=SpecialCellCase.POINTS
     )
+    assert unstruc.n_points == len(df)
     points = PointSet(data=unstruc)
     collars = Collars(
         ids=df.index.to_list(),
@@ -204,6 +204,7 @@ def test_read_survey():
     df = read_survey(reader)
 
     survey: Survey = Survey.from_df(df)
+    assert survey.survey_trajectory.n_points > 0
 
     if PLOT and False:
         s = to_pyvista_line(
