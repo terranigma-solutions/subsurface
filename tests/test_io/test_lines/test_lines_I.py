@@ -2,6 +2,7 @@ import dotenv
 import os
 import pandas as pd
 import pytest
+import numpy as np
 
 from subsurface import UnstructuredData
 from subsurface.api.reader.read_wells import read_wells
@@ -161,6 +162,18 @@ def test_read_assay():
     assert borehole_set.survey.survey_trajectory.data.n_points > 0
     assert "Cu(%)_GDR" in borehole_set.survey.survey_trajectory.data.points_attributes.columns
     
+    # Verify specific points to ensure consistency
+    vertices = borehole_set.combined_trajectory.data.vertex
+    attrs = borehole_set.combined_trajectory.data.points_attributes
+    n = vertices.shape[0]
+    assert n == 3810
+    # Index 0
+    np.testing.assert_allclose(vertices[0], [5455616.0, 5711309.0, 117.8])
+    # Index n // 2 (1905)
+    np.testing.assert_allclose(vertices[1905], [5461592.6, 5713512.1, -102.41111111111107])
+    # Index n - 1 (3809)
+    np.testing.assert_allclose(vertices[3809], [5477296.0, 5701517.0, 123.4])
+
     _plot(
         scalar="Cu(%)_GDR",
         trajectory=borehole_set.combined_trajectory,
@@ -207,6 +220,22 @@ def test_read_stratigraphy():
         merge_option=MergeOptions.INTERSECT
     )
     assert borehole_set.collars.collar_loc.n_points > 0
+    
+    # Verify specific points to ensure consistency
+    vertices = borehole_set.combined_trajectory.data.vertex
+    attrs = borehole_set.combined_trajectory.data.points_attributes
+    n = vertices.shape[0]
+    assert n == 4920
+    # Index 0
+    np.testing.assert_allclose(vertices[0], [5455616.0, 5711309.0, 117.8])
+    assert attrs.iloc[0]["lith_ids"] == 0.0
+    # Index n // 2 (2460)
+    np.testing.assert_allclose(vertices[2460], [5470324.0, 5724845.0, 115.6])
+    assert attrs.iloc[2460]["lith_ids"] == 0.0
+    # Index n - 1 (4919)
+    np.testing.assert_allclose(vertices[4919], [5477296.0, 5701517.0, 123.4])
+    assert attrs.iloc[4919]["lith_ids"] == 0.0
+
     borehole_set.get_bottom_coords_for_each_lith()
     
     foo = borehole_set._merge_vertex_data_arrays_to_dataframe()
