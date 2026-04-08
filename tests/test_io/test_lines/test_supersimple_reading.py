@@ -134,3 +134,60 @@ def test_read_supersimple_with_mapping(data_path):
             image_2d=False,
             radius=0.01
         )
+
+
+@pytest.mark.parametrize("collar_file, survey_file, lith_file", [
+    ('supersimple_collars.csv', 'supersimple_survey.csv', 'supersimple_lithology.csv'),
+    ('supersimple_collars_v2.csv', 'supersimple_survey_v2.csv', 'supersimple_lithology_v2.csv'),
+    ('supersimple_collars_v3.csv', 'supersimple_survey_v3.csv', 'supersimple_lithology_v3.csv'),
+    ('supersimple_collars.csv', 'supersimple_survey_v2.csv', 'supersimple_lithology_v3.csv'),
+    ('supersimple_collars_v3.csv', 'supersimple_survey.csv', 'supersimple_lithology.csv'),
+    ('supersimple_collars_v2.csv', 'supersimple_survey_v3.csv', 'supersimple_lithology_v2.csv'),
+])
+def test_read_supersimple_order_invariance(data_path, collar_file, survey_file, lith_file):
+    collar_path = os.path.join(data_path, 'borehole', collar_file)
+    survey_path = os.path.join(data_path, 'borehole', survey_file)
+    lith_path = os.path.join(data_path, 'borehole', lith_file)
+
+    collars_reader = GenericReaderFilesHelper(file_or_buffer=collar_path)
+    surveys_reader = GenericReaderFilesHelper(file_or_buffer=survey_path)
+    attrs_reader = GenericReaderFilesHelper(file_or_buffer=lith_path)
+
+    borehole_set = read_wells(
+        collars_reader=collars_reader,
+        surveys_reader=surveys_reader,
+        attrs_reader=attrs_reader,
+        is_lith_attr=True
+    )
+
+    # Current behavior: BoreholeSet.collars has ids from survey_df
+    # regardless of whether they are in collars_df.
+    # This might be because it reindexes by survey_df.index
+    import pandas as pd
+    survey_df = pd.read_csv(survey_path, index_col=0)
+    expected_ids = set(survey_df.index.unique())
+
+    assert len(borehole_set.collars.ids) == len(expected_ids)
+    for well_id in expected_ids:
+        assert well_id in borehole_set.collars.ids
+
+    # Check that attributes are correctly mapped regardless of order
+    points_attrs = borehole_set.combined_trajectory.data.points_attributes
+    
+    # All wells in the result should have their attributes mapped correctly
+    # If a well is in both survey and lith, it should have its attributes.
+    lith_df = pd.read_csv(lith_path, index_col=0)
+    common_wells = set(expected_ids).intersection(set(lith_df.index.unique()))
+
+    for well_id in common_wells:
+        well_num_id = borehole_set.survey.get_well_num_id(well_id)
+        well_attrs = points_attrs[points_attrs["well_id"] == well_num_id]
+        assert not well_attrs.empty, f"Well {well_id} attributes should not be empty"
+        
+        # Specific checks
+        if well_id == "aaa":
+            assert any("lettuce" in str(l) for l in well_attrs["component lith"].unique())
+        elif well_id == "zzz":
+            assert any("cheese" in str(l) for l in well_attrs["component lith"].unique())
+        elif well_id == "bbb":
+             assert any("patty" in str(l) for l in well_attrs["component lith"].unique())
