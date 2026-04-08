@@ -176,7 +176,7 @@ def test_read_assay():
     assert_contains_vertex([5466806.0, 5707536.0, -413.2], vertices)
     assert_contains_vertex([5466844.4, 5712503.0, 116.8], vertices)
 
-    if PLOT or True:
+    if PLOT:
         _plot(
             scalar="Cu(%)_GDR",
             trajectory=borehole_set.combined_trajectory,

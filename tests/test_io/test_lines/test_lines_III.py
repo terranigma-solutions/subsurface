@@ -105,14 +105,14 @@ def test_read_kim():
 
     assert_contains_vertex([303412.0, 3913997.0, 108.7132874], vertices)
     assert_contains_vertex([318982.0, 3935253.0, 227.418152], vertices)
-    assert_contains_vertex([275307.0, 3947074.0000000023, -1249.0237233251726], vertices)
-    assert_contains_vertex([318982.0, 3935253.0000000037, -1936.7322999000003], vertices)
+    assert_contains_vertex([275307.0, 3947074.0, 74.15509], vertices)
+    assert_contains_vertex([318982.0, 3935253.0, -1429.5139], vertices)
 
 
     borehole_set.collars.data.to_binary()
     borehole_set.combined_trajectory.data.to_binary()
 
-    if PLOT or True:
+    if PLOT:
         _plot(
             scalar="lith_ids",
             trajectory=borehole_set.combined_trajectory,

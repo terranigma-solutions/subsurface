@@ -75,11 +75,11 @@ def test_read_supersimple_as_lithology(data_path):
     )
 
     assert len(borehole_set.collars.ids) == 2
-    
+
     # In lithology mode, component lith should be present and have categorical values
     points_attrs = borehole_set.combined_trajectory.data.points_attributes
     assert "component lith" in points_attrs.columns
-    
+
     # Check for some lithology values from supersimple_lithology.csv
     # zzz has bun, cheese, patty
     well_zzz_id = borehole_set.survey.get_well_num_id("zzz")
@@ -113,7 +113,8 @@ def test_read_supersimple_with_mapping(data_path):
         surveys_reader=surveys_reader,
         attrs_reader=attrs_reader,
         is_lith_attr=True,
-        add_attrs_as_nodes=True
+        add_attrs_as_nodes=True,
+        duplicate_attr_depths=True
     )
 
     assert len(borehole_set.collars.ids) == 2
@@ -127,7 +128,7 @@ def test_read_supersimple_with_mapping(data_path):
 
     if PLOT:
         _plot(
-            scalar="component lith",
+            scalar="lith_ids",
             trajectory=borehole_set.combined_trajectory,
             collars=borehole_set.collars,
             image_2d=False,
