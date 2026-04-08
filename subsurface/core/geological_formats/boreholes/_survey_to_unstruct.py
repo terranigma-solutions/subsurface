@@ -17,10 +17,19 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
     vertex_attr: pd.DataFrame = pd.DataFrame()
 
     for e, (borehole_id, data) in enumerate(survey_df.groupby(level=0)):
+        md = data['md'].values
+        inc = data['inc'].values
+        azi = data['azi'].values
+
+        if md[0] != 0:
+            md = np.insert(md, 0, 0)
+            inc = np.insert(inc, 0, inc[0])
+            azi = np.insert(azi, 0, azi[0])
+
         dev = wp.deviation(
-            md=data['md'].values,
-            inc=data['inc'].values,
-            azi=data['azi'].values
+            md=md,
+            inc=inc,
+            azi=azi
         )
 
         md_min = dev.md.min()
