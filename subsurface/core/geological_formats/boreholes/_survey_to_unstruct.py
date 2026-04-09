@@ -95,15 +95,14 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
 
 
 def _grab_depths_from_attr(
-        attr_df: pd.DataFrame,
+        attr_df: Optional[pd.DataFrame],
         borehole_id: Hashable,
         duplicate_attr_depths: bool,
         md_max: float,
         md_min: float
 ) -> np.ndarray:
-    # Initialize attr_depths and attr_labels as empty arrays
+    # Initialize attr_depths as empty array
     attr_depths = np.array([], dtype=float)
-    attr_labels = np.array([], dtype='<U4')  # Initialize labels for 'top' and 'base'
 
     if attr_df is None or ("top" not in attr_df.columns and "base" not in attr_df.columns):
         return attr_depths
@@ -136,33 +135,26 @@ def _grab_depths_from_attr(
             # Clip to within md range
             bases = bases[(bases >= md_min) & (bases <= md_max)]
 
-        # Combine tops and bases into attr_depths with labels
-        attr_depths = np.concatenate((tops, bases))
-        attr_labels = np.array(['top'] * len(tops) + ['base'] * len(bases))
-
-        # Drop duplicates while preserving order
-        _, unique_indices = np.unique(attr_depths, return_index=True)
-        attr_depths = attr_depths[unique_indices]
-        attr_labels = attr_labels[unique_indices]
+        # Combine tops and bases into attr_depths
+        attr_depths = np.unique(np.concatenate((tops, bases)))
 
     except KeyError:
         # No attributes for this borehole_id or missing columns
         attr_depths = np.array([], dtype=float)
-        attr_labels = np.array([], dtype='<U4')
 
-    # If duplicate_attr_depths is True, duplicate attr_depths with a tiny offset
+    # If duplicate_attr_depths is True, duplicate every attr_depth with a tiny offset 
+    # to fall into both sides of each boundary
     if duplicate_attr_depths and len(attr_depths) > 0:
         tiny_offset = (md_max - md_min) * 1e-6  # A tiny fraction of the depth range
-        # Create offsets: +tiny_offset for 'top', -tiny_offset for 'base'
-        offsets = np.where(attr_labels == 'top', tiny_offset, -tiny_offset)
-        duplicated_attr_depths = attr_depths + offsets
+        # Combine original depths, plus offsets, and minus offsets
+        duplicated_attr_depths = np.concatenate([
+            attr_depths,
+            attr_depths + tiny_offset,
+            attr_depths - tiny_offset
+        ])
         # Ensure the duplicated depths are within the md range
         valid_indices = (duplicated_attr_depths >= md_min) & (duplicated_attr_depths <= md_max)
-        duplicated_attr_depths = duplicated_attr_depths[valid_indices]
-        # Original attribute depths
-        original_attr_depths = attr_depths
-        # Combine originals and duplicates
-        attr_depths = np.hstack([original_attr_depths, duplicated_attr_depths])
+        attr_depths = np.unique(duplicated_attr_depths[valid_indices])
 
     return attr_depths
 

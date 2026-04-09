@@ -137,7 +137,8 @@ def _interpolate_attribute(
     x_locations: np.ndarray, 
     target_depths: np.ndarray, 
     column_name: str,
-    is_categorical: bool
+    is_categorical: bool,
+    is_interval_data: bool = False
 ) -> np.ndarray:
     """
     Interpolate attribute values to target depths.
@@ -148,12 +149,13 @@ def _interpolate_attribute(
         target_depths: Array of target depths for interpolation
         column_name: Name of the column being interpolated
         is_categorical: Whether the attribute is categorical
+        is_interval_data: Whether the data is interval-based
 
     Returns:
         Array of interpolated values
     """
     # For categorical data or specific columns, use custom nearest neighbor interpolation
-    if is_categorical or column_name in ['lith_ids', 'component lith']:
+    if is_categorical or column_name in ['lith_ids', 'component lith'] or is_interval_data:
         return _nearest_neighbor_categorical_interpolation(
             x_locations=x_locations,
             y_values=attr_values.values,
@@ -208,11 +210,12 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
 
         # Get interpolation locations
         interp_locations = _get_interpolation_locations(attrs_well, well_name)
+        is_interval_data = 'top' in attrs_well.columns
 
         # Interpolate each attribute
         for col in attrs_well.columns:
             # Skip location and ID columns
-            if col in ['top', 'base', 'well_id']:
+            if col in ['well_id']:
                 continue
 
             attr_values = attrs_well[col]
@@ -228,7 +231,8 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
                 interp_locations, 
                 well_depths, 
                 col,
-                is_categorical
+                is_categorical,
+                is_interval_data=is_interval_data
             )
 
             # Convert to appropriate dtype to avoid pandas 3.0 dtype coercion errors
