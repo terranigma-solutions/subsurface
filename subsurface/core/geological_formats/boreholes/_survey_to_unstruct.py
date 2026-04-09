@@ -146,12 +146,18 @@ def _grab_depths_from_attr(
     # to fall into both sides of each boundary
     if duplicate_attr_depths and len(attr_depths) > 0:
         tiny_offset = (md_max - md_min) * 1e-6  # A tiny fraction of the depth range
-        # Combine original depths, plus offsets, and minus offsets
+        # Combine depths + offset and depths - offset to create two nodes per boundary
         duplicated_attr_depths = np.concatenate([
-            attr_depths,
             attr_depths + tiny_offset,
             attr_depths - tiny_offset
         ])
+
+        # We also keep the original boundary depths if they are exactly md_min or md_max
+        # to ensure the borehole starts and ends at the expected depths.
+        ends = attr_depths[(attr_depths == md_min) | (attr_depths == md_max)]
+        if len(ends) > 0:
+            duplicated_attr_depths = np.concatenate([duplicated_attr_depths, ends])
+
         # Ensure the duplicated depths are within the md range
         valid_indices = (duplicated_attr_depths >= md_min) & (duplicated_attr_depths <= md_max)
         attr_depths = np.unique(duplicated_attr_depths[valid_indices])

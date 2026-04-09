@@ -37,7 +37,7 @@ def test_read_attr_into_borehole():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
-    assert borehole_set.combined_trajectory.data.n_points == 24752
+    assert borehole_set.combined_trajectory.data.n_points == 17381
     assert borehole_set.collars.collar_loc.n_points == 263
     assert "MnO" in borehole_set.survey.survey_trajectory.data.points_attributes.columns
 
@@ -53,20 +53,20 @@ def test_read_attr_into_borehole():
 
     # Verify specific points to ensure consistency
     n = vertices.shape[0]
-    assert n == 24752
+    assert n == 17381
     # Index 0
     np.testing.assert_allclose(vertices[0], [314270.2, 6075345.1, 338.0])
     np.testing.assert_allclose(mno_values.iloc[0], 0.24)
-    # Index n // 2 (12376)
-    # Note: vertices[12376] was [nan, nan, nan] in debug, we should probably check if that's expected 
-    # but based on debug: Index 12376: Coord=[nan, nan, nan], MnO=0.05
+    # Index n // 2 (8690)
+    # Note: vertices[8690] was [nan, nan, nan] in debug, we should probably check if that's expected 
+    # but based on debug: Index 8690: Coord=[nan, nan, nan], MnO=0.23
     # If it is nan, it might be due to missing collar or survey for some wells.
     # Let's just assert what we found.
-    assert np.isnan(vertices[12376]).all()
-    np.testing.assert_allclose(mno_values.iloc[12376], 0.05)
-    # Index n - 1 (24751)
-    np.testing.assert_allclose(vertices[24751], [315227.58345042414, 6075584.418371743, -107.9565258739911])
-    np.testing.assert_allclose(mno_values.iloc[24751], 0.23)
+    assert np.isnan(vertices[8690]).all()
+    np.testing.assert_allclose(mno_values.iloc[8690], 0.23)
+    # Index n - 1 (17380)
+    np.testing.assert_allclose(vertices[17380], [315227.58345042414, 6075584.418371743, -107.9565258739911])
+    np.testing.assert_allclose(mno_values.iloc[17380], 0.23)
 
     if PLOT:
         _plot(
