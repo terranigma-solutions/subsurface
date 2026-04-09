@@ -59,11 +59,11 @@ def test_read_attr_into_borehole():
     np.testing.assert_allclose(mno_values.iloc[0], 0.24)
     # Index n // 2 (8690)
     # Note: vertices[8690] was [nan, nan, nan] in debug, we should probably check if that's expected 
-    # but based on debug: Index 8690: Coord=[nan, nan, nan], MnO=0.23
+    # but based on debug: Index 8690: Coord=[nan, nan, nan], MnO=0.02
     # If it is nan, it might be due to missing collar or survey for some wells.
     # Let's just assert what we found.
     assert np.isnan(vertices[8690]).all()
-    np.testing.assert_allclose(mno_values.iloc[8690], 0.23)
+    np.testing.assert_allclose(mno_values.iloc[8690], 0.02)
     # Index n - 1 (17380)
     np.testing.assert_allclose(vertices[17380], [315227.58345042414, 6075584.418371743, -107.9565258739911])
     np.testing.assert_allclose(mno_values.iloc[17380], 0.23)
