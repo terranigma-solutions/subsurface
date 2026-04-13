@@ -175,7 +175,11 @@ def test_read_dflt_with_mapping_tops_and_bottoms(data_path):
     points_attrs = borehole_set.combined_trajectory.data.points_attributes
     well_01_id = borehole_set.survey.get_well_num_id("well_01")
     well_01_attrs = points_attrs[points_attrs["well_id"] == well_01_id]
+    well_02_id = borehole_set.survey.get_well_num_id("well_02")
+    well_02_attrs = points_attrs[points_attrs["well_id"] == well_02_id]
     print(well_01_attrs)
+
+    print(well_02_attrs)
 
     # When add_attrs_as_nodes=True, the nodes should be at the attribute depths
     # Check if some Cu values from dflt_space_attributes.csv are present
