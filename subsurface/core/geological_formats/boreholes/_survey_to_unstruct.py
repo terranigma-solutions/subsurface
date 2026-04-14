@@ -9,6 +9,7 @@ from ...structs.base_structures import UnstructuredData
 
 def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int, attr_df: Optional['pd.DataFrame'] = None,
                                      duplicate_attr_depths: bool = False) -> UnstructuredData:
+    from ._map_attrs_to_survey import _extract_categorical_mappers
     wp = optional_requirements.require_wellpathpy()
 
     cum_vertex: np.ndarray = np.empty((0, 3), dtype=np.float32)
@@ -104,6 +105,8 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
     )
 
     unstruct.data.attrs["well_id_mapper"] = well_id_mapper
+    if attr_df is not None:
+        unstruct.data.attrs.update(_extract_categorical_mappers(attr_df))
 
     return unstruct
 

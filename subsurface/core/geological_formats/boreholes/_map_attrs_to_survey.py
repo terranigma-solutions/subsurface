@@ -9,7 +9,7 @@ from ...structs.base_structures._unstructured_data_constructor import raw_attrib
 from ...structs.unstructured_elements import LineSet
 
 
-def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet,well_id_mapper: dict[str, int]) -> UnstructuredData:
+def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet, well_id_mapper: dict[str, int]) -> UnstructuredData:
     # Import moved to top for clarity and possibly avoiding repeated imports if called multiple times
 
     # Ensure all columns in lith exist in new_attrs, if not, add them as NaN
@@ -23,6 +23,13 @@ def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet,wel
         raw_attributes=new_attrs
     )
 
+    # Extract categorical mappers
+    categorical_mappers = _extract_categorical_mappers(attrs)
+
+    # Update attributes
+    xarray_attributes = survey_trajectory.data.data.attrs.copy()
+    xarray_attributes.update(categorical_mappers)
+
     # Inline construction of UnstructuredData
     return UnstructuredData.from_data_arrays_dict(
         xarray_dict={
@@ -31,10 +38,37 @@ def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet,wel
                 "vertex_attrs": points_attributes_xarray_dict["vertex_attrs"],
                 "cell_attrs"  : survey_trajectory.data.data["cell_attrs"]
         },
-        xarray_attributes=survey_trajectory.data.data.attrs,
+        xarray_attributes=xarray_attributes,
         default_cells_attributes_name=survey_trajectory.data.cells_attr_name,
         default_points_attributes_name=survey_trajectory.data.vertex_attr_name
     )
+
+
+def _extract_categorical_mappers(attrs: pd.DataFrame) -> dict[str, Any]:
+    """
+    Extract categorical mappers from the attributes DataFrame.
+    
+    Args:
+        attrs: DataFrame containing attribute data
+        
+    Returns:
+        Dictionary of categorical mappers
+    """
+    categorical_mappers = {}
+    for col in attrs.columns:
+        if isinstance(attrs[col].dtype, pd.CategoricalDtype):
+            categories = attrs[col].cat.categories
+            # For lith_ids, the mapping is categories -> codes + 1
+            if col == 'component lith':
+                categorical_mappers['lith_id_mapper'] = {str(name): i + 1 for i, name in enumerate(categories)}
+            else:
+                categorical_mappers[f"{col}_mapper"] = {str(name): i for i, name in enumerate(categories)}
+        elif col == 'component lith' and 'lith_ids' in attrs.columns:
+            # Handle case where it's not Categorical dtype but we have both columns
+            uniques = sorted(attrs[col].dropna().unique())
+            categorical_mappers['lith_id_mapper'] = {str(name): i + 1 for i, name in enumerate(uniques)}
+            
+    return categorical_mappers
 
 
 def _prepare_categorical_data(attrs: pd.DataFrame) -> pd.DataFrame:
