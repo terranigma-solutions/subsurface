@@ -9,6 +9,7 @@ from ...structs.base_structures import UnstructuredData
 
 def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int, attr_df: Optional['pd.DataFrame'] = None,
                                      duplicate_attr_depths: bool = False) -> UnstructuredData:
+    from ._map_attrs_to_survey import _extract_categorical_mappers
     wp = optional_requirements.require_wellpathpy()
 
     cum_vertex: np.ndarray = np.empty((0, 3), dtype=np.float32)
@@ -18,7 +19,7 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
 
     # Create well_id_mapper based on the order of groupby to ensure consistent e indexing
     well_id_mapper = {borehole_id: e for e, (borehole_id, _) in enumerate(survey_df.groupby(level=0, sort=True))}
-
+    
     for e, (borehole_id, data) in enumerate(survey_df.groupby(level=0, sort=True)):
         md = data['md'].values
         inc = data['inc'].values
@@ -38,7 +39,7 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
         md_min = dev.md.min()
         md_max = dev.md.max()
 
-        attr_depths = _grab_depths_from_attr(
+        attr_depths, tops, bases = _grab_depths_from_attr(
             attr_df=attr_df,
             borehole_id=borehole_id,
             duplicate_attr_depths=duplicate_attr_depths,
@@ -59,10 +60,7 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
 
         this_well_vertex = np.vstack([pos.easting, pos.northing, pos.depth]).T
         cum_vertex = np.vstack([cum_vertex, this_well_vertex])
-        measured_depths = _calculate_distances(
-            array_of_vertices=this_well_vertex,
-            start_md = depths[0]
-        )
+        measured_depths = depths
 
         n_vertex_shift_0 = np.arange(0, len(pos.depth) - 1, dtype=np.int_)
         n_vertex_shift_1 = np.arange(1, len(pos.depth), dtype=np.int_)
@@ -70,11 +68,28 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
         cells = np.vstack([cells, cell_per_well])
 
         attribute_values = np.isin(depths, attr_depths)
+        
+        # Calculate segment node type
+        is_top = np.isin(depths, tops)
+        is_base = np.isin(depths, bases)
+        
+        # Check if inside any segment (between top and base)
+        is_inside = np.zeros(len(depths), dtype=bool)
+        if len(tops) > 0 and len(tops) == len(bases):
+            for t, b in zip(tops, bases):
+                is_inside |= (depths > t) & (depths < b)
+        
+        segment_node_type = np.zeros(len(depths), dtype=int)
+        segment_node_type[is_inside] = 3
+        segment_node_type[is_top] = 1
+        segment_node_type[is_base] = 2
+        segment_node_type[is_top & is_base] = 4
 
         vertex_attr_per_well = pd.DataFrame({
-                'well_id'        : [e] * len(pos.depth),
-                'measured_depths': measured_depths,
-                'is_attr_point'  : attribute_values,
+                'well_id'           : [e] * len(pos.depth),
+                'measured_depths'   : measured_depths,
+                'is_attr_point'     : attribute_values,
+                'segment_node_type' : segment_node_type,
         })
 
         vertex_attr = pd.concat([vertex_attr, vertex_attr_per_well], ignore_index=True)
@@ -90,6 +105,8 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
     )
 
     unstruct.data.attrs["well_id_mapper"] = well_id_mapper
+    if attr_df is not None:
+        unstruct.data.attrs.update(_extract_categorical_mappers(attr_df))
 
     return unstruct
 
@@ -100,12 +117,12 @@ def _grab_depths_from_attr(
         duplicate_attr_depths: bool,
         md_max: float,
         md_min: float
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     # Initialize attr_depths as empty array
     attr_depths = np.array([], dtype=float)
 
     if attr_df is None or ("top" not in attr_df.columns and "base" not in attr_df.columns):
-        return attr_depths
+        return attr_depths, np.array([]), np.array([])
 
     try:
         vals = attr_df.loc[borehole_id]
@@ -141,6 +158,8 @@ def _grab_depths_from_attr(
     except KeyError:
         # No attributes for this borehole_id or missing columns
         attr_depths = np.array([], dtype=float)
+        tops = np.array([], dtype=float)
+        bases = np.array([], dtype=float)
 
     # If duplicate_attr_depths is True, duplicate every attr_depth with a tiny offset 
     # to fall into both sides of each boundary
@@ -162,15 +181,5 @@ def _grab_depths_from_attr(
         valid_indices = (duplicated_attr_depths >= md_min) & (duplicated_attr_depths <= md_max)
         attr_depths = np.unique(duplicated_attr_depths[valid_indices])
 
-    return attr_depths
+    return attr_depths, tops, bases
 
-
-def _calculate_distances(array_of_vertices: np.ndarray, start_md: float = 0) -> np.ndarray:
-    # Calculate the differences between consecutive points
-    differences = np.diff(array_of_vertices, axis=0)
-
-    # Calculate the Euclidean distance for each pair of consecutive points
-    distances = np.linalg.norm(differences, axis=1)
-    # Start from start_md instead of 0
-    measured_depths = np.insert(np.cumsum(distances) + start_md, 0, start_md)
-    return measured_depths

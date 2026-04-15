@@ -9,7 +9,7 @@ from ...structs.base_structures._unstructured_data_constructor import raw_attrib
 from ...structs.unstructured_elements import LineSet
 
 
-def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet,well_id_mapper: dict[str, int]) -> UnstructuredData:
+def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet, well_id_mapper: dict[str, int]) -> UnstructuredData:
     # Import moved to top for clarity and possibly avoiding repeated imports if called multiple times
 
     # Ensure all columns in lith exist in new_attrs, if not, add them as NaN
@@ -23,6 +23,13 @@ def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet,wel
         raw_attributes=new_attrs
     )
 
+    # Extract categorical mappers
+    categorical_mappers = _extract_categorical_mappers(attrs)
+
+    # Update attributes
+    xarray_attributes = survey_trajectory.data.data.attrs.copy()
+    xarray_attributes.update(categorical_mappers)
+
     # Inline construction of UnstructuredData
     return UnstructuredData.from_data_arrays_dict(
         xarray_dict={
@@ -31,10 +38,37 @@ def combine_survey_and_attrs(attrs: pd.DataFrame, survey_trajectory: LineSet,wel
                 "vertex_attrs": points_attributes_xarray_dict["vertex_attrs"],
                 "cell_attrs"  : survey_trajectory.data.data["cell_attrs"]
         },
-        xarray_attributes=survey_trajectory.data.data.attrs,
+        xarray_attributes=xarray_attributes,
         default_cells_attributes_name=survey_trajectory.data.cells_attr_name,
         default_points_attributes_name=survey_trajectory.data.vertex_attr_name
     )
+
+
+def _extract_categorical_mappers(attrs: pd.DataFrame) -> dict[str, Any]:
+    """
+    Extract categorical mappers from the attributes DataFrame.
+    
+    Args:
+        attrs: DataFrame containing attribute data
+        
+    Returns:
+        Dictionary of categorical mappers
+    """
+    categorical_mappers = {}
+    for col in attrs.columns:
+        if isinstance(attrs[col].dtype, pd.CategoricalDtype):
+            categories = attrs[col].cat.categories
+            # For lith_ids, the mapping is categories -> codes + 1
+            if col == 'component lith':
+                categorical_mappers['lith_id_mapper'] = {str(name): i + 1 for i, name in enumerate(categories)}
+            else:
+                categorical_mappers[f"{col}_mapper"] = {str(name): i for i, name in enumerate(categories)}
+        elif col == 'component lith' and 'lith_ids' in attrs.columns:
+            # Handle case where it's not Categorical dtype but we have both columns
+            uniques = sorted(attrs[col].dropna().unique())
+            categorical_mappers['lith_id_mapper'] = {str(name): i + 1 for i, name in enumerate(uniques)}
+            
+    return categorical_mappers
 
 
 def _prepare_categorical_data(attrs: pd.DataFrame) -> pd.DataFrame:
@@ -132,30 +166,82 @@ def _nearest_neighbor_categorical_interpolation(
     return result
 
 
+def _nearest_interval_interpolation(
+    tops: np.ndarray,
+    bases: np.ndarray,
+    y_values: np.ndarray,
+    target_depths: np.ndarray
+) -> np.ndarray:
+    """
+    Nearest neighbor interpolation based on distance to intervals.
+
+    Args:
+        tops: Array of interval top depths
+        bases: Array of interval base depths
+        y_values: Array of values for each interval
+        target_depths: Array of target depths for interpolation
+
+    Returns:
+        Array of interpolated values
+    """
+    # Sort tops to use searchsorted efficiently
+    sort_idx = np.argsort(tops)
+    s_tops = tops[sort_idx]
+    s_y_values = y_values[sort_idx]
+
+    # Use searchsorted to find the last interval that starts before or at the target depth
+    # side='right' ensures that for depth=top, we pick that interval (and any subsequent ones with same top)
+    idx = np.searchsorted(s_tops, target_depths, side='right') - 1
+
+    # Initialize result array
+    result = np.full(target_depths.shape, np.nan, dtype=object)
+
+    # Fill values for target depths that are after or at the first top
+    valid_mask = idx >= 0
+    result[valid_mask] = s_y_values[idx[valid_mask]]
+
+    # For target depths before the first top, fallback to the value of the first interval
+    if len(s_y_values) > 0:
+        result[~valid_mask] = s_y_values[0]
+
+    return result
+
+
 def _interpolate_attribute(
     attr_values: pd.Series, 
-    x_locations: np.ndarray, 
     target_depths: np.ndarray, 
     column_name: str,
     is_categorical: bool,
-    is_interval_data: bool = False
+    x_locations: Optional[np.ndarray] = None,
+    tops: Optional[np.ndarray] = None,
+    bases: Optional[np.ndarray] = None
 ) -> np.ndarray:
     """
     Interpolate attribute values to target depths.
 
     Args:
         attr_values: Series containing attribute values
-        x_locations: Array of source locations for interpolation
         target_depths: Array of target depths for interpolation
         column_name: Name of the column being interpolated
         is_categorical: Whether the attribute is categorical
-        is_interval_data: Whether the data is interval-based
+        x_locations: Array of source locations for interpolation
+        tops: Array of interval top depths
+        bases: Array of interval base depths
 
     Returns:
         Array of interpolated values
     """
+    # For interval data, use custom nearest interval interpolation
+    if tops is not None and bases is not None:
+        return _nearest_interval_interpolation(
+            tops=tops,
+            bases=bases,
+            y_values=attr_values.values,
+            target_depths=target_depths
+        )
+
     # For categorical data or specific columns, use custom nearest neighbor interpolation
-    if is_categorical or column_name in ['lith_ids', 'component lith'] or is_interval_data:
+    if is_categorical or column_name in ['lith_ids', 'component lith']:
         return _nearest_neighbor_categorical_interpolation(
             x_locations=x_locations,
             y_values=attr_values.values,
@@ -209,8 +295,9 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
         well_depths = measured_depths[well_mask]
 
         # Get interpolation locations
+        tops = attrs_well['top'].values if 'top' in attrs_well.columns else None
+        bases = attrs_well['base'].values if 'base' in attrs_well.columns else None
         interp_locations = _get_interpolation_locations(attrs_well, well_name)
-        is_interval_data = 'top' in attrs_well.columns
 
         # Interpolate each attribute
         for col in attrs_well.columns:
@@ -228,11 +315,12 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
             # Interpolate and assign values
             interpolated_values = _interpolate_attribute(
                 attr_values, 
-                interp_locations, 
                 well_depths, 
                 col,
                 is_categorical,
-                is_interval_data=is_interval_data
+                x_locations=interp_locations,
+                tops=tops,
+                bases=bases
             )
 
             # Convert to appropriate dtype to avoid pandas 3.0 dtype coercion errors

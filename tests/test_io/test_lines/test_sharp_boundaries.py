@@ -51,9 +51,15 @@ def test_sharp_lith_boundaies(data_path):
     # Check for lettuce which only appears in aaa
     assert any("lettuce" in str(l) for l in well_aaa_attrs["component lith"].unique())
     
-    print(borehole_set.combined_trajectory.data.points_attributes)
 
-    if PLOT or True:
+    # Verify that the lith_id_mapper is present in the xarray attributes
+    assert 'lith_id_mapper' in borehole_set.combined_trajectory.data.data.attrs
+    lith_id_mapper = borehole_set.combined_trajectory.data.data.attrs['lith_id_mapper']
+    assert isinstance(lith_id_mapper, dict)
+    assert 'lettuce' in lith_id_mapper
+    
+
+    if PLOT or False:
         _plot(
             scalar="lith_ids",
             trajectory=borehole_set.combined_trajectory,
