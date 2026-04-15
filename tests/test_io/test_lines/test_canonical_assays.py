@@ -1,7 +1,16 @@
-import pandas as pd
+import os
+
+import pytest
+
 from subsurface.api.reader.read_wells import read_wells
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
-import os
+from tests.conftest import RequirementsLevel
+
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_WELL"
+)
+
 
 def test_canonical_assays():
     # Define paths
@@ -28,19 +37,20 @@ def test_canonical_assays():
 
     print("BoreholeSet created successfully from canonical files with assays")
     print(f"Boreholes: {borehole_set.survey.ids}")
-    
+
     # Check if assays are present in combined_trajectory
     data = borehole_set.combined_trajectory.data.data
     print(f"Available attributes: {data.keys()}")
-    
+
     # Verify Cu and Au are in vertex_attr if they were mapped
     # Actually read_wells uses read_attributes which returns the whole df if not lith
     # then survey.update_survey_with_lith(attrs) is called (it seems it's used for both lith and attrs in read_wells, though the name is misleading)
-    
+
     assert "well_id" in data.vertex_attr.values
     # Cu and Au should be there as well
     assert "Cu" in data.vertex_attr.values
     assert "Au" in data.vertex_attr.values
+
 
 if __name__ == "__main__":
     test_canonical_assays()

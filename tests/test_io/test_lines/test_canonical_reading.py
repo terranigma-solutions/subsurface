@@ -1,7 +1,14 @@
-import pandas as pd
+import pytest
+
 from subsurface.api.reader.read_wells import read_wells
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
-import os
+from tests.conftest import RequirementsLevel
+
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_WELL"
+)
+
 
 def test_read_canonical():
     # Paths to canonical files
@@ -26,16 +33,14 @@ def test_read_canonical():
 
     print("BoreholeSet successfully created from canonical files!")
     print(f"Boreholes: {borehole_set.collars.ids}")
-    
+
     # Verify some data
     assert len(borehole_set.collars.ids) == 2
     assert "well_01" in borehole_set.collars.ids
     assert "well_02" in borehole_set.collars.ids
-    
+
     # Check if survey was correctly read (inc should be present)
     # The read_wells function calls Survey.from_df which corrects angles and sets up trajectories
-    
+
     print("Verification complete.")
 
-if __name__ == "__main__":
-    test_read_canonical()
