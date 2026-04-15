@@ -1,0 +1,5 @@
+id,top,base,component lith
+well_01,0,15,Sandstone
+well_01,15,30,Shale
+well_02,0,10,Gravel
+well_02,10,30,Granite
