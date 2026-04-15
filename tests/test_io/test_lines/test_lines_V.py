@@ -1,6 +1,7 @@
 import dotenv
 import os
 import pandas as pd
+import numpy as np
 import pytest
 from subsurface.modules.visualization import to_pyvista_points, pv_plot
 
@@ -42,6 +43,7 @@ def test_read_survey():
             additional_reader_kwargs={"decimal": ","}
         )
     )
+    assert not collar_df.empty
     extent_from_collar_max = collar_df[['x', 'y', 'z']].max()
     extent_from_collar_min = collar_df[['x', 'y', 'z']].min()
 
@@ -50,12 +52,14 @@ def test_read_survey():
         vertex=collar_df[["x", "y", "z"]].values,
         cells=SpecialCellCase.POINTS
     )
+    assert unstruc.n_points == len(collar_df)
 
     points = ss.PointSet(data=unstruc)
     collars: Collars = Collars(
         ids=collar_df.index.to_list(),
         collar_loc=points
     )
+    assert collars.collar_loc.n_points > 0
 
     if PLOT and False:
         s = to_pyvista_points(collars.collar_loc)
@@ -75,6 +79,7 @@ def test_read_survey():
             additional_reader_kwargs={"decimal": ","}
         )
     )
+    assert not survey_df.empty
 
 
     print("\nSurvey Dataframe Info:")
@@ -102,6 +107,7 @@ def test_read_survey():
         number_nodes=10,
         duplicate_attr_depths=True
     )
+    assert survey.survey_trajectory.data.n_points > 0
 
 
 def test_read():
@@ -120,6 +126,7 @@ def test_read():
             additional_reader_kwargs={"decimal": ","}
         )
     )
+    assert not collar_df.empty
     extent_from_collar_max = collar_df[['x', 'y', 'z']].max()
     extent_from_collar_min = collar_df[['x', 'y', 'z']].min()
 
@@ -128,12 +135,14 @@ def test_read():
         vertex=collar_df[["x", "y", "z"]].values,
         cells=SpecialCellCase.POINTS
     )
+    assert unstruc.n_points == len(collar_df)
 
     points = ss.PointSet(data=unstruc)
     collars: Collars = Collars(
         ids=collar_df.index.to_list(),
         collar_loc=points
     )
+    assert collars.collar_loc.n_points > 0
 
     if PLOT and False:
         s = to_pyvista_points(collars.collar_loc)
@@ -153,6 +162,7 @@ def test_read():
             additional_reader_kwargs={"decimal": ","}
         )
     )
+    assert not survey_df.empty
     
     
     
@@ -168,6 +178,7 @@ def test_read():
             encoding="latin-1",
             additional_reader_kwargs={"decimal": ","}
         ))
+    assert not attributes.empty
 
     lith: pd.DataFrame = read_lith(
         GenericReaderFilesHelper(
@@ -181,6 +192,7 @@ def test_read():
             encoding="latin-1",
             additional_reader_kwargs={"decimal": ","}
         ))
+    assert not lith.empty
     lith['component lith'].unique()
 
     # sort survey_df by column Name and md 
@@ -202,6 +214,27 @@ def test_read():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
+    assert borehole_set.combined_trajectory.data.n_points > 0
+    
+    # Coordinate and attribute checks
+    vertices = borehole_set.combined_trajectory.data.vertex
+    assert not np.allclose(vertices[0], vertices[-1])
+    # check that we have some lith ids
+    lith_ids = borehole_set.survey.survey_trajectory.data.points_attributes["lith_ids"]
+    assert lith_ids.nunique() > 1
+    
+    # Verify specific points to ensure consistency
+    n = vertices.shape[0]
+    assert n == 940
+    # Index 0
+    np.testing.assert_allclose(vertices[0], [3529790.0, 5685410.0, 278.0])
+    assert lith_ids.iloc[0] == 0.0
+    # Index n // 2 (470)
+    np.testing.assert_allclose(vertices[470], [3538660.0, 5678660.0, 168.999643])
+    assert lith_ids.iloc[470] == 7.0
+    # Index n - 1 (939)
+    np.testing.assert_allclose(vertices[939], [3545790.0, 5674350.0, 130.3])
+    assert lith_ids.iloc[939] == 47.0
 
     # %%
     # Visualize boreholes with pyvista

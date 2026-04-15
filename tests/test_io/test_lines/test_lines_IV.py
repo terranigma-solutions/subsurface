@@ -1,6 +1,7 @@
 import dotenv
 import os
 import pandas as pd
+import numpy as np
 import pytest
 
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
@@ -40,12 +41,17 @@ def test_read():
 
         )
     )
+    assert not collar_df.empty
+    assert "x" in collar_df.columns
+    assert "y" in collar_df.columns
+    assert "z" in collar_df.columns
 
     # Convert to UnstructuredData
     unstruc: ss.UnstructuredData = ss.UnstructuredData.from_array(
         vertex=collar_df[["x", "y", "z"]].values,
         cells=SpecialCellCase.POINTS
     )
+    assert unstruc.n_points == len(collar_df)
 
     points = ss.PointSet(data=unstruc)
     collars: Collars = Collars(
@@ -68,7 +74,11 @@ def test_read():
 
     # remove duplicates
     survey_df = survey_df.drop_duplicates()
+    assert not survey_df.empty
+    assert "md" in survey_df.columns
+
     survey: Survey = Survey.from_df(survey_df)
+    assert survey.survey_trajectory.data.n_points > 0
 
     lith = read_lith(
         GenericReaderFilesHelper(
@@ -81,6 +91,7 @@ def test_read():
             }
         )
     )
+    assert not lith.empty
 
     # Update survey data with lithology information
     survey.update_survey_with_lith(lith)
@@ -90,6 +101,28 @@ def test_read():
         survey=survey,
         merge_option=MergeOptions.INTERSECT
     )
+    assert borehole_set.combined_trajectory.data.n_points > 0
+    assert "lith_ids" in borehole_set.survey.survey_trajectory.data.points_attributes.columns
+    
+    # Coordinate and attribute checks
+    vertices = borehole_set.combined_trajectory.data.vertex
+    assert not np.allclose(vertices[0], vertices[-1])
+    # check that we have some lith ids
+    lith_ids = borehole_set.survey.survey_trajectory.data.points_attributes["lith_ids"]
+    assert lith_ids.nunique() > 1
+    
+    # Verify specific points to ensure consistency
+    n = vertices.shape[0]
+    assert n == 120
+    # Index 0
+    np.testing.assert_allclose(vertices[0], [5450950.0, 5708499.9, 115.0])
+    assert lith_ids.iloc[0] == 0.0
+    # Index n // 2 (60)
+    np.testing.assert_allclose(vertices[60], [5451361.3, 5709288.2, 110.9])
+    assert lith_ids.iloc[60] == 2.0
+    # Index n - 1 (119)
+    np.testing.assert_allclose(vertices[119], [5450661.3, 5709527.8, 79.0])
+    assert lith_ids.iloc[119] == 6.0
 
     # %%
     # Visualize boreholes with pyvista
