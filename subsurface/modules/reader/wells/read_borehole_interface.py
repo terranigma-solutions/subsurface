@@ -139,10 +139,8 @@ def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper
                          'Use columns_map to assign column names to these fields. Maybe you are marking as lithology'
                          'the wrong file?')
 
-    lith_df = d[['top', 'base', 'component lith']]
-
     # * Make sure values are positive
-    lith_df['top'] = np.abs(lith_df['top'])
-    lith_df['base'] = np.abs(lith_df['base'])
+    d['top'] = np.abs(d['top'])
+    d['base'] = np.abs(d['base'])
 
-    return lith_df
+    return d

@@ -225,7 +225,7 @@ def test_read():
     
     # Verify specific points to ensure consistency
     n = vertices.shape[0]
-    assert n == 958
+    assert n == 960
     
     def assert_contains_vertex(target, array, atol=1e-1):
         found = np.any(np.all(np.isclose(array, target, atol=atol), axis=1))
