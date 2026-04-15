@@ -42,13 +42,17 @@ class Survey:
             number_nodes=number_nodes,
             duplicate_attr_depths=duplicate_attr_depths
         )
-        # Grab the unique ids
-        unique_ids = trajectories.points_attributes["well_id"].unique()
+        
+        well_id_mapper = trajectories.data.attrs["well_id_mapper"]
+        # Reverse the well_id_mapper dictionary to map IDs to well names
+        id_to_well_name_mapper = {v: k for k, v in well_id_mapper.items()}
+        unique_ids_int = trajectories.points_attributes["well_id"].unique()
+        unique_ids_str = [id_to_well_name_mapper[i] for i in unique_ids_int]
 
         return cls(
-            ids=unique_ids,
+            ids=unique_ids_str,
             survey_trajectory=LineSet(data=trajectories, radius=RADIUS),
-            well_id_mapper=trajectories.data.attrs["well_id_mapper"]
+            well_id_mapper=well_id_mapper
         )
 
     def get_well_string_id(self, well_id: int) -> str:

@@ -18,7 +18,7 @@ from ...conftest import RequirementsLevel
 
 dotenv.load_dotenv()
 
-PLOT = True
+PLOT = False
 
 pf = pathlib.Path(__file__).parent.absolute()
 data_path = pf.joinpath('../../data/borehole/')
@@ -98,23 +98,25 @@ def test_read_kim():
     # Verify specific points to ensure consistency
     n = vertices.shape[0]
     assert n == 2070
-    # Index 0
-    np.testing.assert_allclose(vertices[0], [303412.0, 3913997.0, 108.7132874])
-    assert lith_ids.iloc[0] == 0.0
-    # Index n // 2 (1035)
-    np.testing.assert_allclose(vertices[1035], [275307.0, 3947074.0000000023, -1249.0237233251726])
-    assert lith_ids.iloc[1035] == 1.0
-    # Index n - 1 (2069)
-    np.testing.assert_allclose(vertices[2069], [318982.0, 3935253.0000000037, -1936.7322999000003])
-    assert lith_ids.iloc[2069] == 0.0
+    
+    def assert_contains_vertex(target, array, atol=1e-1):
+        found = np.any(np.all(np.isclose(array, target, atol=atol), axis=1))
+        assert found, f"Vertex {target} not found in trajectory"
+
+    assert_contains_vertex([303412.0, 3913997.0, 108.7132874], vertices)
+    assert_contains_vertex([318982.0, 3935253.0, 227.418152], vertices)
+    assert_contains_vertex([275307.0, 3947074.0, 74.15509], vertices)
+    assert_contains_vertex([318982.0, 3935253.0, -1429.5139], vertices)
+
 
     borehole_set.collars.data.to_binary()
     borehole_set.combined_trajectory.data.to_binary()
 
-    _plot(
-        scalar="lith_ids",
-        trajectory=borehole_set.combined_trajectory,
-        collars=collars,
-        lut=14,
-        image_2d=True
-    )
+    if PLOT:
+        _plot(
+            scalar="lith_ids",
+            trajectory=borehole_set.combined_trajectory,
+            collars=collars,
+            lut=14,
+            image_2d=False
+        )

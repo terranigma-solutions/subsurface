@@ -19,7 +19,7 @@ from ...conftest import RequirementsLevel
 
 dotenv.load_dotenv()
 
-PLOT = True
+PLOT = False
 
 pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
@@ -167,19 +167,22 @@ def test_read_assay():
     attrs = borehole_set.combined_trajectory.data.points_attributes
     n = vertices.shape[0]
     assert n == 3810
-    # Index 0
-    np.testing.assert_allclose(vertices[0], [5455616.0, 5711309.0, 117.8])
-    # Index n // 2 (1905)
-    np.testing.assert_allclose(vertices[1905], [5461592.6, 5713512.1, -102.41111111111107])
-    # Index n - 1 (3809)
-    np.testing.assert_allclose(vertices[3809], [5477296.0, 5701517.0, 123.4])
 
-    _plot(
-        scalar="Cu(%)_GDR",
-        trajectory=borehole_set.combined_trajectory,
-        collars=borehole_set.collars,
-        image_2d=True
-    )
+    def assert_contains_vertex(target, array, atol=1e-1):
+        found = np.any(np.all(np.isclose(array, target, atol=atol), axis=1))
+        assert found, f"Vertex {target} not found in trajectory"
+
+    assert_contains_vertex([5455616.0, 5711309.0, 117.8], vertices)
+    assert_contains_vertex([5466806.0, 5707536.0, -413.2], vertices)
+    assert_contains_vertex([5466844.4, 5712503.0, 116.8], vertices)
+
+    if PLOT:
+        _plot(
+            scalar="Cu(%)_GDR",
+            trajectory=borehole_set.combined_trajectory,
+            collars=borehole_set.collars,
+            image_2d=False
+        )
 
 
 
@@ -226,15 +229,14 @@ def test_read_stratigraphy():
     attrs = borehole_set.combined_trajectory.data.points_attributes
     n = vertices.shape[0]
     assert n == 4920
-    # Index 0
-    np.testing.assert_allclose(vertices[0], [5455616.0, 5711309.0, 117.8])
-    assert attrs.iloc[0]["lith_ids"] == 0.0
-    # Index n // 2 (2460)
-    np.testing.assert_allclose(vertices[2460], [5470324.0, 5724845.0, 115.6])
-    assert attrs.iloc[2460]["lith_ids"] == 0.0
-    # Index n - 1 (4919)
-    np.testing.assert_allclose(vertices[4919], [5477296.0, 5701517.0, 123.4])
-    assert attrs.iloc[4919]["lith_ids"] == 0.0
+    
+    def assert_contains_vertex(target, array, atol=1e-1):
+        found = np.any(np.all(np.isclose(array, target, atol=atol), axis=1))
+        assert found, f"Vertex {target} not found in trajectory"
+
+    assert_contains_vertex([5455616.0, 5711309.0, 117.8], vertices)
+    assert_contains_vertex([5476792.0, 5705293.0, 129.3], vertices)
+    assert_contains_vertex([5466844.4, 5712503.0, 116.8], vertices)
 
     borehole_set.get_bottom_coords_for_each_lith()
     

@@ -16,11 +16,23 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
     cell_attr: pd.DataFrame = pd.DataFrame(columns=['well_id'], dtype=np.float32)
     vertex_attr: pd.DataFrame = pd.DataFrame()
 
-    for e, (borehole_id, data) in enumerate(survey_df.groupby(level=0)):
+    # Create well_id_mapper based on the order of groupby to ensure consistent e indexing
+    well_id_mapper = {borehole_id: e for e, (borehole_id, _) in enumerate(survey_df.groupby(level=0, sort=True))}
+
+    for e, (borehole_id, data) in enumerate(survey_df.groupby(level=0, sort=True)):
+        md = data['md'].values
+        inc = data['inc'].values
+        azi = data['azi'].values
+
+        if md[0] != 0:
+            md = np.insert(md, 0, 0)
+            inc = np.insert(inc, 0, inc[0])
+            azi = np.insert(azi, 0, azi[0])
+
         dev = wp.deviation(
-            md=data['md'].values,
-            inc=data['inc'].values,
-            azi=data['azi'].values
+            md=md,
+            inc=inc,
+            azi=azi
         )
 
         md_min = dev.md.min()
@@ -77,7 +89,7 @@ def data_frame_to_unstructured_data(survey_df: 'pd.DataFrame', number_nodes: int
         cells_attr=cell_attr.reset_index(drop=True)
     )
 
-    unstruct.data.attrs["well_id_mapper"] = {well_id: e for e, well_id in enumerate(survey_df.index.unique(level=0))}
+    unstruct.data.attrs["well_id_mapper"] = well_id_mapper
 
     return unstruct
 

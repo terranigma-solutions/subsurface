@@ -12,6 +12,7 @@ import numpy as np
 try:
     import pyvista as pv
 except ImportError:
+    pv = None
     warnings.warn('Pyvista is not installed. Some visualization functions will not work.')
 
 

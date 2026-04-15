@@ -18,7 +18,7 @@ from ...conftest import RequirementsLevel
 
 dotenv.load_dotenv()
 
-PLOT = True
+PLOT = False
 
 data_folder = os.getenv("PATH_TO_ASCII_DRILLHOLES")
 
@@ -68,12 +68,13 @@ def test_read_attr_into_borehole():
     np.testing.assert_allclose(vertices[17377], [315227.58345042414, 6075584.418371743, -107.9565258739911])
     np.testing.assert_allclose(mno_values.iloc[17377], 0.22792552219515821)
 
-    _plot(
-        scalar="MnO",
-        trajectory=borehole_set.combined_trajectory,
-        collars=borehole_set.collars,
-        image_2d=True
-    )
+    if PLOT:
+        _plot(
+            scalar="MnO",
+            trajectory=borehole_set.combined_trajectory,
+            collars=borehole_set.collars,
+            image_2d=True
+        )
 
 
 @pytest.mark.liquid_earth
@@ -111,12 +112,13 @@ def test_read_geophys_attr():
         )
         pv_plot([s], image_2d=True)
 
-    _plot(
-        scalar="Gamma_TC",
-        trajectory=borehole_set.combined_trajectory,
-        collars=collars,
-        image_2d=True
-    )
+    if PLOT:
+        _plot(
+            scalar="Gamma_TC",
+            trajectory=borehole_set.combined_trajectory,
+            collars=borehole_set.collars,
+            image_2d=True
+        )
 
 
 @pytest.mark.liquid_earth
