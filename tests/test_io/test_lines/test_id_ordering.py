@@ -4,6 +4,14 @@ import os
 import pytest
 from subsurface.api.reader.read_wells import read_wells
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
+from tests.conftest import RequirementsLevel
+
+PLOT = False
+
+pytestmark = pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_WELL"
+)
 
 def test_borehole_id_ordering_bug():
     """Test that borehole data is correctly mapped to IDs even if the order in files is different.
