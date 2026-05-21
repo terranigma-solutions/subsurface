@@ -188,7 +188,10 @@ def test_read_soricom_geotiff():
     # Plot directly from rasterio for comparison
     fig_raw = _raw_rasterio_plot(tif_path, 'soricomDEM10m')
     fig_raw.show()
-    struct = read_structured_topography(tif_path)
+    struct = read_structured_topography(
+        path=tif_path,
+        crop_to_extent=[4441850.0, 4588200.0, 4442350.0, 4588400.0]
+    )
     # replace_outliers(struct, 'topography', 0.99)
     sg = StructuredGrid(struct)
     s = to_pyvista_grid(sg, data_order='C', data_set_name='topography')
