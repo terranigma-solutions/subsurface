@@ -64,6 +64,21 @@ def test_rasterio_dataset_to_structured_data_projects_geographic_coords_to_metri
     assert np.diff(y)[0] > 10_000
 
 
+def test_rasterio_dataset_to_structured_data_masks_unsigned_integer_max_without_nodata():
+    data = np.array([[1, np.iinfo(np.uint32).max], [3, 4]], dtype=np.uint32)
+    transform = from_origin(100, 220, 10, 20)
+
+    with _memory_raster(data, transform) as memory_file:
+        with memory_file.open() as dataset:
+            struct = rasterio_dataset_to_structured_data(dataset)
+
+    topography = struct.data['topography']
+    np.testing.assert_allclose(
+        topography.values,
+        np.array([[3, 1], [4, np.nan]], dtype=float)
+    )
+
+
 def _raw_rasterio_plot(tif_path: str, title: str):
     """Plot a GeoTIFF directly via rasterio for comparison."""
     with rasterio.open(tif_path) as src:

@@ -39,7 +39,7 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
     else:
         window = None
 
-    data = dataset.read(1, window=window, masked=True).filled(np.nan)
+    data = _read_raster_band_as_float(dataset, window)
     data = np.fliplr(data.T)
     shape = data.shape
 
@@ -53,6 +53,17 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
     }
     structured_data = StructuredData.from_numpy(data, data_array_name='topography', coords=coords)
     return structured_data
+
+
+def _read_raster_band_as_float(dataset, window=None):
+    data = dataset.read(1, window=window, masked=True)
+    data = data.astype(float).filled(np.nan)
+
+    if dataset.nodata is None and np.issubdtype(dataset.dtypes[0], np.unsignedinteger):
+        unsigned_max = np.iinfo(dataset.dtypes[0]).max
+        data[data == unsigned_max] = np.nan
+
+    return data
 
 
 def _get_raster_center_coords(dataset, shape: Tuple[int, int], window=None):
