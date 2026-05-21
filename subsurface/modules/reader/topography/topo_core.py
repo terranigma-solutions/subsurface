@@ -1,3 +1,4 @@
+from math import ceil, floor
 from typing import Sequence, Optional, Tuple
 
 import numpy as np
@@ -187,12 +188,25 @@ def topography_to_unstructured_data(structured_data: StructuredData) -> Unstruct
 
 
 def _get_raster_window(crop_to_extent, dataset):
-    from rasterio.windows import Window
-    # TODO: Add None check
-    # Get the indices of the window
+    from rasterio.windows import Window, from_bounds
+
     left, bottom, right, top = crop_to_extent
-    row_start, col_start = dataset.index(left, top)
-    row_stop, col_stop = dataset.index(right, bottom)
-    # Read the data in the window
+
+    window = from_bounds(
+        left=left,
+        bottom=bottom,
+        right=right,
+        top=top,
+        transform=dataset.transform
+    )
+
+    row_start = max(floor(window.row_off), 0)
+    col_start = max(floor(window.col_off), 0)
+    row_stop = min(ceil(window.row_off + window.height), dataset.height)
+    col_stop = min(ceil(window.col_off + window.width), dataset.width)
+
+    if row_stop <= row_start or col_stop <= col_start:
+        raise ValueError('The crop extent does not overlap the raster bounds.')
+
     window = Window.from_slices((row_start, row_stop), (col_start, col_stop))
     return window
