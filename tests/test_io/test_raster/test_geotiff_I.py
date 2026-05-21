@@ -85,6 +85,11 @@ def _raw_rasterio_plot(tif_path: str, title: str):
 def test_read_lisbon_elevation_geotiff():
     devops_path = os.getenv("TERRA_PATH_DEVOPS")
     tif_path = os.path.join(devops_path, "raster/geotiff-testdata-lisbon-elevation.tif")
+
+    # Plot directly from rasterio for comparison
+    fig_raw = _raw_rasterio_plot(tif_path, 'wind-direction')
+    fig_raw.show()
+    
     struct = read_structured_topography(tif_path)
     replace_outliers(struct, 'topography', 0.99)
     sg = StructuredGrid(struct)
@@ -111,3 +116,24 @@ def test_read_wind_direction_geotiff():
     sg = StructuredGrid(struct)
     s = to_pyvista_grid(sg, data_order='C', data_set_name='topography')
     pv_plot([s], image_2d=False)
+
+
+@pytest.mark.skipif(
+    condition=(RequirementsLevel.READ_GEOSPATIAL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
+    reason="Need to set the READ_GEOSPATIAL variable to run this test"
+)
+def test_read_soricom_geotiff():
+    """Import soricomDEM10m.tif and compare raw vs subsurface pipeline plots."""
+    devops_path = os.getenv("TERRA_PATH_DEVOPS")
+    tif_path = os.path.join(devops_path, "raster/soricomDEM10m.tif")
+
+    # Plot directly from rasterio for comparison
+    fig_raw = _raw_rasterio_plot(tif_path, 'soricomDEM10m')
+    fig_raw.show()
+
+    # Plot via subsurface pipeline
+    struct = read_structured_topography(tif_path)
+    # replace_outliers(struct, 'topography', 0.99)
+    sg = StructuredGrid(struct)
+    s = to_pyvista_grid(sg, data_order='C', data_set_name='topography')
+    pv_plot([s], image_2d=True)
