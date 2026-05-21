@@ -18,18 +18,24 @@ pytestmark = pytest.mark.read_geospatial
 
 
 def _memory_raster(data, transform, crs='EPSG:3857', nodata=None):
+    count = 1 if data.ndim == 2 else data.shape[0]
+    height = data.shape[0] if data.ndim == 2 else data.shape[1]
+    width = data.shape[1] if data.ndim == 2 else data.shape[2]
     memory_file = MemoryFile()
     with memory_file.open(
             driver='GTiff',
-            height=data.shape[0],
-            width=data.shape[1],
-            count=1,
+            height=height,
+            width=width,
+            count=count,
             dtype=data.dtype,
             transform=transform,
             crs=crs,
             nodata=nodata
     ) as dataset:
-        dataset.write(data, 1)
+        if data.ndim == 2:
+            dataset.write(data, 1)
+        else:
+            dataset.write(data)
     return memory_file
 
 
@@ -79,6 +85,42 @@ def test_rasterio_dataset_to_structured_data_masks_unsigned_integer_max_without_
     )
 
 
+def test_rasterio_dataset_to_structured_data_can_read_requested_band():
+    data = np.array([
+            [[0, np.iinfo(np.uint32).max], [0, np.iinfo(np.uint32).max]],
+            [[10, 20], [30, 40]]
+    ], dtype=np.uint32)
+    transform = from_origin(100, 220, 10, 20)
+
+    with _memory_raster(data, transform) as memory_file:
+        with memory_file.open() as dataset:
+            struct = rasterio_dataset_to_structured_data(dataset, band=2)
+
+    topography = struct.data['topography']
+    np.testing.assert_allclose(
+        topography.values,
+        np.array([[30, 10], [40, 20]], dtype=float)
+    )
+
+
+def test_rasterio_dataset_to_structured_data_auto_selects_richest_band():
+    data = np.array([
+            [[0, np.iinfo(np.uint32).max], [0, np.iinfo(np.uint32).max]],
+            [[10, 20], [30, 40]]
+    ], dtype=np.uint32)
+    transform = from_origin(100, 220, 10, 20)
+
+    with _memory_raster(data, transform) as memory_file:
+        with memory_file.open() as dataset:
+            struct = rasterio_dataset_to_structured_data(dataset)
+
+    topography = struct.data['topography']
+    np.testing.assert_allclose(
+        topography.values,
+        np.array([[30, 10], [40, 20]], dtype=float)
+    )
+
+
 def _raw_rasterio_plot(tif_path: str, title: str):
     """Plot a GeoTIFF directly via rasterio for comparison."""
     with rasterio.open(tif_path) as src:
@@ -104,7 +146,7 @@ def test_read_lisbon_elevation_geotiff():
     # Plot directly from rasterio for comparison
     fig_raw = _raw_rasterio_plot(tif_path, 'wind-direction')
     fig_raw.show()
-    
+
     struct = read_structured_topography(tif_path)
     replace_outliers(struct, 'topography', 0.99)
     sg = StructuredGrid(struct)
@@ -140,13 +182,12 @@ def test_read_wind_direction_geotiff():
 def test_read_soricom_geotiff():
     """Import soricomDEM10m.tif and compare raw vs subsurface pipeline plots."""
     devops_path = os.getenv("TERRA_PATH_DEVOPS")
-    tif_path = os.path.join(devops_path, "raster/soricomDEM10m.tif")
+    tif_path = os.path.join(devops_path, "raster/dem.tif")
+    # foo = "/home/leguark/Downloads/dem.tif"
 
     # Plot directly from rasterio for comparison
     fig_raw = _raw_rasterio_plot(tif_path, 'soricomDEM10m')
     fig_raw.show()
-
-    # Plot via subsurface pipeline
     struct = read_structured_topography(tif_path)
     # replace_outliers(struct, 'topography', 0.99)
     sg = StructuredGrid(struct)

@@ -11,14 +11,15 @@ from ....core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
 from ..mesh.surfaces_api import read_2d_mesh_to_unstruct
 
 
-def read_structured_topography(path, crop_to_extent: Optional[Sequence] = None) -> StructuredData:
+def read_structured_topography(path, crop_to_extent: Optional[Sequence] = None, band: Optional[int] = None) -> StructuredData:
     rasterio = require_rasterio()
 
     extension = get_extension(path)
     if extension == '.tif':
         structured_data = rasterio_dataset_to_structured_data(
             dataset=rasterio.open(path),
-            crop_to_extent=crop_to_extent
+            crop_to_extent=crop_to_extent,
+            band=band
         )
     else:
         raise NotImplementedError('The extension given cannot be read yet')
@@ -31,7 +32,7 @@ def read_structured_topography_to_unstructured(path) -> UnstructuredData:
     return topography_to_unstructured_data(structured_data)
 
 
-def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequence] = None):
+def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequence] = None, band: Optional[int] = None):
     rasterio = require_rasterio()
 
     if crop_to_extent is not None:
@@ -39,7 +40,8 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
     else:
         window = None
 
-    data = _read_raster_band_as_float(dataset, window)
+    band = _select_raster_band(dataset, window, band)
+    data = _read_raster_band_as_float(dataset, window, band)
     data = np.fliplr(data.T)
     shape = data.shape
 
@@ -55,12 +57,35 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
     return structured_data
 
 
-def _read_raster_band_as_float(dataset, window=None):
-    data = dataset.read(1, window=window, masked=True)
+def _select_raster_band(dataset, window=None, band: Optional[int] = None):
+    if band is not None:
+        return band
+
+    if dataset.count == 1:
+        return 1
+
+    band_scores = []
+    for band_index in dataset.indexes:
+        data = _read_raster_band_as_float(dataset, window, band_index)
+        valid_data = data[np.isfinite(data)]
+        if valid_data.size == 0:
+            band_scores.append((-1, -1, -1, band_index))
+            continue
+
+        sample = valid_data[::max(valid_data.size // 10000, 1)]
+        unique_values = np.unique(sample).size
+        value_range = float(np.nanmax(valid_data) - np.nanmin(valid_data))
+        band_scores.append((unique_values, value_range, valid_data.size, band_index))
+
+    return max(band_scores)[-1]
+
+
+def _read_raster_band_as_float(dataset, window=None, band: int = 1):
+    data = dataset.read(band, window=window, masked=True)
     data = data.astype(float).filled(np.nan)
 
-    if dataset.nodata is None and np.issubdtype(dataset.dtypes[0], np.unsignedinteger):
-        unsigned_max = np.iinfo(dataset.dtypes[0]).max
+    if dataset.nodatavals[band - 1] is None and np.issubdtype(dataset.dtypes[band - 1], np.unsignedinteger):
+        unsigned_max = np.iinfo(dataset.dtypes[band - 1]).max
         data[data == unsigned_max] = np.nan
 
     return data

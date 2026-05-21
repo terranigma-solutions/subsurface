@@ -211,7 +211,7 @@ Exported from the Einstein Telescope project:
               MEMBER["European Terrestrial Reference Frame 1997"],
               MEMBER["European Terrestrial Reference Frame 2000"],
               MEMBER["European Terrestrial Reference Frame 2005"],
-              MEMBER["European Terrestrial Reference Frame 2014"],
+            ****  MEMBER["European Terrestrial Reference Frame 2014"],
               MEMBER["European Terrestrial Reference Frame 2020"],
               ELLIPSOID["GRS 1980",6378137,298.257222101,
                   LENGTHUNIT["metre",1]],
