@@ -1,4 +1,4 @@
-from typing import Sequence, Optional
+from typing import Sequence, Optional, Tuple
 
 import numpy as np
 
@@ -39,22 +39,58 @@ def rasterio_dataset_to_structured_data(dataset, crop_to_extent: Optional[Sequen
     else:
         window = None
 
-    data = dataset.read(1, window=window)
+    data = dataset.read(1, window=window, masked=True).filled(np.nan)
     data = np.fliplr(data.T)
     shape = data.shape
 
-    # Use window bounds if cropping, otherwise use full dataset bounds
-    if window is not None:
-        left, bottom, right, top = rasterio.windows.bounds(window, dataset.transform)
-    else:
-        left, bottom, right, top = dataset.bounds.left, dataset.bounds.bottom, dataset.bounds.right, dataset.bounds.top
+    x, y = _get_raster_center_coords(dataset, shape, window)
+    if dataset.crs is not None and dataset.crs.is_geographic:
+        x, y = _geographic_coords_to_metric_coords(x, y, dataset.crs)
 
     coords = {
-            'x': np.linspace(left, right, shape[0]),
-            'y': np.linspace(bottom, top, shape[1])
+            'x': x,
+            'y': y
     }
     structured_data = StructuredData.from_numpy(data, data_array_name='topography', coords=coords)
     return structured_data
+
+
+def _get_raster_center_coords(dataset, shape: Tuple[int, int], window=None):
+    rasterio = require_rasterio()
+
+    if window is not None:
+        transform = rasterio.windows.transform(window, dataset.transform)
+    else:
+        transform = dataset.transform
+
+    x = rasterio.transform.xy(transform, 0, np.arange(shape[0]), offset='center')[0]
+    y = rasterio.transform.xy(transform, np.arange(shape[1] - 1, -1, -1), 0, offset='center')[1]
+    return np.asarray(x), np.asarray(y)
+
+
+def _geographic_coords_to_metric_coords(x, y, crs):
+    rasterio = require_rasterio()
+    from rasterio import warp
+
+    longitude_center = float(np.nanmean(x))
+    latitude_center = float(np.nanmean(y))
+    zone = int((longitude_center + 180) // 6) + 1
+    epsg = 32600 + zone if latitude_center >= 0 else 32700 + zone
+    metric_crs = rasterio.crs.CRS.from_epsg(epsg)
+
+    x_metric, _ = warp.transform(
+        src_crs=crs,
+        dst_crs=metric_crs,
+        xs=x,
+        ys=np.full_like(x, latitude_center, dtype=float)
+    )
+    _, y_metric = warp.transform(
+        src_crs=crs,
+        dst_crs=metric_crs,
+        xs=np.full_like(y, longitude_center, dtype=float),
+        ys=y
+    )
+    return np.asarray(x_metric), np.asarray(y_metric)
 
 
 def rasterio_dataset_to_structured_data_(dataset, crop_to_extent: Optional[Sequence] = None):
