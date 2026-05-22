@@ -43,6 +43,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit: mark a test as a unit test")
     config.addinivalue_line("markers", "performance: mark a test as a performance test")
     config.addinivalue_line("markers", "liquid_earth: mark a test as used by LiquidEarth test")
+    config.addinivalue_line("markers", "read_geospatial: mark a test as requiring geospatial reading")
 
 
 @pytest.fixture(scope='session')
