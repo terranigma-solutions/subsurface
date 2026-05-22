@@ -1,17 +1,15 @@
 import os
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pytest
 import rasterio
 from matplotlib.patches import Rectangle
 from rasterio.plot import plotting_extent
 
-from tests.conftest import RequirementsLevel
 from subsurface import StructuredGrid
 from subsurface.modules.reader import read_structured_topography
-from subsurface.modules.reader.topography.topo_core import rasterio_dataset_to_structured_data
 from subsurface.modules.visualization import to_pyvista_grid, pv_plot
+from tests.conftest import RequirementsLevel
 
 pytestmark = pytest.mark.read_geospatial
 
