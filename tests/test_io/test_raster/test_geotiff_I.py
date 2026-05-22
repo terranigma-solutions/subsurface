@@ -240,7 +240,8 @@ def test_read_soricom_geotiff():
     devops_path = os.getenv("TERRA_PATH_DEVOPS")
     tif_path = os.path.join(devops_path, "raster/dem.tif")
     # foo = "/home/leguark/Downloads/dem.tif"
-    crop_to_extent = [441850.0, 4584200.0, 442350.0, 4584400.0]
+    # crop_to_extent = [441850.0, 4584200.0, 442350.0, 4584400.0]
+    crop_to_extent = [4441850.0, 4588200.0, 4442350.0, 4588400.0]
 
     # Plot directly from rasterio for comparison
     fig_raw = _raw_rasterio_plot(tif_path, 'soricomDEM10m', crop_to_extent=crop_to_extent)

@@ -189,7 +189,8 @@ def topography_to_unstructured_data(structured_data: StructuredData) -> Unstruct
 
 def _get_raster_window(crop_to_extent, dataset):
     from rasterio.windows import Window, from_bounds
-
+    # [4441850.0, 4588200.0, 4442350.0, 4588400.0]
+    # [441850.0,  4584200.0, 442350.0, 4584400.0]
     left, bottom, right, top = crop_to_extent
 
     window = from_bounds(
