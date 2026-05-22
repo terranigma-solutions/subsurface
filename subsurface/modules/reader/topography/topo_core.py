@@ -16,7 +16,7 @@ def read_structured_topography(path, crop_to_extent: Optional[Sequence] = None, 
     rasterio = require_rasterio()
 
     extension = get_extension(path)
-    if extension == '.tif':
+    if extension in ('.tif', '.tiff'):
         structured_data = rasterio_dataset_to_structured_data(
             dataset=rasterio.open(path),
             crop_to_extent=crop_to_extent,
