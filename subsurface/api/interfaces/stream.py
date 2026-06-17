@@ -19,6 +19,15 @@ from ...modules.reader.volume.volume_utils import interpolate_unstructured_data_
 from ..reader.read_wells import read_wells
 
 
+def GEOTIF_stream_to_struct(stream: BytesIO, band: Optional[int] = None) -> list[StructuredData]:
+    from ...optional_requirements import require_rasterio
+    rasterio = require_rasterio()
+    dataset = rasterio.open(stream)
+    from ...modules.reader.topography.topo_core import rasterio_dataset_to_structured_data
+    structured_data = rasterio_dataset_to_structured_data(dataset, crop_to_extent=None, band=band)
+    return [structured_data]
+
+
 def DXF_stream_to_unstruc(stream: TextIO) -> UnstructuredData:
     vertex, cells, cell_attr_int, cell_attr_map = reader.dxf_stream_to_unstruct_input(stream)
 

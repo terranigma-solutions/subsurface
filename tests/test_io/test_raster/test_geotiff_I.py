@@ -191,13 +191,25 @@ def _raw_rasterio_plot(tif_path: str, title: str, crop_to_extent=None):
     return fig
 
 
+def _build_path(filename):
+    devops_path = os.getenv("TERRA_PATH_DEVOPS")
+    primary = os.path.join(devops_path, "raster", filename)
+    if os.path.exists(primary):
+        return primary
+    fallback = os.path.expanduser(
+        "~/.cache/rclone/vfs/terranigma/DevOps/SubsurfaceTestData/raster/" + filename
+    )
+    if os.path.exists(fallback):
+        return fallback
+    return primary  # let it fail with a clear path
+
+
 @pytest.mark.skipif(
     condition=(RequirementsLevel.READ_GEOSPATIAL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set the READ_GEOSPATIAL variable to run this test"
 )
 def test_read_lisbon_elevation_geotiff():
-    devops_path = os.getenv("TERRA_PATH_DEVOPS")
-    tif_path = os.path.join(devops_path, "raster/geotiff-testdata-lisbon-elevation.tif")
+    tif_path = _build_path("geotiff-testdata-lisbon-elevation.tif")
 
     # Plot directly from rasterio for comparison
     fig_raw = _raw_rasterio_plot(tif_path, 'wind-direction')
@@ -207,7 +219,7 @@ def test_read_lisbon_elevation_geotiff():
     replace_outliers(struct, 'topography', 0.99)
     sg = StructuredGrid(struct)
     s = to_pyvista_grid(sg, data_order='C', data_set_name='topography')
-    pv_plot([s], image_2d=False)
+    pv_plot([s], image_2d=True)
 
 
 @pytest.mark.skipif(
@@ -216,8 +228,7 @@ def test_read_lisbon_elevation_geotiff():
 )
 def test_read_wind_direction_geotiff():
     """Compare raw rasterio plot vs subsurface pipeline for wind_direction.tif."""
-    devops_path = os.getenv("TERRA_PATH_DEVOPS")
-    tif_path = os.path.join(devops_path, "raster/geotiff-testdata-wind-direction.tif")
+    tif_path = _build_path("geotiff-testdata-wind-direction.tif")
 
     # Plot directly from rasterio for comparison
     fig_raw = _raw_rasterio_plot(tif_path, 'wind-direction')
@@ -228,7 +239,7 @@ def test_read_wind_direction_geotiff():
     # replace_outliers(struct, 'topography', 0.99)
     sg = StructuredGrid(struct)
     s = to_pyvista_grid(sg, data_order='C', data_set_name='topography')
-    pv_plot([s], image_2d=False)
+    pv_plot([s], image_2d=True)
 
 
 @pytest.mark.skipif(
@@ -237,8 +248,7 @@ def test_read_wind_direction_geotiff():
 )
 def test_read_soricom_geotiff():
     """Import soricomDEM10m.tif and compare raw vs subsurface pipeline plots."""
-    devops_path = os.getenv("TERRA_PATH_DEVOPS")
-    tif_path = os.path.join(devops_path, "raster/dem.tif")
+    tif_path = _build_path("dem.tif")
     # foo = "/home/leguark/Downloads/dem.tif"
     # crop_to_extent = [441850.0, 4584200.0, 442350.0, 4584400.0]
     crop_to_extent = [4441850.0, 4588200.0, 4442350.0, 4588400.0]
@@ -253,4 +263,4 @@ def test_read_soricom_geotiff():
     # replace_outliers(struct, 'topography', 0.99)
     sg = StructuredGrid(struct)
     s = to_pyvista_grid(sg, data_order='C', data_set_name='topography')
-    pv_plot([s], image_2d=False)
+    pv_plot([s], image_2d=True)
