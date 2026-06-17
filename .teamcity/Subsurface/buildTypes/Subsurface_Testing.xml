@@ -67,10 +67,11 @@ VENVPIP="venv/bin/python -E -s -m pip"
 
 $VENVPIP install --upgrade pip setuptools wheel
 $VENVPIP install --verbose --pre -r requirements/requirements_dev.txt
+$VENVPIP install --verbose -r requirements/requirements_geospatial.txt
 $VENVPIP install --verbose teamcity-messages
 
 # Sanity probe
-venv/bin/python -E -s - <<'PY'
+venv/bin/python -E -s - <<'"PY"'
 import sys, encodings
 print("OK python:", sys.version)
 print("encodings:", encodings.__file__)
