@@ -7,6 +7,7 @@ import xarray as xr
 
 from subsurface.core.structs.base_structures._unstructured_data_constructor import vertex_and_cells_arrays_to_data_array, raw_attributes_to_dict_data_arrays
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
+from subsurface.core.structs.base_structures._liquid_earth_mesh import _validate_attribute_dataframe
 
 
 @dataclass(frozen=False)
@@ -14,6 +15,8 @@ class UnstructuredData:
     data: xr.Dataset
     cells_attr_name: str = "cell_attrs"
     vertex_attr_name: str = "vertex_attrs"
+    _cells_attr_orig_dtypes: dict = None
+    _vertex_attr_orig_dtypes: dict = None
 
     """Primary structure definition for unstructured data
 
@@ -80,6 +83,11 @@ class UnstructuredData:
         """
         if attributes is not None:
             cells_attr = attributes
+
+        if isinstance(cells_attr, pd.DataFrame) and not cells_attr.empty:
+            _validate_attribute_dataframe(cells_attr, 'cells_attr')
+        if isinstance(vertex_attr, pd.DataFrame) and not vertex_attr.empty:
+            _validate_attribute_dataframe(vertex_attr, 'vertex_attr')
 
         cells_data_array, n_cells, n_vertex, vertex_data_array = vertex_and_cells_arrays_to_data_array(
             cells=cells,
@@ -278,57 +286,36 @@ class UnstructuredData:
         return file
 
     def _set_binary_header(self):
-        from subsurface.core.structs.base_structures._aux import safe_convert_to_float32
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _column_metadata, _validate_attribute_dataframe
         
-        # Get the filtered dataframes (same as in _to_bytearray)
-        filtered_cell_attrs = safe_convert_to_float32(
-            self.attributes,
-            error_handling='drop'
-        )
-        filtered_vertex_attrs = safe_convert_to_float32(
-            self.points_attributes,
-            error_handling='drop'
-        )
+        _validate_attribute_dataframe(self.attributes, 'cell_attrs')
+        _validate_attribute_dataframe(self.points_attributes, 'vertex_attrs')
         
         header = {
+                "format_version"   : 2,
                 "vertex_shape"     : self.vertex.shape,
                 "cell_shape"       : self.cells.shape,
-                "cell_attr_shape"  : filtered_cell_attrs.shape,
-                "vertex_attr_shape": filtered_vertex_attrs.shape,
-                "cell_attr_names"  : filtered_cell_attrs.columns.to_list(),
-                "cell_attr_types"  : filtered_cell_attrs.dtypes.astype(str).to_list(),
-                "vertex_attr_names": filtered_vertex_attrs.columns.to_list(),
-                "vertex_attr_types": filtered_vertex_attrs.dtypes.astype(str).to_list(),
+                "cell_attrs"       : _column_metadata(self.attributes, 'C') if not self.attributes.empty else [],
+                "vertex_attrs"     : _column_metadata(self.points_attributes, 'C') if not self.points_attributes.empty else [],
                 "xarray_attrs"     : self.data.attrs
         }
         return header
 
     def _to_bytearray(self, order):
-        vertex = self.vertex.astype('float32').tobytes(order)
-        cells = self.cells.astype('int32').tobytes(order)
-        cell_attribute = self.attributes.values.astype('float32').tobytes(order)
-        vertex_attribute = self.points_attributes.values.astype('float32').tobytes(order)
-        bytearray_le = vertex + cells + cell_attribute + vertex_attribute
-        return bytearray_le
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _serialize_column, _validate_attribute_dataframe
+        _validate_attribute_dataframe(self.attributes, 'cell_attrs')
+        _validate_attribute_dataframe(self.points_attributes, 'vertex_attrs')
 
-    def _to_bytearray(self, order):
-        from subsurface.core.structs.base_structures._aux import safe_convert_to_float32
         vertex = self.vertex.astype('float32').tobytes(order)
         cells = self.cells.astype('int32').tobytes(order)
 
-        # Only include numeric columns
-        cell_attribute = safe_convert_to_float32(
-            self.attributes,
-            error_handling='drop'
-        ).values.tobytes(order)
+        parts = [vertex, cells]
+        for col in self.attributes.columns:
+            parts.append(_serialize_column(self.attributes[col].to_numpy()))
+        for col in self.points_attributes.columns:
+            parts.append(_serialize_column(self.points_attributes[col].to_numpy()))
 
-        vertex_attribute = safe_convert_to_float32(
-            self.points_attributes,
-            error_handling='drop'
-        ).values.tobytes(order)
-
-        bytearray_le = vertex + cells + cell_attribute + vertex_attribute
-        return bytearray_le
+        return b''.join(parts)
 
     def _validate(self):
         try:
