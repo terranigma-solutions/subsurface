@@ -7,7 +7,7 @@ import xarray as xr
 
 from subsurface.core.structs.base_structures._unstructured_data_constructor import vertex_and_cells_arrays_to_data_array, raw_attributes_to_dict_data_arrays
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
-from subsurface.core.structs.base_structures._liquid_earth_mesh import _validate_attribute_dataframe
+
 
 
 @dataclass(frozen=False)
@@ -83,11 +83,6 @@ class UnstructuredData:
         """
         if attributes is not None:
             cells_attr = attributes
-
-        if isinstance(cells_attr, pd.DataFrame) and not cells_attr.empty:
-            _validate_attribute_dataframe(cells_attr, 'cells_attr')
-        if isinstance(vertex_attr, pd.DataFrame) and not vertex_attr.empty:
-            _validate_attribute_dataframe(vertex_attr, 'vertex_attr')
 
         cells_data_array, n_cells, n_vertex, vertex_data_array = vertex_and_cells_arrays_to_data_array(
             cells=cells,
@@ -286,34 +281,34 @@ class UnstructuredData:
         return file
 
     def _set_binary_header(self):
-        from subsurface.core.structs.base_structures._liquid_earth_mesh import _column_metadata, _validate_attribute_dataframe
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _column_metadata, _filter_numeric_columns
         
-        _validate_attribute_dataframe(self.attributes, 'cell_attrs')
-        _validate_attribute_dataframe(self.points_attributes, 'vertex_attrs')
+        cell_attrs_filtered = _filter_numeric_columns(self.attributes)
+        vertex_attrs_filtered = _filter_numeric_columns(self.points_attributes)
         
         header = {
                 "format_version"   : 2,
                 "vertex_shape"     : self.vertex.shape,
                 "cell_shape"       : self.cells.shape,
-                "cell_attrs"       : _column_metadata(self.attributes, 'C') if not self.attributes.empty else [],
-                "vertex_attrs"     : _column_metadata(self.points_attributes, 'C') if not self.points_attributes.empty else [],
+                "cell_attrs"       : _column_metadata(cell_attrs_filtered, 'C') if not cell_attrs_filtered.empty else [],
+                "vertex_attrs"     : _column_metadata(vertex_attrs_filtered, 'C') if not vertex_attrs_filtered.empty else [],
                 "xarray_attrs"     : self.data.attrs
         }
         return header
 
     def _to_bytearray(self, order):
-        from subsurface.core.structs.base_structures._liquid_earth_mesh import _serialize_column, _validate_attribute_dataframe
-        _validate_attribute_dataframe(self.attributes, 'cell_attrs')
-        _validate_attribute_dataframe(self.points_attributes, 'vertex_attrs')
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _serialize_column, _filter_numeric_columns
+        cell_attrs_filtered = _filter_numeric_columns(self.attributes)
+        vertex_attrs_filtered = _filter_numeric_columns(self.points_attributes)
 
         vertex = self.vertex.astype('float32').tobytes(order)
         cells = self.cells.astype('int32').tobytes(order)
 
         parts = [vertex, cells]
-        for col in self.attributes.columns:
-            parts.append(_serialize_column(self.attributes[col].to_numpy()))
-        for col in self.points_attributes.columns:
-            parts.append(_serialize_column(self.points_attributes[col].to_numpy()))
+        for col in cell_attrs_filtered.columns:
+            parts.append(_serialize_column(cell_attrs_filtered[col].to_numpy()))
+        for col in vertex_attrs_filtered.columns:
+            parts.append(_serialize_column(vertex_attrs_filtered[col].to_numpy()))
 
         return b''.join(parts)
 

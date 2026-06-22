@@ -73,6 +73,17 @@ def _serialize_column(values: np.ndarray) -> bytes:
         return values.astype(np.float32).tobytes('C')
 
 
+def _filter_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
+    numeric = []
+    for col in df.columns:
+        series = df[col]
+        if np.issubdtype(series.dtype, np.integer) or np.issubdtype(series.dtype, np.bool_):
+            numeric.append(col)
+        elif np.issubdtype(series.dtype, np.floating):
+            numeric.append(col)
+    return df[numeric]
+
+
 class LiquidEarthMesh:
     def __init__(self, vertex=None, cells=None, attributes=None, points_attributes=None, data_attrs=None):
         self.vertex = vertex
