@@ -9,11 +9,14 @@ from subsurface.core.structs.base_structures._unstructured_data_constructor impo
 from subsurface.core.structs.base_structures.base_structures_enum import SpecialCellCase
 
 
+
 @dataclass(frozen=False)
 class UnstructuredData:
     data: xr.Dataset
     cells_attr_name: str = "cell_attrs"
     vertex_attr_name: str = "vertex_attrs"
+    _cells_attr_orig_dtypes: dict = None
+    _vertex_attr_orig_dtypes: dict = None
 
     """Primary structure definition for unstructured data
 
@@ -278,57 +281,36 @@ class UnstructuredData:
         return file
 
     def _set_binary_header(self):
-        from subsurface.core.structs.base_structures._aux import safe_convert_to_float32
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _column_metadata, _filter_numeric_columns
         
-        # Get the filtered dataframes (same as in _to_bytearray)
-        filtered_cell_attrs = safe_convert_to_float32(
-            self.attributes,
-            error_handling='drop'
-        )
-        filtered_vertex_attrs = safe_convert_to_float32(
-            self.points_attributes,
-            error_handling='drop'
-        )
+        cell_attrs_filtered = _filter_numeric_columns(self.attributes)
+        vertex_attrs_filtered = _filter_numeric_columns(self.points_attributes)
         
         header = {
+                "format_version"   : 2,
                 "vertex_shape"     : self.vertex.shape,
                 "cell_shape"       : self.cells.shape,
-                "cell_attr_shape"  : filtered_cell_attrs.shape,
-                "vertex_attr_shape": filtered_vertex_attrs.shape,
-                "cell_attr_names"  : filtered_cell_attrs.columns.to_list(),
-                "cell_attr_types"  : filtered_cell_attrs.dtypes.astype(str).to_list(),
-                "vertex_attr_names": filtered_vertex_attrs.columns.to_list(),
-                "vertex_attr_types": filtered_vertex_attrs.dtypes.astype(str).to_list(),
+                "cell_attrs"       : _column_metadata(cell_attrs_filtered, 'C') if not cell_attrs_filtered.empty else [],
+                "vertex_attrs"     : _column_metadata(vertex_attrs_filtered, 'C') if not vertex_attrs_filtered.empty else [],
                 "xarray_attrs"     : self.data.attrs
         }
         return header
 
     def _to_bytearray(self, order):
-        vertex = self.vertex.astype('float32').tobytes(order)
-        cells = self.cells.astype('int32').tobytes(order)
-        cell_attribute = self.attributes.values.astype('float32').tobytes(order)
-        vertex_attribute = self.points_attributes.values.astype('float32').tobytes(order)
-        bytearray_le = vertex + cells + cell_attribute + vertex_attribute
-        return bytearray_le
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _serialize_column, _filter_numeric_columns
+        cell_attrs_filtered = _filter_numeric_columns(self.attributes)
+        vertex_attrs_filtered = _filter_numeric_columns(self.points_attributes)
 
-    def _to_bytearray(self, order):
-        from subsurface.core.structs.base_structures._aux import safe_convert_to_float32
         vertex = self.vertex.astype('float32').tobytes(order)
         cells = self.cells.astype('int32').tobytes(order)
 
-        # Only include numeric columns
-        cell_attribute = safe_convert_to_float32(
-            self.attributes,
-            error_handling='drop'
-        ).values.tobytes(order)
+        parts = [vertex, cells]
+        for col in cell_attrs_filtered.columns:
+            parts.append(_serialize_column(cell_attrs_filtered[col].to_numpy()))
+        for col in vertex_attrs_filtered.columns:
+            parts.append(_serialize_column(vertex_attrs_filtered[col].to_numpy()))
 
-        vertex_attribute = safe_convert_to_float32(
-            self.points_attributes,
-            error_handling='drop'
-        ).values.tobytes(order)
-
-        bytearray_le = vertex + cells + cell_attribute + vertex_attribute
-        return bytearray_le
+        return b''.join(parts)
 
     def _validate(self):
         try:

@@ -2,120 +2,222 @@ import json
 import numpy as np
 import pandas as pd
 
+_FORMAT_VERSION = 2
+
+
+def _validate_attribute_dataframe(df: pd.DataFrame, attr_name: str):
+    for col in df.columns:
+        series = df[col]
+        if np.issubdtype(series.dtype, np.integer) or np.issubdtype(series.dtype, np.bool_):
+            continue
+        if np.issubdtype(series.dtype, np.floating):
+            continue
+        raise TypeError(
+            f"Column '{col}' in {attr_name} has dtype '{series.dtype}' which is not a supported "
+            f"numeric or boolean type. Only integer, float, and bool columns are allowed."
+        )
+
+
+def _column_metadata(df: pd.DataFrame, order: str) -> list[dict]:
+    meta = []
+    for col in df.columns:
+        series = df[col]
+        dtype = series.dtype
+        values = series.to_numpy()
+
+        if np.issubdtype(dtype, np.integer):
+            stored_dtype = str(dtype)
+            byte_length = values.nbytes
+        elif np.issubdtype(dtype, np.bool_):
+            stored_dtype = 'bool'
+            byte_length = values.size
+        elif np.issubdtype(dtype, np.floating):
+            if np.all(np.mod(values, 1) == 0):
+                int_vals = values.astype(np.int64)
+                if np.all(int_vals.astype(np.float64) == values):
+                    stored_dtype = 'int64'
+                    byte_length = values.size * 8
+                    meta.append({
+                        "name": col,
+                        "dtype": stored_dtype,
+                        "shape": list(values.shape),
+                        "byte_length": byte_length,
+                    })
+                    continue
+            stored_dtype = 'float32'
+            byte_length = values.size * 4
+        else:
+            stored_dtype = str(dtype)
+            byte_length = values.nbytes
+
+        meta.append({
+            "name": col,
+            "dtype": stored_dtype,
+            "shape": list(values.shape),
+            "byte_length": byte_length,
+        })
+    return meta
+
+
+def _serialize_column(values: np.ndarray) -> bytes:
+    if np.issubdtype(values.dtype, np.integer):
+        return values.tobytes('C')
+    elif np.issubdtype(values.dtype, np.bool_):
+        return values.astype(np.uint8).tobytes('C')
+    else:
+        if np.issubdtype(values.dtype, np.floating):
+            if np.all(np.mod(values, 1) == 0):
+                int_vals = values.astype(np.int64)
+                if np.all(int_vals.astype(np.float64) == values):
+                    return int_vals.tobytes('C')
+        return values.astype(np.float32).tobytes('C')
+
+
+def _filter_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
+    numeric = []
+    for col in df.columns:
+        series = df[col]
+        if np.issubdtype(series.dtype, np.integer) or np.issubdtype(series.dtype, np.bool_):
+            numeric.append(col)
+        elif np.issubdtype(series.dtype, np.floating):
+            numeric.append(col)
+    return df[numeric]
+
 
 class LiquidEarthMesh:
     def __init__(self, vertex=None, cells=None, attributes=None, points_attributes=None, data_attrs=None):
-        self.vertex = vertex  # Expected to be a numpy array of shape (N, 3)
-        self.cells = cells  # Expected to be a numpy array of shape (M, K)
+        self.vertex = vertex
+        self.cells = cells
         self.attributes = attributes
         self.points_attributes = points_attributes
         self.data_attrs = data_attrs if data_attrs is not None else {}
 
+        if self.attributes is not None and not self.attributes.empty:
+            _validate_attribute_dataframe(self.attributes, 'cell_attrs')
+        if self.points_attributes is not None and not self.points_attributes.empty:
+            _validate_attribute_dataframe(self.points_attributes, 'vertex_attrs')
+
     def to_binary(self, order='F') -> bytes:
-        body_ = self._to_bytearray(order)
         header_ = self._set_binary_header()
         header_json = json.dumps(header_)
         header_json_bytes = header_json.encode('utf-8')
         header_json_length = len(header_json_bytes)
         header_json_length_bytes = header_json_length.to_bytes(4, byteorder='little')
-        file = header_json_length_bytes + header_json_bytes + body_
-        return file
+        body_ = self._to_bytearray()
+        return header_json_length_bytes + header_json_bytes + body_
 
     def _set_binary_header(self):
         header = {
-                "vertex_shape"     : self.vertex.shape if self.vertex is not None else [0, 0],
-                "cell_shape"       : self.cells.shape if self.cells is not None else [0, 0],
-                "cell_attr_shape"  : self.attributes.shape if not self.attributes.empty else [0, 0],
-                "vertex_attr_shape": self.points_attributes.shape if not self.points_attributes.empty else [0, 0],
-                "cell_attr_names"  : self.attributes.columns.tolist() if not self.attributes.empty else [],
-                "cell_attr_types"  : self.attributes.dtypes.astype(str).tolist() if not self.attributes.empty else [],
-                "vertex_attr_names": self.points_attributes.columns.tolist() if not self.points_attributes.empty else [],
-                "vertex_attr_types": self.points_attributes.dtypes.astype(str).tolist() if not self.points_attributes.empty else [],
-                "xarray_attrs"     : self.data_attrs
+            "format_version": _FORMAT_VERSION,
+            "vertex_shape": self.vertex.shape if self.vertex is not None else [0, 0],
+            "cell_shape": self.cells.shape if self.cells is not None else [0, 0],
+            "cell_attrs": _column_metadata(self.attributes, 'C') if not self.attributes.empty else [],
+            "vertex_attrs": _column_metadata(self.points_attributes, 'C') if not self.points_attributes.empty else [],
+            "xarray_attrs": self.data_attrs,
         }
         return header
 
-    def _to_bytearray(self, order):
+    def _to_bytearray(self) -> bytes:
         parts = []
         if self.vertex is not None:
-            vertex_bytes = self.vertex.astype('float32').tobytes(order)
-            parts.append(vertex_bytes)
+            parts.append(self.vertex.astype('float32').tobytes('C'))
         if self.cells is not None:
-            cells_bytes = self.cells.astype('int32').tobytes(order)
-            parts.append(cells_bytes)
+            parts.append(self.cells.astype('int32').tobytes('C'))
         if not self.attributes.empty:
-            cell_attr_bytes = self.attributes.values.astype('float32').tobytes(order)
-            parts.append(cell_attr_bytes)
+            for col in self.attributes.columns:
+                parts.append(_serialize_column(self.attributes[col].to_numpy()))
         if not self.points_attributes.empty:
-            vertex_attr_bytes = self.points_attributes.values.astype('float32').tobytes(order)
-            parts.append(vertex_attr_bytes)
-        bytearray_le = b''.join(parts)
-        return bytearray_le
+            for col in self.points_attributes.columns:
+                parts.append(_serialize_column(self.points_attributes[col].to_numpy()))
+        return b''.join(parts)
+
+    @staticmethod
+    def _read_attr_v1(body: bytes, offset: int, header: dict, attr_key: str
+                     ) -> tuple[pd.DataFrame | None, int]:
+        shape = header.get(attr_key + '_shape', [0, 0])
+        if shape[0] <= 0 or shape[1] <= 0:
+            return None, offset
+        num_attrs = int(np.prod(shape))
+        num_bytes = num_attrs * 4
+        values = np.frombuffer(body[offset:offset + num_bytes], dtype=np.float32, count=num_attrs)
+        offset += num_bytes
+        values = values.reshape(shape[:2], order='C')
+        names = header.get(attr_key + '_names', [])
+        return pd.DataFrame(values, columns=names), offset
+
+    @staticmethod
+    def _read_attr_v2(body: bytes, offset: int, columns_meta: list[dict]
+                      ) -> tuple[pd.DataFrame, int]:
+        columns = {}
+        for meta in columns_meta:
+            dtype_str = meta["dtype"]
+            count = int(np.prod(meta["shape"]))
+            byte_length = meta["byte_length"]
+
+            if dtype_str == 'bool':
+                raw = np.frombuffer(body[offset:offset + byte_length], dtype=np.uint8, count=count)
+                values = raw.astype(bool)
+            else:
+                values = np.frombuffer(body[offset:offset + byte_length], dtype=np.dtype(dtype_str), count=count)
+
+            columns[meta["name"]] = values
+            offset += byte_length
+
+        return pd.DataFrame(columns), offset
 
     @classmethod
     def from_binary(cls, binary_data, order='F'):
-        # Read header length
         header_length_bytes = binary_data[:4]
         header_length = int.from_bytes(header_length_bytes, byteorder='little')
-        # Read header
         header_json_bytes = binary_data[4:4 + header_length]
-        header_json = header_json_bytes.decode('utf-8')
-        header = json.loads(header_json)
-        # Read body
+        header = json.loads(header_json_bytes.decode('utf-8'))
         body = binary_data[4 + header_length:]
         offset = 0
+        format_version = header.get("format_version", 1)
 
-        # Parse vertices
-        vertex_shape = header['vertex_shape']
+        vertex_shape = header.get('vertex_shape', [0, 0])
         if vertex_shape[0] > 0 and vertex_shape[1] > 0:
-            num_vertices = np.prod(vertex_shape)
-            num_bytes = num_vertices * 4  # float32
+            num_vertices = int(np.prod(vertex_shape))
+            num_bytes = num_vertices * 4
             vertex = np.frombuffer(body[offset:offset + num_bytes], dtype=np.float32, count=num_vertices)
             offset += num_bytes
             vertex = vertex.reshape(vertex_shape, order=order)
         else:
             vertex = None
 
-        # Parse cells
-        cell_shape = header['cell_shape']
+        cell_shape = header.get('cell_shape', [0, 0])
         if cell_shape[0] > 0 and cell_shape[1] > 0:
-            num_cells = np.prod(cell_shape)
-            num_bytes = num_cells * 4  # int32
+            num_cells = int(np.prod(cell_shape))
+            num_bytes = num_cells * 4
             cells = np.frombuffer(body[offset:offset + num_bytes], dtype=np.int32, count=num_cells)
             offset += num_bytes
             cells = cells.reshape(cell_shape, order=order)
         else:
             cells = None
 
-        # Parse cell attributes
-        attributes = pd.DataFrame()
-        cell_attr_shape = header['cell_attr_shape']
-        if cell_attr_shape[0] > 0 and cell_attr_shape[1] > 0:
-            num_attrs = np.prod(cell_attr_shape)
-            num_bytes = num_attrs * 4  # float32
-            cell_attr_values = np.frombuffer(body[offset:offset + num_bytes], dtype=np.float32, count=num_attrs)
-            offset += num_bytes
-            cell_attr_values = cell_attr_values.reshape(cell_attr_shape, order=order)
-            attr_names = header['cell_attr_names']
-            attributes = pd.DataFrame(cell_attr_values, columns=attr_names)
-        else:
-            attributes = None
+        if format_version >= 2:
+            cell_attrs_meta = header.get('cell_attrs', [])
+            if cell_attrs_meta:
+                cell_attr_values, offset = cls._read_attr_v2(body, offset, cell_attrs_meta)
+            else:
+                cell_attr_values = None
 
-        # Parse vertex attributes
-        points_attributes = pd.DataFrame()
-        vertex_attr_shape = header['vertex_attr_shape']
-        if vertex_attr_shape[0] > 0 and vertex_attr_shape[1] > 0:
-            num_attrs = np.prod(vertex_attr_shape)
-            num_bytes = num_attrs * 4  # float32
-            vertex_attr_values = np.frombuffer(body[offset:offset + num_bytes], dtype=np.float32, count=num_attrs)
-            offset += num_bytes
-            vertex_attr_values = vertex_attr_values.reshape(vertex_attr_shape, order=order)
-            attr_names = header['vertex_attr_names']
-            points_attributes = pd.DataFrame(vertex_attr_values, columns=attr_names)
+            vertex_attrs_meta = header.get('vertex_attrs', [])
+            if vertex_attrs_meta:
+                vertex_attr_values, offset = cls._read_attr_v2(body, offset, vertex_attrs_meta)
+            else:
+                vertex_attr_values = None
         else:
-            points_attributes = None
+            cell_attr_values, offset = cls._read_attr_v1(body, offset, header, 'cell_attr')
+            vertex_attr_values, offset = cls._read_attr_v1(body, offset, header, 'vertex_attr')
 
         data_attrs = header.get('xarray_attrs', {})
 
-        return cls(vertex=vertex, cells=cells, attributes=attributes, points_attributes=points_attributes, data_attrs=data_attrs)
+        return cls(
+            vertex=vertex,
+            cells=cells,
+            attributes=cell_attr_values,
+            points_attributes=vertex_attr_values,
+            data_attrs=data_attrs,
+        )
 
