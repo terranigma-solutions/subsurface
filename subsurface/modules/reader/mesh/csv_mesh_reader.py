@@ -6,14 +6,14 @@ import pandas as pd
 
 def mesh_csv_to_vertex(path_to_file: str, columns_map: Union[None, Callable, dict, pd.Series] = None,
                        **reader_kwargs) -> np.ndarray:
-    data = pd.read_csv(path_to_file, **reader_kwargs)
+    data = pd.read_csv(path_to_file, engine='python', **reader_kwargs)
     if columns_map is not None: map_columns_names(columns_map, data)
     return get_vertices_from_df(data)
 
 
 def mesh_csv_to_cells(path_to_file: str, columns_map: Union[None, Callable, dict, pd.Series] = None,
-                      **reader_kwargs) -> np.ndarray:
-    data = pd.read_csv(path_to_file, **reader_kwargs)
+                       **reader_kwargs) -> np.ndarray:
+    data = pd.read_csv(path_to_file, engine='python', **reader_kwargs)
     if columns_map is not None: map_columns_names(columns_map, data)
     return get_cells_from_df(data)
 
@@ -21,7 +21,7 @@ def mesh_csv_to_cells(path_to_file: str, columns_map: Union[None, Callable, dict
 def mesh_csv_to_attributes(path_to_file: str,
                            columns_map: Union[None, Callable, dict, pd.Series] = None,
                            **reader_kwargs) -> pd.DataFrame:
-    data = pd.read_csv(path_to_file, **reader_kwargs)
+    data = pd.read_csv(path_to_file, engine='python', **reader_kwargs)
     if columns_map is not None:
         map_columns_names(columns_map, data)
     return data
