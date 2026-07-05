@@ -1,4 +1,6 @@
-﻿import numpy as np
+﻿import warnings
+
+import numpy as np
 import pandas as pd
 import xarray as xr
 from typing import Tuple, Optional, Union, List, Any
@@ -282,6 +284,7 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
     new_attrs: pd.DataFrame = _prepare_new_attributes(attrs, survey_trajectory)
 
     # Process each well
+    _warned_skipped_columns = set()
     for well_name in well_id_mapper:
         # Skip wells not in the attributes DataFrame
         if well_name not in attrs.index:
@@ -310,6 +313,20 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
 
             # Skip columns that can't be interpolated and aren't categorical
             if is_categorical and col not in ['lith_ids', 'component lith']:
+                if col not in _warned_skipped_columns:
+                    _warned_skipped_columns.add(col)
+                    non_null_sample = attr_values.dropna()
+                    sample_str = (
+                        f", sample values: {non_null_sample.head(3).tolist()}"
+                        if not non_null_sample.empty
+                        else ""
+                    )
+                    warnings.warn(
+                        f"Column '{col}' has non-numeric dtype ({attr_values.dtype}) "
+                        f"and will be skipped during interpolation for all wells.{sample_str}. "
+                        f"To include numeric-like string columns, add them to "
+                        f"coerce_numeric in the reader config or pre-process the data."
+                    )
                 continue
 
             # Interpolate and assign values
