@@ -125,7 +125,7 @@ class GenericReaderFilesHelper(BaseModel):
             delimiter = self.additional_reader_kwargs.get("delimiter", None)
         else:
             delimiter = None
-        if self.separator is not None and delimiter is None:
+        if delimiter is None:
             attr_dict["sep"] = self.separator
         
         return {**attr_dict, **self.additional_reader_kwargs}
