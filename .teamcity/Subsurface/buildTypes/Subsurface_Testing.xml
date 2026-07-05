@@ -40,7 +40,7 @@
       <param name="env.PATH_TO_SPREMBERG_SURVEY" value="%env.TERRA_PATH_DEVOPS%/boreholes/Spremberg/Spremberg_survey.csv" />
       <param name="env.PATH_TO_VOLUME_NUMPY" value="%env.TERRA_PATH_DEVOPS%/volume/numpy/" />
       <param name="env.PATH_TO_WEISWEILER" value="%env.TERRA_PATH_DEVOPS%/meshes/Weisweiler/" />
-      <param name="env.TERRA_PATH_DEVOPS" value="/home/leguark/DevOps/DevOps/SubsurfaceTestData/" />
+      <param name="env.TERRA_PATH_DEVOPS" value="/home/leguark/Data/OneDrive/Terranigma/DevOps/SubsurfaceTestData" />
     </parameters>
     <build-runners>
       <runner id="Setup" name="Setup" type="simpleRunner">
