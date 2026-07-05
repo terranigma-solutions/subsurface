@@ -1,3 +1,4 @@
+import json
 import os
 
 import numpy as np
@@ -18,6 +19,8 @@ pytestmark = pytest.mark.skipif(
     condition=(RequirementsLevel.READ_WELL) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set the READ_WELL",
 )
+
+WRITE_JSON = True
 
 
 def _read_collar_df():
@@ -494,3 +497,79 @@ class TestDiagnosticRawDictGaps:
         assert len(cu_values) > 0
         au_values = mr01_attrs["Au ppm"].dropna()
         assert len(au_values) > 0
+
+
+def test_atalaya_serialized_json_roundtrip():
+    collar_readers = GenericReaderFilesHelper(
+        file_or_buffer=os.path.join(_DATA_PATH, "Collar_Mojarra.csv"),
+        encoding="latin-1",
+        columns_map={
+            "BHID": "id", "XCOLLAR": "x", "YCOLLAR": "y", "ZCOLLAR": "z",
+        },
+        additional_reader_kwargs={"sep": ";"},
+    )
+    survey_readers = GenericReaderFilesHelper(
+        file_or_buffer=os.path.join(_DATA_PATH, "Survey_Mojarra.csv"),
+        columns_map={"AT": "md", "BRG": "azi", "DIP": "dip"},
+        additional_reader_kwargs={"sep": ";"},
+    )
+    assay_readers = GenericReaderFilesHelper(
+        file_or_buffer=os.path.join(_DATA_PATH, "Assay_Mojarra.csv"),
+        columns_map={"HoleID": "id", "From": "top", "To": "base"},
+        additional_reader_kwargs={"sep": ";"},
+        coerce_numeric=[
+            "Cu %", "Au ppm", "Fe %", "S %", "Pb %", "Zn %",
+        ],
+    )
+
+    collar_json = collar_readers.model_dump_json(indent=2)
+    survey_json = survey_readers.model_dump_json(indent=2)
+    assay_json = assay_readers.model_dump_json(indent=2)
+
+    if WRITE_JSON:
+        for name, js in [
+            ("Collar_Mojarra_reader.json", collar_json),
+            ("Survey_Mojarra_reader.json", survey_json),
+            ("Assay_Mojarra_reader.json", assay_json),
+        ]:
+            path = os.path.join(_DATA_PATH, name)
+            with open(path, "w") as f:
+                f.write(js)
+
+        combined = {
+            "collars_reader": json.loads(collar_json),
+            "surveys_reader": json.loads(survey_json),
+            "attrs_reader": json.loads(assay_json),
+        }
+        combined_path = os.path.join(_DATA_PATH, "borehole_import_config.json")
+        with open(combined_path, "w") as f:
+            json.dump(combined, f, indent=2)
+
+    collar2 = GenericReaderFilesHelper.model_validate_json(collar_json)
+    survey2 = GenericReaderFilesHelper.model_validate_json(survey_json)
+    assay2 = GenericReaderFilesHelper.model_validate_json(assay_json)
+
+    assert collar2.file_or_buffer == collar_readers.file_or_buffer
+    assert collar2.encoding == collar_readers.encoding
+    assert collar2.columns_map == collar_readers.columns_map
+    assert survey2.columns_map == survey_readers.columns_map
+    assert assay2.coerce_numeric == assay_readers.coerce_numeric
+    assert assay2.additional_reader_kwargs == assay_readers.additional_reader_kwargs
+
+    borehole_set = read_wells(
+        collars_reader=collar2,
+        surveys_reader=survey2,
+        attrs_reader=assay2,
+        is_lith_attr=False,
+        add_attrs_as_nodes=True,
+    )
+
+    points_attrs = borehole_set.combined_trajectory.data.points_attributes
+    assert "Cu %" in points_attrs.columns
+    assert "Au ppm" in points_attrs.columns
+
+    mr01_id = borehole_set.survey.get_well_num_id("MR01")
+    mr01_attrs = points_attrs[points_attrs["well_id"] == mr01_id]
+    assert not mr01_attrs.empty
+    assert mr01_attrs["Cu %"].dropna().notna().any()
+    assert mr01_attrs["Au ppm"].dropna().notna().any()
