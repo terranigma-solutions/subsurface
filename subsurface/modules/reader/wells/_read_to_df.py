@@ -13,19 +13,23 @@ def check_format_and_read_to_df(reader_helper: GenericReaderFilesHelper) -> pd.D
             d = pd.read_json(reader_helper.file_or_buffer, orient='split')
         case str() | pathlib.Path(), _:
             reader: Callable = _get_reader(reader_helper.format)
+            base_kwargs = {"engine": "python"}
+            if reader_helper.separator is not None:
+                base_kwargs["sep"] = reader_helper.separator
             d = reader(
                 filepath_or_buffer=reader_helper.file_or_buffer,
-                sep=reader_helper.separator,
-                engine='python',
-                **reader_helper.pandas_reader_kwargs
+                **base_kwargs,
+                **reader_helper.pandas_reader_kwargs,
             )
         case (bytes() | io.BytesIO() | io.StringIO() | io.TextIOWrapper()), _:
             reader = _get_reader(reader_helper.format)
+            base_kwargs = {"engine": "python"}
+            if reader_helper.separator is not None:
+                base_kwargs["sep"] = reader_helper.separator
             d = reader(
                 filepath_or_buffer=reader_helper.file_or_buffer,
-                sep=reader_helper.separator,
-                engine='python',
-                **reader_helper.pandas_reader_kwargs
+                **base_kwargs,
+                **reader_helper.pandas_reader_kwargs,
             )
         case dict(), _:
             reader = _get_reader('dict')

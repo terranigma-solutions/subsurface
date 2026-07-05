@@ -14,6 +14,7 @@ def read_collar(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
     # Check file_or_buffer type
     data_df: pd.DataFrame = check_format_and_read_to_df(reader_helper)
     _map_rows_and_cols_inplace(data_df, reader_helper)
+    _coerce_numeric_columns(data_df, reader_helper)
 
     # Remove duplicates
     data_df = data_df[~data_df.index.duplicated(keep='first')]
@@ -46,6 +47,7 @@ def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool = Fal
     d = check_format_and_read_to_df(reader_helper)
 
     _map_rows_and_cols_inplace(d, reader_helper)
+    _coerce_numeric_columns(d, reader_helper)
     if validate_attr is False:
         return d
     
@@ -54,6 +56,13 @@ def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool = Fal
     else:
         _validate_attr_data(d)
     return d
+
+
+def _coerce_numeric_columns(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> None:
+    if reader_helper.coerce_numeric:
+        for col in d.columns:
+            if col not in ('dip',):
+                d[col] = pd.to_numeric(d[col], errors='coerce')
 
 
 def _map_rows_and_cols_inplace(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper):
@@ -69,8 +78,12 @@ def _validate_survey_data(d):
         raise AttributeError(
             'md, inc, and azi columns must be present in the file. Use columns_map to assign column names to these fields.')
 
+    # Drop rows with NaN in essential survey columns
+    d.dropna(subset=['md'], inplace=True)
+
     # Check if 'dip' column exists and convert it to 'inc'
     if 'dip' in d.columns:
+        d.dropna(subset=['dip'], inplace=True)
         # Convert dip to inclination (90 - dip)
         d['inc'] = 90 - d['dip']
         # Optionally, drop the 'dip' column if it's no longer needed

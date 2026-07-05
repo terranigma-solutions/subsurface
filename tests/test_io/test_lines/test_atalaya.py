@@ -358,17 +358,14 @@ def _make_raw_assay_dict():
 
 class TestDiagnosticRawDictGaps:
     """
-    Diagnostic tests that expose gaps in read_wells when fed raw (uncleaned)
-    data via JSON/dict input.
+    Diagnostic tests showing the behavior of read_wells with raw (uncleaned)
+    dict/JSON input, and how the coerce_numeric fix resolves the issues.
 
-    These tests pass *as-is* (they assert current behavior) but they document
-    what's broken and what needs fixing in read_wells / GenericReaderFilesHelper.
+    FIXED: raw survey no longer crashes (NaN rows are dropped in _validate_survey_data).
+           raw assay with coerce_numeric=True now interpolates correctly.
     """
 
-    @pytest.mark.xfail(
-        reason="BUG: _correct_angles crashes on NaN inc from blank survey rows"
-    )
-    def test_raw_survey_crashes_in_correct_angles(self):
+    def test_raw_survey_no_longer_crashes(self):
         raw_survey = pd.read_csv(
             os.path.join(_DATA_PATH, "Survey_Mojarra.csv"),
             sep=";",
@@ -392,13 +389,15 @@ class TestDiagnosticRawDictGaps:
             columns_map={"HoleID": "id", "From": "top", "To": "base"},
         )
 
-        read_wells(
+        # Previously crashed in _correct_angles, now succeeds.
+        borehole_set = read_wells(
             collars_reader=collar_reader,
             surveys_reader=survey_reader,
             attrs_reader=attr_reader,
             is_lith_attr=False,
             add_attrs_as_nodes=True,
         )
+        assert borehole_set.combined_trajectory.data.n_points > 0
 
     def test_raw_assay_columns_exist_but_all_none(self):
         raw_survey = pd.read_csv(
@@ -427,6 +426,49 @@ class TestDiagnosticRawDictGaps:
             columns_map={"HoleID": "id", "From": "top", "To": "base"},
         )
 
+        with pytest.warns(UserWarning, match="non-numeric dtype"):
+            borehole_set = read_wells(
+                collars_reader=collar_reader,
+                surveys_reader=survey_reader,
+                attrs_reader=attr_reader,
+                is_lith_attr=False,
+                add_attrs_as_nodes=True,
+            )
+
+        points_attrs = borehole_set.combined_trajectory.data.points_attributes
+        assert "Cu %" in points_attrs.columns
+        assert points_attrs["Cu %"].isna().all()
+        assert "Au ppm" in points_attrs.columns
+        assert points_attrs["Au ppm"].isna().all()
+
+    def test_raw_assay_with_coerce_numeric_works(self):
+        raw_survey = pd.read_csv(
+            os.path.join(_DATA_PATH, "Survey_Mojarra.csv"),
+            sep=";",
+            index_col=0,
+        )
+        raw_survey.index = raw_survey.index.where(raw_survey.index.notna(), None)
+        raw_survey = raw_survey[raw_survey.index.notna() & raw_survey.index.notnull()]
+        raw_survey = raw_survey[raw_survey.index.duplicated(keep=False)]
+        survey_dict = _df_to_dict(raw_survey)
+
+        collar_reader = GenericReaderFilesHelper(
+            file_or_buffer=_df_to_dict(pd.read_csv(
+                os.path.join(_DATA_PATH, "Collar_Mojarra.csv"),
+                sep=";", encoding="latin-1", index_col=0,
+            )),
+            columns_map={"BHID": "id", "XCOLLAR": "x", "YCOLLAR": "y", "ZCOLLAR": "z"},
+        )
+        survey_reader = GenericReaderFilesHelper(
+            file_or_buffer=survey_dict,
+            columns_map={"AT": "md", "BRG": "azi", "DIP": "dip"},
+        )
+        attr_reader = GenericReaderFilesHelper(
+            file_or_buffer=_make_raw_assay_dict(),
+            columns_map={"HoleID": "id", "From": "top", "To": "base"},
+            coerce_numeric=True,
+        )
+
         borehole_set = read_wells(
             collars_reader=collar_reader,
             surveys_reader=survey_reader,
@@ -436,10 +478,14 @@ class TestDiagnosticRawDictGaps:
         )
 
         points_attrs = borehole_set.combined_trajectory.data.points_attributes
-
-        # BUG: columns exist but all values are None because
-        #      'n.a.' / '<0.05' force object dtype -> skipped by interpolation
         assert "Cu %" in points_attrs.columns
-        assert points_attrs["Cu %"].isna().all()
         assert "Au ppm" in points_attrs.columns
-        assert points_attrs["Au ppm"].isna().all()
+
+        mr01_id = borehole_set.survey.get_well_num_id("MR01")
+        mr01_attrs = points_attrs[points_attrs["well_id"] == mr01_id]
+        assert not mr01_attrs.empty
+
+        cu_values = mr01_attrs["Cu %"].dropna()
+        assert len(cu_values) > 0
+        au_values = mr01_attrs["Au ppm"].dropna()
+        assert len(au_values) > 0
