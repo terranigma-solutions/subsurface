@@ -324,8 +324,8 @@ def _map_attrs_to_measured_depths(attrs: pd.DataFrame, survey_trajectory: LineSe
                     warnings.warn(
                         f"Column '{col}' has non-numeric dtype ({attr_values.dtype}) "
                         f"and will be skipped during interpolation for all wells.{sample_str}. "
-                        f"To include numeric-like string columns, set coerce_numeric=True "
-                        f"in the reader config or pre-process the data."
+                        f"To include numeric-like string columns, add them to "
+                        f"coerce_numeric in the reader config or pre-process the data."
                     )
                 continue
 

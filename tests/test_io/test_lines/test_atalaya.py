@@ -466,7 +466,12 @@ class TestDiagnosticRawDictGaps:
         attr_reader = GenericReaderFilesHelper(
             file_or_buffer=_make_raw_assay_dict(),
             columns_map={"HoleID": "id", "From": "top", "To": "base"},
-            coerce_numeric=True,
+            coerce_numeric=[
+                "Cu %", "S %", "Pb %", "Zn %", "As %", "Sb %", "Bi %",
+                "Hg ppm", "Fe %", "Th  ppm", "Ag ppm", "Cd %",
+                "Co %", "Ni %", "Mn %", "Al %", "Ca %", "Mg %",
+                "Sn ppm", "Mo %", "P %", "Tl %", "Au ppm",
+            ],
         )
 
         borehole_set = read_wells(

@@ -35,7 +35,7 @@ class GenericReaderFilesHelper(BaseModel):
     encoding: str = "utf-8"
     index_col: Optional[Union[int, str, bool]] = False
     header: Union[None, int, List[int]] = 0
-    coerce_numeric: bool = False
+    coerce_numeric: Optional[List[str]] = None
 
     # Computed fields
     file_or_buffer_type: str = Field(init=False)

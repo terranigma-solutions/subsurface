@@ -59,9 +59,9 @@ def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool = Fal
 
 
 def _coerce_numeric_columns(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> None:
-    if reader_helper.coerce_numeric:
-        for col in d.columns:
-            if col not in ('dip',):
+    if reader_helper.coerce_numeric is not None:
+        for col in reader_helper.coerce_numeric:
+            if col in d.columns:
                 d[col] = pd.to_numeric(d[col], errors='coerce')
 
 
