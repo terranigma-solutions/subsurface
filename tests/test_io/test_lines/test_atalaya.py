@@ -345,3 +345,101 @@ def test_read_atalaya_assays_via_dict():
     assert len(cu_values) > 0
     au_values = mr01_attrs["Au ppm"].dropna()
     assert len(au_values) > 0
+
+
+def _make_raw_assay_dict():
+    raw = pd.read_csv(
+        os.path.join(_DATA_PATH, "Assay_Mojarra.csv"),
+        sep=";",
+        index_col=0,
+    )
+    return _df_to_dict(raw)
+
+
+class TestDiagnosticRawDictGaps:
+    """
+    Diagnostic tests that expose gaps in read_wells when fed raw (uncleaned)
+    data via JSON/dict input.
+
+    These tests pass *as-is* (they assert current behavior) but they document
+    what's broken and what needs fixing in read_wells / GenericReaderFilesHelper.
+    """
+
+    @pytest.mark.xfail(
+        reason="BUG: _correct_angles crashes on NaN inc from blank survey rows"
+    )
+    def test_raw_survey_crashes_in_correct_angles(self):
+        raw_survey = pd.read_csv(
+            os.path.join(_DATA_PATH, "Survey_Mojarra.csv"),
+            sep=";",
+            index_col=0,
+        )
+        survey_dict = _df_to_dict(raw_survey)
+
+        collar_reader = GenericReaderFilesHelper(
+            file_or_buffer=_df_to_dict(pd.read_csv(
+                os.path.join(_DATA_PATH, "Collar_Mojarra.csv"),
+                sep=";", encoding="latin-1", index_col=0,
+            )),
+            columns_map={"BHID": "id", "XCOLLAR": "x", "YCOLLAR": "y", "ZCOLLAR": "z"},
+        )
+        survey_reader = GenericReaderFilesHelper(
+            file_or_buffer=survey_dict,
+            columns_map={"AT": "md", "BRG": "azi", "DIP": "dip"},
+        )
+        attr_reader = GenericReaderFilesHelper(
+            file_or_buffer=_make_raw_assay_dict(),
+            columns_map={"HoleID": "id", "From": "top", "To": "base"},
+        )
+
+        read_wells(
+            collars_reader=collar_reader,
+            surveys_reader=survey_reader,
+            attrs_reader=attr_reader,
+            is_lith_attr=False,
+            add_attrs_as_nodes=True,
+        )
+
+    def test_raw_assay_columns_exist_but_all_none(self):
+        raw_survey = pd.read_csv(
+            os.path.join(_DATA_PATH, "Survey_Mojarra.csv"),
+            sep=";",
+            index_col=0,
+        )
+        raw_survey.index = raw_survey.index.where(raw_survey.index.notna(), None)
+        raw_survey = raw_survey[raw_survey.index.notna() & raw_survey.index.notnull()]
+        raw_survey = raw_survey[raw_survey.index.duplicated(keep=False)]
+        survey_dict = _df_to_dict(raw_survey)
+
+        collar_reader = GenericReaderFilesHelper(
+            file_or_buffer=_df_to_dict(pd.read_csv(
+                os.path.join(_DATA_PATH, "Collar_Mojarra.csv"),
+                sep=";", encoding="latin-1", index_col=0,
+            )),
+            columns_map={"BHID": "id", "XCOLLAR": "x", "YCOLLAR": "y", "ZCOLLAR": "z"},
+        )
+        survey_reader = GenericReaderFilesHelper(
+            file_or_buffer=survey_dict,
+            columns_map={"AT": "md", "BRG": "azi", "DIP": "dip"},
+        )
+        attr_reader = GenericReaderFilesHelper(
+            file_or_buffer=_make_raw_assay_dict(),
+            columns_map={"HoleID": "id", "From": "top", "To": "base"},
+        )
+
+        borehole_set = read_wells(
+            collars_reader=collar_reader,
+            surveys_reader=survey_reader,
+            attrs_reader=attr_reader,
+            is_lith_attr=False,
+            add_attrs_as_nodes=True,
+        )
+
+        points_attrs = borehole_set.combined_trajectory.data.points_attributes
+
+        # BUG: columns exist but all values are None because
+        #      'n.a.' / '<0.05' force object dtype -> skipped by interpolation
+        assert "Cu %" in points_attrs.columns
+        assert points_attrs["Cu %"].isna().all()
+        assert "Au ppm" in points_attrs.columns
+        assert points_attrs["Au ppm"].isna().all()
