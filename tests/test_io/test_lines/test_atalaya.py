@@ -7,6 +7,8 @@ import pytest
 from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, MergeOptions
 from subsurface.core.geological_formats.boreholes.collars import Collars
 from subsurface.core.geological_formats.boreholes.survey import Survey
+from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
+from subsurface.api.reader.read_wells import read_wells
 from tests.conftest import RequirementsLevel
 
 _TERRA_PATH = os.getenv("TERRA_PATH_DEVOPS")
@@ -91,6 +93,26 @@ def _read_assay_df():
         },
         inplace=True,
     )
+    return df
+
+
+def _df_to_dict(df: pd.DataFrame) -> dict:
+    return {
+        "data": df.values.tolist(),
+        "columns": list(df.columns),
+        "index": df.index.tolist(),
+    }
+
+
+def _clean_assay_numerics(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    for col in df.columns:
+        if col in ("HoleID", "From", "To"):
+            continue
+        df[col] = pd.to_numeric(
+            df[col].replace(r"^(n\.a\.|<.*)$", None, regex=True),
+            errors="coerce",
+        )
     return df
 
 
@@ -248,3 +270,78 @@ def test_read_atalaya_lithology_with_explicit_mapping():
 
     unique_lith_ids = points_attrs["lith_ids"].unique()
     assert len(unique_lith_ids) > 1
+
+
+def test_read_atalaya_assays_via_dict():
+    collar_df = pd.read_csv(
+        os.path.join(_DATA_PATH, "Collar_Mojarra.csv"),
+        sep=";",
+        encoding="latin-1",
+        index_col=0,
+    )
+    survey_df = pd.read_csv(
+        os.path.join(_DATA_PATH, "Survey_Mojarra.csv"),
+        sep=";",
+        index_col=0,
+    )
+    survey_df.index = survey_df.index.where(survey_df.index.notna(), None)
+    survey_df = survey_df[survey_df.index.notna() & survey_df.index.notnull()]
+    survey_df = survey_df[survey_df.index.duplicated(keep=False)]
+
+    raw_assay_df = pd.read_csv(
+        os.path.join(_DATA_PATH, "Assay_Mojarra.csv"),
+        sep=";",
+        index_col=0,
+    )
+    assay_df = _clean_assay_numerics(raw_assay_df)
+
+    collar_dict = _df_to_dict(collar_df)
+    survey_dict = _df_to_dict(survey_df)
+    assay_dict = _df_to_dict(assay_df)
+
+    collar_reader = GenericReaderFilesHelper(
+        file_or_buffer=collar_dict,
+        columns_map={
+            "BHID": "id",
+            "XCOLLAR": "x",
+            "YCOLLAR": "y",
+            "ZCOLLAR": "z",
+        },
+    )
+    survey_reader = GenericReaderFilesHelper(
+        file_or_buffer=survey_dict,
+        columns_map={
+            "AT": "md",
+            "BRG": "azi",
+            "DIP": "dip",
+        },
+    )
+    assay_reader = GenericReaderFilesHelper(
+        file_or_buffer=assay_dict,
+        columns_map={
+            "HoleID": "id",
+            "From": "top",
+            "To": "base",
+        },
+    )
+
+    borehole_set = read_wells(
+        collars_reader=collar_reader,
+        surveys_reader=survey_reader,
+        attrs_reader=assay_reader,
+        is_lith_attr=False,
+        add_attrs_as_nodes=True,
+    )
+
+    assert "Cu %" in borehole_set.combined_trajectory.data.points_attributes.columns
+    assert "Au ppm" in borehole_set.combined_trajectory.data.points_attributes.columns
+
+    mr01_id = borehole_set.survey.get_well_num_id("MR01")
+    points_attrs = borehole_set.combined_trajectory.data.points_attributes
+    mr01_attrs = points_attrs[points_attrs["well_id"] == mr01_id]
+    assert not mr01_attrs.empty
+
+    cu_values = mr01_attrs["Cu %"].dropna()
+    assert len(cu_values) > 0
+    au_values = mr01_attrs["Au ppm"].dropna()
+    assert len(au_values) > 0

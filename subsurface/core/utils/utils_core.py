@@ -10,7 +10,7 @@ def get_extension(path):
         p = Path(path)
         return p.suffix
     except TypeError:
-        return False
+        return ""
 
 
 def replace_outliers(base_data: Union[StructuredData, UnstructuredData], dim=0, perc=0.99, replace_for=None):
