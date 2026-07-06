@@ -97,13 +97,13 @@ class LiquidEarthMesh:
         if self.points_attributes is not None and not self.points_attributes.empty:
             _validate_attribute_dataframe(self.points_attributes, 'vertex_attrs')
 
-    def to_binary(self, order='F') -> bytes:
+    def to_binary(self, order='C') -> bytes:
         header_ = self._set_binary_header()
         header_json = json.dumps(header_)
         header_json_bytes = header_json.encode('utf-8')
         header_json_length = len(header_json_bytes)
         header_json_length_bytes = header_json_length.to_bytes(4, byteorder='little')
-        body_ = self._to_bytearray()
+        body_ = self._to_bytearray(order)
         return header_json_length_bytes + header_json_bytes + body_
 
     def _set_binary_header(self):
@@ -117,12 +117,12 @@ class LiquidEarthMesh:
         }
         return header
 
-    def _to_bytearray(self) -> bytes:
+    def _to_bytearray(self, order='C') -> bytes:
         parts = []
         if self.vertex is not None:
-            parts.append(self.vertex.astype('float32').tobytes('C'))
+            parts.append(self.vertex.astype('float32').tobytes(order))
         if self.cells is not None:
-            parts.append(self.cells.astype('int32').tobytes('C'))
+            parts.append(self.cells.astype('int32').tobytes(order))
         if not self.attributes.empty:
             for col in self.attributes.columns:
                 parts.append(_serialize_column(self.attributes[col].to_numpy()))
@@ -132,16 +132,16 @@ class LiquidEarthMesh:
         return b''.join(parts)
 
     @staticmethod
-    def _read_attr_v1(body: bytes, offset: int, header: dict, attr_key: str
+    def _read_attr_v1(body: bytes, offset: int, header: dict, attr_key: str, order: str = 'F'
                      ) -> tuple[pd.DataFrame | None, int]:
         shape = header.get(attr_key + '_shape', [0, 0])
-        if shape[0] <= 0 or shape[1] <= 0:
+        if shape is None or shape[0] <= 0 or shape[1] <= 0:
             return None, offset
         num_attrs = int(np.prod(shape))
         num_bytes = num_attrs * 4
         values = np.frombuffer(body[offset:offset + num_bytes], dtype=np.float32, count=num_attrs)
         offset += num_bytes
-        values = values.reshape(shape[:2], order='C')
+        values = values.reshape(shape[:2], order=order)
         names = header.get(attr_key + '_names', [])
         return pd.DataFrame(values, columns=names), offset
 
@@ -192,6 +192,13 @@ class LiquidEarthMesh:
             cells = np.frombuffer(body[offset:offset + num_bytes], dtype=np.int32, count=num_cells)
             offset += num_bytes
             cells = cells.reshape(cell_shape, order=order)
+
+            # Auto-reshape legacy flattened cells
+            if format_version == 1 and cells.shape[0] == 1 and cells.shape[1] > 3:
+                if cells.shape[1] % 3 == 0:
+                    cells = cells.reshape((-1, 3), order='C')
+                elif cells.shape[1] % 2 == 0:
+                    cells = cells.reshape((-1, 2), order='C')
         else:
             cells = None
 
@@ -208,8 +215,8 @@ class LiquidEarthMesh:
             else:
                 vertex_attr_values = None
         else:
-            cell_attr_values, offset = cls._read_attr_v1(body, offset, header, 'cell_attr')
-            vertex_attr_values, offset = cls._read_attr_v1(body, offset, header, 'vertex_attr')
+            cell_attr_values, offset = cls._read_attr_v1(body, offset, header, 'cell_attr', order=order)
+            vertex_attr_values, offset = cls._read_attr_v1(body, offset, header, 'vertex_attr', order=order)
 
         data_attrs = header.get('xarray_attrs', {})
 
