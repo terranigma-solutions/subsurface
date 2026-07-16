@@ -65,6 +65,7 @@ setup(
             "plog": read_requirements("requirements_plot.txt", "requirements"),
             "opt": read_requirements("requirements_opt.txt", "requirements"),
             "dev": read_requirements("requirements_dev.txt", "requirements"),
+            "pointcloud": read_requirements("requirements_pointcloud.txt", "requirements"),
             "all": read_requirements("requirements_all.txt", "requirements")
     },
     classifiers=CLASSIFIERS,

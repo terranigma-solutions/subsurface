@@ -13,7 +13,7 @@ from ...core.structs.base_structures import UnstructuredData, StructuredData
 from ...modules import reader
 from ...modules.reader.mesh._trimesh_reader import TriMeshTransformations
 from ...modules.reader.volume.read_volume import read_volumetric_mesh_to_subsurface, read_VTK_structured_grid
-from ...modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct
+from ...modules.reader.mesh.surfaces_api import read_2d_mesh_to_unstruct, read_point_cloud_to_unstruct
 from ...modules.reader.volume.volume_utils import interpolate_unstructured_data_to_structured_data
 
 from ..reader.read_wells import read_wells

@@ -1,14 +1,16 @@
 import pandas as pd
-from typing import Union
+from typing import Union, List
 
 import numpy as np
 import warnings
 
 from .surface_reader import read_mesh_file_to_vertex, read_mesh_file_to_cells, cells_from_delaunay, read_mesh_file_to_attr
+from .point_cloud_reader import read_ply_point_cloud_to_unstruct, read_e57_point_clouds_to_unstruct
 from ....core.reader_helpers.reader_unstruct import ReaderUnstructuredHelper
 from ....core.structs import UnstructuredData
 
 from ....core.structs.base_structures.base_structures_enum import SpecialCellCase
+from ....core.reader_helpers.readers_data import SupportedFormats, GenericReaderFilesHelper
 
 
 def read_2d_mesh_to_unstruct(
@@ -39,3 +41,16 @@ def read_2d_mesh_to_unstruct(
         vertex_attr=vertex_attr,
     )
     return ud
+
+
+def read_point_cloud_to_unstruct(reader_args: GenericReaderFilesHelper) -> Union[UnstructuredData, List[UnstructuredData]]:
+    """Read a point cloud file into UnstructuredData.
+
+    PLY files return a single UnstructuredData.
+    E57 files return a list of UnstructuredData, one per scan.
+    """
+    if reader_args.format == SupportedFormats.PLY:
+        return read_ply_point_cloud_to_unstruct(reader_args)
+    if reader_args.format == SupportedFormats.E57:
+        return read_e57_point_clouds_to_unstruct(reader_args)
+    raise ValueError(f"Unsupported point cloud format: {reader_args.format}")

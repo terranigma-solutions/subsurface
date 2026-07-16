@@ -35,9 +35,9 @@ class PointSet:
     @property
     def point_data(self):
         """Fetch the scalar data associated with the vertices."""
-        return self.data.attributes
+        return self.data.points_attributes
 
     @property
     def point_data_dict(self):
         """Fetch the point data as a dictionary of numpy arrays."""
-        return self.data.attributes_to_dict
+        return self.data.points_attributes_to_dict

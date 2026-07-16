@@ -7,4 +7,6 @@
 
 -r requirements_geospatial.txt
 
+-r requirements_pointcloud.txt
+
 -r requirements_dev.txt
