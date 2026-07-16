@@ -11,4 +11,5 @@ from .interfaces.stream import (
     OBJ_stream_to_trisurf,
     GLTF_stream_to_trisurf,
     MSH_stream_to_struct,
+    read_point_cloud_to_unstruct,
 )

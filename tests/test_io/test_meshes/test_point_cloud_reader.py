@@ -6,7 +6,7 @@ from tests.conftest import RequirementsLevel
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper, SupportedFormats
 from subsurface.core.structs.base_structures import UnstructuredData
 from subsurface.core.structs.unstructured_elements import PointSet
-from subsurface.modules.reader.mesh.surfaces_api import read_point_cloud_to_unstruct
+from subsurface.api import read_point_cloud_to_unstruct
 
 pytestmark = pytest.mark.read_mesh
 pytestmark = pytest.mark.skipif(

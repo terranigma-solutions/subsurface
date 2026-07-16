@@ -115,3 +115,12 @@ def require_matplotlib():
     except ImportError:
         raise ImportError("The matplotlib package is required to run this function.")
     return matplotlib
+
+
+def require_pye57():
+    try:
+        import pye57
+    except ImportError:
+        raise ImportError("The pye57 package is required to read E57 point clouds. "
+                          "Install it with: pip install subsurface-terra[pointcloud]")
+    return pye57

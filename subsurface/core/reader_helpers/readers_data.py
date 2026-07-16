@@ -21,6 +21,7 @@ class SupportedFormats(str, enum.Enum):
     JSON = "json"
     XLXS = "xlsx"
     PLY = "ply"
+    E57 = "e57"
 
 
 class GenericReaderFilesHelper(BaseModel):
@@ -55,6 +56,7 @@ class GenericReaderFilesHelper(BaseModel):
                     ".json": SupportedFormats.JSON,
                     ".xlsx": SupportedFormats.XLXS,
                     ".ply" : SupportedFormats.PLY,
+                    ".e57" : SupportedFormats.E57,
             }
             format = format_map.get(extension.lower())
             values['format'] = format
