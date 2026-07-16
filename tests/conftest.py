@@ -67,7 +67,7 @@ def point_set_fixture():
     n = 100
 
     data = UnstructuredData.from_array(vertex=np.random.rand(n, 3), cells=np.random.rand(n, 0),
-                                       cells_attr=pd.DataFrame({'foo': np.arange(n)}))
+                                           vertex_attr=pd.DataFrame({'foo': np.arange(n)}))
 
     pointset = PointSet(data)
     return pointset
