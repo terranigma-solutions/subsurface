@@ -101,7 +101,7 @@ def to_pyvista_points(point_set: PointSet):
     """
     pv = optional_requirements.require_pyvista()
     poly: pv.PolyData = pv.PolyData(point_set.data.vertex)
-    poly.point_data.update(point_set.data.attributes_to_dict)
+    poly.point_data.update(point_set.data.points_attributes_to_dict)
 
     return poly
 

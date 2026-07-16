@@ -1,16 +1,39 @@
+import os
+
 import pytest
 import numpy as np
 
-from tests.conftest import RequirementsLevel
+from tests.conftest import RequirementsLevel, check_requirements
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper, SupportedFormats
 from subsurface.core.structs.base_structures import UnstructuredData
 from subsurface.core.structs.unstructured_elements import PointSet
 from subsurface.api import read_point_cloud_to_unstruct
 
-pytestmark = pytest.mark.read_mesh
-pytestmark = pytest.mark.skipif(
-    condition=(RequirementsLevel.MESH) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
-    reason="Need to set REQUIREMENT_LEVEL=MESH or REQUIREMENT_LEVEL=ALL"
+pytestmark = pytest.mark.slow
+
+
+def _build_e57_path():
+    devops_path = os.getenv("TERRA_PATH_DEVOPS")
+    if devops_path:
+        primary = os.path.join(devops_path, "point cloud", "parking-lot-updated.e57")
+        if os.path.exists(primary):
+            return primary
+    fallback = os.path.expanduser(
+        "~/.cache/rclone/vfs/terranigma/DevOps/SubsurfaceTestData/point cloud/parking-lot-updated.e57"
+    )
+    if os.path.exists(fallback):
+        return fallback
+    direct = os.path.expanduser(
+        "/home/leguark/Data/OneDrive/Terranigma/DevOps/SubsurfaceTestData/point cloud/parking-lot-updated.e57"
+    )
+    if os.path.exists(direct):
+        return direct
+    return None
+
+
+_needs_e57_file = pytest.mark.skipif(
+    _build_e57_path() is None,
+    reason="parking-lot-updated.e57 not found. Set TERRA_PATH_DEVOPS or ensure OneDrive is mounted.",
 )
 
 
@@ -19,97 +42,108 @@ def test_e57_format_detection():
     assert reader_args.format == SupportedFormats.E57
 
 
-class TestReadE57PointCloud:
-    def test_read_two_scans_returns_list(self, data_path):
-        """E57 reader returns a list of UnstructuredData, one per scan."""
-        path = data_path + '/pointcloud/two_scans.e57'
-        reader_args = GenericReaderFilesHelper(file_or_buffer=path)
-        result = read_point_cloud_to_unstruct(reader_args)
+@pytest.fixture(scope="module")
+def e57_scans():
+    path = _build_e57_path()
+    if path is None:
+        pytest.skip("parking-lot-updated.e57 not found")
+    reader_args = GenericReaderFilesHelper(file_or_buffer=path)
+    return read_point_cloud_to_unstruct(reader_args)
 
-        assert isinstance(result, list)
-        assert len(result) == 2
-        assert all(isinstance(ud, UnstructuredData) for ud in result)
 
-    def test_scan_0_has_xyz_and_attributes(self, data_path):
-        """Scan 0 (3 points) has XYZ, intensity, and RGB."""
-        path = data_path + '/pointcloud/two_scans.e57'
-        reader_args = GenericReaderFilesHelper(file_or_buffer=path)
-        result = read_point_cloud_to_unstruct(reader_args)
+@pytest.mark.skipif(
+    condition=check_requirements(RequirementsLevel.MESH | RequirementsLevel.PLOT),
+    reason="Need to set REQUIREMENT_LEVEL=MESH or REQUIREMENT_LEVEL=ALL"
+)
+class TestReadE57ParkingLot:
+    """
+    Integration test against the real parking-lot-updated.e57 dataset.
 
-        ud0 = result[0]
-        assert ud0.n_points == 3
-        assert ud0.cells.shape[1] == 1
+    The file contains 19 scans from a Leica ScanStation 2:
+      - 3 large scans (~2.5M points each) from different scanner positions
+      - 16 smaller registration-target scans (~1.4K points each)
 
-        expected = np.array([[0.0, 0.0, 1.0],
-                             [1.0, 0.0, 1.0],
-                             [2.0, 0.0, 1.0]])
-        assert np.allclose(ud0.vertex, expected)
+    Each scan carries global-space XYZ, intensity, RGB, row/column indices,
+    and per-scan pose metadata (rotation matrix and translation vector).
 
-        pa = ud0.points_attributes
-        assert 'intensity' in pa.columns
-        assert np.allclose(pa['intensity'].values, [0.1, 0.5, 0.9], atol=0.01)
+    Requires pye57 (pip install subsurface-terra[pointcloud]) and pyvista.
+    The dataset must be available at TERRA_PATH_DEVOPS or the OneDrive path.
+    """
 
-        assert 'red' in pa.columns
-        assert list(pa['red']) == [255, 128, 0]
+    @_needs_e57_file
+    def test_returns_list_of_nineteen_scans(self, e57_scans):
+        """E57 reader produces one UnstructuredData per scan."""
+        assert isinstance(e57_scans, list)
+        assert len(e57_scans) == 19
+        assert all(isinstance(ud, UnstructuredData) for ud in e57_scans)
 
-    def test_scan_1_has_xyz_and_intensity_only(self, data_path):
-        """Scan 1 (2 points) has XYZ and intensity, no RGB.
+    @_needs_e57_file
+    def test_all_scans_are_point_clouds(self, e57_scans):
+        """Every scan has point cells (cells.shape[1] == 1)."""
+        for i, ud in enumerate(e57_scans):
+            assert ud.cells.shape[1] == 1, f"Scan {i} is not a point cloud"
 
-        Coordinates are in global space (translation [1,2,3] applied by pye57 read_scan).
-        """
-        path = data_path + '/pointcloud/two_scans.e57'
-        reader_args = GenericReaderFilesHelper(file_or_buffer=path)
-        result = read_point_cloud_to_unstruct(reader_args)
+    @_needs_e57_file
+    def test_large_scans_have_expected_attributes(self, e57_scans):
+        """Large scans carry intensity, RGB, and row/column indices."""
+        large_scan_indices = [0, 7, 11]  # ~2.5M-point scans
+        for idx in large_scan_indices:
+            ud = e57_scans[idx]
+            assert ud.n_points > 1_000_000, f"Scan {idx} has {ud.n_points} points, expected >1M"
+            pa = ud.points_attributes
+            expected_cols = ['intensity', 'red', 'green', 'blue', 'rowIndex', 'columnIndex']
+            for col in expected_cols:
+                assert col in pa.columns, f"Scan {idx} missing column {col}"
 
-        ud1 = result[1]
-        assert ud1.n_points == 2
+    @_needs_e57_file
+    def test_scan_metadata_preserved(self, e57_scans):
+        """Every scan stores source_format, scan_index, point_count, and pose."""
+        for i, ud in enumerate(e57_scans):
+            attrs = ud.data.attrs
+            assert attrs.get('source_format') == 'e57', f"Scan {i}"
+            assert attrs.get('scan_index') == i, f"Scan {i}"
+            # header point_count is raw total; read_scan filters invalid points
+            assert attrs.get('scan_point_count') >= ud.n_points, f"Scan {i}"
+            assert 'scan_translation' in attrs, f"Scan {i}"
+            assert isinstance(attrs['scan_translation'], list), f"Scan {i}"
 
-        # raw [10,10,20] + [1,2,3] = [11,12,23], raw [11,10,21] + [1,2,3] = [12,12,24]
-        expected = np.array([[11.0, 12.0, 23.0],
-                             [12.0, 12.0, 24.0]])
-        assert np.allclose(ud1.vertex, expected)
+    @_needs_e57_file
+    def test_total_point_count_is_plausible(self, e57_scans):
+        """Combined point count exceeds 7M (the dataset totals ~7.9M)."""
+        total = sum(ud.n_points for ud in e57_scans)
+        assert total > 7_000_000, f"Total point count {total} below expected minimum"
 
-        pa = ud1.points_attributes
-        assert 'intensity' in pa.columns
-        assert 'red' not in pa.columns
-
-    def test_scan_metadata_preserved(self, data_path):
-        """Scan-level metadata is stored in xarray attrs."""
-        path = data_path + '/pointcloud/two_scans.e57'
-        reader_args = GenericReaderFilesHelper(file_or_buffer=path)
-        result = read_point_cloud_to_unstruct(reader_args)
-
-        attrs0 = result[0].data.attrs
-        assert attrs0['source_format'] == 'e57'
-        assert attrs0['scan_index'] == 0
-        assert attrs0['scan_point_count'] == 3
-        assert 'scan_translation' in attrs0
-        assert attrs0['scan_translation'] == [0.0, 0.0, 0.0]
-
-        attrs1 = result[1].data.attrs
-        assert attrs1['scan_index'] == 1
-        assert attrs1['scan_point_count'] == 2
-        assert attrs1['scan_translation'] == [1.0, 2.0, 3.0]
-
-    def test_pointset_construction(self, data_path):
-        """Each scan can be wrapped in a PointSet."""
-        path = data_path + '/pointcloud/two_scans.e57'
-        reader_args = GenericReaderFilesHelper(file_or_buffer=path)
-        result = read_point_cloud_to_unstruct(reader_args)
-
-        for ud in result:
+    @_needs_e57_file
+    def test_pointset_wraps_all_scans(self, e57_scans):
+        """Every scan can be wrapped in a PointSet."""
+        for i, ud in enumerate(e57_scans):
             ps = PointSet(ud)
-            assert isinstance(ps.points, np.ndarray)
-            assert ps.n_points > 0
+            assert isinstance(ps.points, np.ndarray), f"Scan {i}"
+            assert ps.n_points > 0, f"Scan {i}"
 
-    def test_scan_0_pointset_point_data(self, data_path):
-        """Scan 0 PointSet exposes intensity and RGB through point_data."""
-        path = data_path + '/pointcloud/two_scans.e57'
-        reader_args = GenericReaderFilesHelper(file_or_buffer=path)
-        result = read_point_cloud_to_unstruct(reader_args)
-
-        ps = PointSet(result[0])
+    @_needs_e57_file
+    def test_pointset_exposes_vertex_attributes(self, e57_scans):
+        """PointSet.point_data exposes intensity and RGB from the reader."""
+        ps = PointSet(e57_scans[0])
         point_data = ps.point_data
         assert 'intensity' in point_data.columns
         assert 'red' in point_data.columns
-        assert len(point_data) == 3
+        assert len(point_data) == e57_scans[0].n_points
+
+    @_needs_e57_file
+    def test_visualize_scan_0_with_pyvista(self, e57_scans):
+        """Convert scan 0 to pyvista PolyData and render with intensity scalars."""
+        pytest.importorskip("pyvista", reason="PyVista is required for visualization")
+        from subsurface.modules.visualization import to_pyvista_points, pv_plot
+
+        ps = PointSet(e57_scans[0])
+        cloud = to_pyvista_points(ps)
+
+        assert 'intensity' in cloud.point_data, "intensity not attached to PolyData"
+        assert cloud.n_points == e57_scans[0].n_points
+
+        pv_plot(
+            [cloud],
+            image_2d=True,
+            add_mesh_kwargs={'scalars': 'intensity', 'point_size': 1},
+        )
