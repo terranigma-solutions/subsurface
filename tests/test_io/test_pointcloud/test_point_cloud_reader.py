@@ -10,11 +10,10 @@ from subsurface.core.structs.base_structures import UnstructuredData
 from subsurface.core.structs.unstructured_elements import PointSet
 from subsurface.api import read_point_cloud_to_unstruct
 
-pytestmark = pytest.mark.read_mesh
-pytestmark = pytest.mark.skipif(
+pytestmark = [pytest.mark.read_mesh, pytest.mark.skipif(
     condition=(RequirementsLevel.MESH) not in RequirementsLevel.REQUIREMENT_LEVEL_TO_TEST(),
     reason="Need to set REQUIREMENT_LEVEL=MESH or REQUIREMENT_LEVEL=ALL"
-)
+)]
 
 
 def _build_ply_path(filename):

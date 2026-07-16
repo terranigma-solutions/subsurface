@@ -8,13 +8,13 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures import UnstructuredData
 from subsurface.core.structs.unstructured_elements import PointSet
 from subsurface.api import read_point_cloud_to_unstruct
-from tests.test_io.test_meshes.test_point_cloud_reader import (
+from tests.test_io.test_pointcloud.test_point_cloud_reader import (
     _build_binary_dir,
     _write_and_verify_roundtrip,
     _needs_binary_write,
 )
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.read_mesh, pytest.mark.slow]
 
 
 def _build_e57_path():
