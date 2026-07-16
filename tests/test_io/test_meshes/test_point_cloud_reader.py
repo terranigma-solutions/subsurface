@@ -47,6 +47,54 @@ _needs_pred_mineralogy = pytest.mark.skipif(
     reason="Z1_PredMineralogy.ply not found. Set TERRA_PATH_DEVOPS or ensure OneDrive is mounted.",
 )
 
+_WRITE_BINARIES = os.getenv("WRITE_POINT_CLOUD_BINARIES", "").strip() != ""
+
+_needs_binary_write = pytest.mark.skipif(
+    not _WRITE_BINARIES,
+    reason="Set WRITE_POINT_CLOUD_BINARIES=1 to enable binary export tests",
+)
+
+
+def _build_binary_dir():
+    devops_path = os.getenv("TERRA_PATH_DEVOPS")
+    if devops_path:
+        return os.path.join(devops_path, "point cloud", "binary")
+    return os.path.expanduser(
+        "/home/leguark/Data/OneDrive/Terranigma/DevOps/SubsurfaceTestData/point cloud/binary"
+    )
+
+
+def _write_and_verify_roundtrip(ud, le_path, label):
+    binary = ud.to_binary()
+    os.makedirs(os.path.dirname(le_path), exist_ok=True)
+    with open(le_path, "wb") as f:
+        f.write(binary)
+
+    assert os.path.getsize(le_path) > 0, f"{label}: binary file is empty"
+
+    rt = UnstructuredData.from_binary_le(le_path)
+
+    assert rt.vertex.shape == ud.vertex.shape, f"{label}: vertex shape mismatch"
+    assert rt.cells.shape == ud.cells.shape, f"{label}: cells shape mismatch"
+    assert np.allclose(rt.vertex, ud.vertex, atol=1e-5), f"{label}: vertex values differ"
+
+    pa_orig = ud.points_attributes
+    pa_rt = rt.points_attributes
+    assert list(pa_rt.columns) == list(pa_orig.columns), f"{label}: attribute column mismatch"
+
+    for col in pa_orig.columns:
+        orig_vals = pa_orig[col].values
+        rt_vals = pa_rt[col].values
+        assert np.allclose(rt_vals, orig_vals, atol=1e-5, equal_nan=True), f"{label}: column {col} differs"
+
+    extent = ud.extent.tolist()
+    file_mb = os.path.getsize(le_path) / (1024 * 1024)
+    print(f"\n{label}:")
+    print(f"  points: {ud.n_points}")
+    print(f"  extent [xmin xmax ymin ymax zmin zmax]: {extent}")
+    print(f"  binary size: {file_mb:.1f} MB")
+    print(f"  output: {le_path}")
+
 
 def test_ply_format_detection():
     reader_args = GenericReaderFilesHelper(file_or_buffer="something.ply")
@@ -222,6 +270,12 @@ class TestReadZinnwaldPly:
             add_mesh_kwargs={'scalars': 'RGB', 'rgb': True, 'point_size': 1},
         )
 
+    @_needs_zinnwald
+    @_needs_binary_write
+    def test_export_binary_and_roundtrip(self, zinnwald_point_cloud):
+        le_path = os.path.join(_build_binary_dir(), "zinnwald.le")
+        _write_and_verify_roundtrip(zinnwald_point_cloud, le_path, "zinnwald")
+
 
 @pytest.mark.skipif(
     condition=check_requirements(RequirementsLevel.MESH | RequirementsLevel.PLOT),
@@ -327,3 +381,9 @@ class TestReadZinnwaldPredMineralogy:
             image_2d=False,
             add_mesh_kwargs={'scalars': 'scalar_Zinnwaldite', 'point_size': 1},
         )
+
+    @_needs_pred_mineralogy
+    @_needs_binary_write
+    def test_export_binary_and_roundtrip(self, pred_mineralogy_point_cloud):
+        le_path = os.path.join(_build_binary_dir(), "zinnwaldHSIMaps", "Z1_PredMineralogy.le")
+        _write_and_verify_roundtrip(pred_mineralogy_point_cloud, le_path, "Z1_PredMineralogy")

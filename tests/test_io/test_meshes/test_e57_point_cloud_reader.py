@@ -8,6 +8,11 @@ from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
 from subsurface.core.structs.base_structures import UnstructuredData
 from subsurface.core.structs.unstructured_elements import PointSet
 from subsurface.api import read_point_cloud_to_unstruct
+from tests.test_io.test_meshes.test_point_cloud_reader import (
+    _build_binary_dir,
+    _write_and_verify_roundtrip,
+    _needs_binary_write,
+)
 
 pytestmark = pytest.mark.slow
 
@@ -175,3 +180,23 @@ class TestReadE57ParkingLot:
             image_2d=True,
             add_mesh_kwargs={'scalars': 'RGB', 'rgb': True, 'point_size': 1},
         )
+
+    @_needs_e57_file
+    @_needs_binary_write
+    def test_export_all_scans_to_binary_and_roundtrip(self, e57_scans):
+        all_vertices = []
+        base = os.path.join(_build_binary_dir(), "parking-lot-updated")
+        for i, ud in enumerate(e57_scans):
+            le_path = os.path.join(base, f"scan_{i:02d}.le")
+            _write_and_verify_roundtrip(ud, le_path, f"parking-lot scan {i}")
+            all_vertices.append(ud.vertex)
+
+        combined = np.vstack(all_vertices)
+        cmin = combined.min(axis=0)
+        cmax = combined.max(axis=0)
+        total = sum(ud.n_points for ud in e57_scans)
+        agg_extent = [cmin[0], cmax[0], cmin[1], cmax[1], cmin[2], cmax[2]]
+        print(f"\nparking-lot aggregate:")
+        print(f"  scans: {len(e57_scans)}")
+        print(f"  total points: {total}")
+        print(f"  aggregate extent [xmin xmax ymin ymax zmin zmax]: {agg_extent}")
