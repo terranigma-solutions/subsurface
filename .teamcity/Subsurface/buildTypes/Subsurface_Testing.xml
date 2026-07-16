@@ -104,6 +104,8 @@ source venv/bin/activate
 
 pip install --verbose -r requirements/requirements_mesh.txt
 
+pip install --verbose -r requirements/requirements_pointcloud.txt
+
 export REQUIREMENT_LEVEL="${REQUIREMENT_LEVEL:-READ_MESH}"
 echo "REQUIREMENT_LEVEL is ${REQUIREMENT_LEVEL}"
 
