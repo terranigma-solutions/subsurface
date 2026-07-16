@@ -131,8 +131,8 @@ class TestReadE57ParkingLot:
         assert len(point_data) == e57_scans[0].n_points
 
     @_needs_e57_file
-    def test_visualize_scan_0_with_pyvista(self, e57_scans):
-        """Convert scan 0 to pyvista PolyData and render with intensity scalars."""
+    def test_visualize_intensity_with_viridis(self, e57_scans):
+        """Render scan 0 with intensity mapped through viridis colormap."""
         pytest.importorskip("pyvista", reason="PyVista is required for visualization")
         from subsurface.modules.visualization import to_pyvista_points, pv_plot
 
@@ -146,4 +146,32 @@ class TestReadE57ParkingLot:
             [cloud],
             image_2d=True,
             add_mesh_kwargs={'scalars': 'intensity', 'point_size': 1},
+        )
+
+    @_needs_e57_file
+    def test_visualize_rgb_colors(self, e57_scans):
+        """Render scan 0 with original scanner RGB colors, bypassing colormap."""
+        pytest.importorskip("pyvista", reason="PyVista is required for visualization")
+        from subsurface.modules.visualization import to_pyvista_points, pv_plot
+
+        ps = PointSet(e57_scans[0])
+        cloud = to_pyvista_points(ps)
+
+        assert 'red' in cloud.point_data, "red not attached to PolyData"
+        assert 'green' in cloud.point_data
+        assert 'blue' in cloud.point_data
+
+        rgb = np.column_stack([
+            cloud.point_data["red"],
+            cloud.point_data["green"],
+            cloud.point_data["blue"],
+        ]).astype(np.uint8)
+        assert rgb.shape == (cloud.n_points, 3)
+
+        cloud.point_data["RGB"] = rgb
+
+        pv_plot(
+            [cloud],
+            image_2d=True,
+            add_mesh_kwargs={'scalars': 'RGB', 'rgb': True, 'point_size': 1},
         )
