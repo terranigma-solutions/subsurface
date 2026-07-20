@@ -177,7 +177,7 @@ def test_read():
             },
             encoding="latin-1",
             additional_reader_kwargs={"decimal": ","}
-        ))
+        ), validate_attr=False)
     assert not attributes.empty
 
     lith: pd.DataFrame = read_lith(

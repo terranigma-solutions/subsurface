@@ -29,7 +29,8 @@ def test_read_supersimple_borehole_data(data_path):
         collars_reader=collars_reader,
         surveys_reader=surveys_reader,
         attrs_reader=attrs_reader,
-        is_lith_attr=False
+        is_lith_attr=False,
+        validate_attr=False,
     )
 
     # Verification

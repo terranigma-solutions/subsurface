@@ -74,14 +74,18 @@ def _serialize_column(values: np.ndarray) -> bytes:
 
 
 def _filter_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
-    numeric = []
+    numeric_cols = {}
     for col in df.columns:
         series = df[col]
         if np.issubdtype(series.dtype, np.integer) or np.issubdtype(series.dtype, np.bool_):
-            numeric.append(col)
+            numeric_cols[col] = series
         elif np.issubdtype(series.dtype, np.floating):
-            numeric.append(col)
-    return df[numeric]
+            numeric_cols[col] = series
+        elif series.dtype == object:
+            converted = pd.to_numeric(series, errors='coerce')
+            if converted.notna().sum() >= series.notna().sum():
+                numeric_cols[col] = converted
+    return pd.DataFrame(numeric_cols, index=df.index) if numeric_cols else pd.DataFrame(index=df.index)
 
 
 class LiquidEarthMesh:

@@ -4,6 +4,7 @@ from tests.conftest import RequirementsLevel, check_requirements
 
 import pytest
 import numpy as np
+import pandas as pd
 
 from subsurface import UnstructuredData, StructuredData, optional_requirements
 from subsurface.core.structs.unstructured_elements import TriSurf
@@ -94,3 +95,73 @@ def test_profile_to_binary(data_path):
     new_file.write(texture_binary)
 
     return mesh_binary
+
+
+class TestFilterNumericColumns:
+    def test_keeps_numeric_columns_when_mixed_with_object(self):
+        """Regression: object-dtype columns containing only numeric values
+        must be included in _filter_numeric_columns output with a numeric dtype."""
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _filter_numeric_columns
+
+        df = pd.DataFrame({
+            "well_id": pd.Series([0, 1, 2], dtype=object),
+            "depth": pd.Series([1.5, 2.0, 3.0], dtype=object),
+            "Cu_pct": pd.Series(["4.0", "3.0", "2.0"], dtype=object),
+            "As_pct": pd.Series(["n.a.", "<0.005", "0.001"], dtype=object),
+        })
+
+        result = _filter_numeric_columns(df)
+
+        assert "well_id" in result.columns
+        assert "depth" in result.columns
+        assert "Cu_pct" in result.columns
+        assert "As_pct" not in result.columns
+
+        assert pd.api.types.is_numeric_dtype(result["Cu_pct"])
+        assert result["Cu_pct"].tolist() == [4.0, 3.0, 2.0]
+
+    def test_keeps_mixed_int_float_numeric(self):
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _filter_numeric_columns
+
+        df = pd.DataFrame({
+            "a": pd.Series([1, 2, 3], dtype=np.int32),
+            "b": pd.Series([1.1, 2.2, 3.3], dtype=np.float64),
+            "c": pd.Series([True, False, True], dtype=bool),
+        })
+
+        result = _filter_numeric_columns(df)
+        assert list(result.columns) == ["a", "b", "c"]
+
+    def test_excludes_all_text_when_no_numeric(self):
+        from subsurface.core.structs.base_structures._liquid_earth_mesh import _filter_numeric_columns
+
+        df = pd.DataFrame({
+            "text": pd.Series(["foo", "bar", "baz"], dtype=object),
+        })
+
+        result = _filter_numeric_columns(df)
+        assert result.empty
+
+    def test_round_trip_unstructured_data_with_mixed_attrs(self):
+        df_vertex = pd.DataFrame({
+            "well_id": pd.Series([0, 0, 1, 1], dtype=object),
+            "depth": pd.Series([0.0, 1.0, 0.0, 1.0], dtype=object),
+            "Cu_pct": pd.Series([4.0, 3.0, 2.0, 1.0], dtype=object),
+            "notes": pd.Series(["", "", "lost", ""], dtype=object),
+        })
+
+        unstr = UnstructuredData.from_array(
+            vertex=np.array([[0, 0, 0], [0, 0, 1], [1, 0, 0], [1, 0, 1]], dtype=np.float32),
+            cells=np.array([[0, 1], [2, 3]], dtype=np.int32),
+            vertex_attr=df_vertex,
+        )
+
+        header = unstr._set_binary_header()
+        attr_names = [m["name"] for m in header["vertex_attrs"]]
+        assert "well_id" in attr_names
+        assert "depth" in attr_names
+        assert "Cu_pct" in attr_names
+        assert "notes" not in attr_names
+
+        binary = unstr.to_binary()
+        assert len(binary) > 0

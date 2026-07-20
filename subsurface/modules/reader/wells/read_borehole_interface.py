@@ -43,19 +43,36 @@ def read_lith(reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:
 def read_attributes(reader_helper: GenericReaderFilesHelper, is_lith: bool = False, validate_attr: bool = True) -> pd.DataFrame:
     if reader_helper.index_col is False:
         reader_helper.index_col = 0
-        
+
     d = check_format_and_read_to_df(reader_helper)
 
     _map_rows_and_cols_inplace(d, reader_helper)
+
+    if not is_lith:
+        _validate_coerce_numeric_columns(d, reader_helper)
+
     _coerce_numeric_columns(d, reader_helper)
     if validate_attr is False:
         return d
-    
+
     if is_lith:
         d = _validate_lith_data(d, reader_helper)
     else:
-        _validate_attr_data(d)
+        _validate_attr_dtypes(d)
     return d
+
+
+def _validate_coerce_numeric_columns(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> None:
+    if not reader_helper.coerce_numeric:
+        return
+    missing = set(reader_helper.coerce_numeric) - set(d.columns)
+    if missing:
+        names = ", ".join(sorted(missing))
+        raise ValueError(
+            f"attrs_reader.coerce_numeric references columns not present after reading: {names}. "
+            f"Available columns: {list(d.columns)}. "
+            f"Ensure these columns are included in usecols and match the source file headers."
+        )
 
 
 def _coerce_numeric_columns(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> None:
@@ -102,9 +119,30 @@ def _validate_survey_data(d):
     return d_no_singles
 
 
-def _validate_attr_data(d):
-    assert d.columns.isin(['base']).any(), ('base column must be present in the file. '
-                                            'Use columns_map to assign column names to these fields.')
+def _validate_attr_dtypes(d: pd.DataFrame) -> None:
+    if 'base' not in d.columns:
+        raise ValueError(
+            "base column must be present in the attributes file. "
+            "Use columns_map to map a source column to 'base'."
+        )
+
+    structural = {'top', 'base', 'altitude'}
+    assay_cols = [c for c in d.columns if c not in structural]
+
+    non_numeric = []
+    for col in assay_cols:
+        series = d[col]
+        if not (pd.api.types.is_numeric_dtype(series) or pd.api.types.is_bool_dtype(series)):
+            non_numeric.append(col)
+
+    if non_numeric:
+        names = ", ".join(non_numeric)
+        raise ValueError(
+            f"Non-numeric assay columns cannot be imported: {names}. "
+            f"Add these columns to coerce_numeric, preprocess their values "
+            f"(e.g. replace '<0.005' and 'n.a.' with numeric equivalents), "
+            f"or exclude them via usecols."
+        )
 
 
 def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper) -> pd.DataFrame:

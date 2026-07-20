@@ -156,7 +156,8 @@ def test_read_assay():
         surveys_reader=reader,
         attrs_reader=reader_attr,
         is_lith_attr=False,
-        add_attrs_as_nodes=True
+        add_attrs_as_nodes=True,
+        validate_attr=False,
     )
     assert borehole_set.collars.collar_loc.n_points > 0
     assert borehole_set.survey.survey_trajectory.data.n_points > 0

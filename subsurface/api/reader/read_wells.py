@@ -19,7 +19,8 @@ def read_wells(
         is_lith_attr: bool,
         number_nodes: int = 10,
         add_attrs_as_nodes: bool = False,
-        duplicate_attr_depths: bool = False 
+        duplicate_attr_depths: bool = False,
+        validate_attr: bool = True,
 ) -> BoreholeSet:
     # ! FIGUROUT IF WE NEED LITH
     
@@ -47,7 +48,7 @@ def read_wells(
         raise ValueError(f"Error while reading surveys: {e}")
     
     try:
-        attrs: pd.DataFrame = read_attributes(attrs_reader, is_lith=is_lith_attr)
+        attrs: pd.DataFrame = read_attributes(attrs_reader, is_lith=is_lith_attr, validate_attr=validate_attr)
     except Exception as e:
         raise ValueError(f"Error while reading attributes: {e}")
     
