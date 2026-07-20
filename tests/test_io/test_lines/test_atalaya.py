@@ -9,6 +9,7 @@ from subsurface.core.geological_formats.boreholes.boreholes import BoreholeSet, 
 from subsurface.core.geological_formats.boreholes.collars import Collars
 from subsurface.core.geological_formats.boreholes.survey import Survey
 from subsurface.core.reader_helpers.readers_data import GenericReaderFilesHelper
+from subsurface.core.structs.base_structures.unstructured_data import UnstructuredData
 from subsurface.api.reader.read_wells import read_wells
 from tests.conftest import RequirementsLevel
 
@@ -577,3 +578,63 @@ def test_atalaya_serialized_json_roundtrip():
     assert not mr01_attrs.empty
     assert mr01_attrs["Cu %"].dropna().notna().any()
     assert mr01_attrs["Au ppm"].dropna().notna().any()
+
+
+_EXPECTED_ASSAY_COLS = ["Cu %", "Au ppm", "Fe %", "S %", "Pb %", "Zn %"]
+
+
+def test_atalaya_le_binary_roundtrip(tmp_path):
+    """Verify that the exact JSON config produces a .le trajectory binary
+    containing all selected assay columns with numeric values."""
+    collar_reader = GenericReaderFilesHelper(
+        file_or_buffer=os.path.join(_DATA_PATH, "Collar_Mojarra.csv"),
+        encoding="latin-1",
+        columns_map={"BHID": "id", "XCOLLAR": "x", "YCOLLAR": "y", "ZCOLLAR": "z"},
+        additional_reader_kwargs={"sep": ";"},
+    )
+    survey_reader = GenericReaderFilesHelper(
+        file_or_buffer=os.path.join(_DATA_PATH, "Survey_Mojarra.csv"),
+        columns_map={"AT": "md", "BRG": "azi", "DIP": "dip"},
+        additional_reader_kwargs={"sep": ";"},
+    )
+    assay_reader = GenericReaderFilesHelper(
+        file_or_buffer=os.path.join(_DATA_PATH, "Assay_Mojarra.csv"),
+        usecols=["HoleID", "From", "To"] + _EXPECTED_ASSAY_COLS,
+        columns_map={"HoleID": "id", "From": "top", "To": "base"},
+        coerce_numeric=_EXPECTED_ASSAY_COLS,
+        additional_reader_kwargs={"sep": ";"},
+    )
+
+    borehole_set = read_wells(
+        collars_reader=collar_reader,
+        surveys_reader=survey_reader,
+        attrs_reader=assay_reader,
+        is_lith_attr=False,
+        add_attrs_as_nodes=True,
+    )
+
+    base_path = tmp_path / "atalaya"
+    borehole_set.to_binary(str(base_path))
+
+    traj_path = str(base_path) + "_trajectory.le"
+    assert os.path.isfile(traj_path), f"Expected {traj_path} to exist"
+
+    unstruct = UnstructuredData.from_binary_le(traj_path)
+    points = unstruct.points_attributes
+
+    for col in _EXPECTED_ASSAY_COLS:
+        assert col in points.columns, f"Missing column: {col}"
+
+    well_id_col = borehole_set.survey.get_well_num_id
+    assay_wells = [w for w in ["MR01", "MR02", "MR03", "MR04"] if w in borehole_set.survey.well_id_mapper]
+    found = {col: False for col in _EXPECTED_ASSAY_COLS}
+    for well in assay_wells:
+        wid = well_id_col(well)
+        w_attrs = points[points["well_id"] == wid]
+        if w_attrs.empty:
+            continue
+        for col in _EXPECTED_ASSAY_COLS:
+            if not found[col]:
+                found[col] = w_attrs[col].dropna().notna().any()
+    for col in _EXPECTED_ASSAY_COLS:
+        assert found[col], f"{col} has no non-null values across any Atalaya well"
