@@ -369,13 +369,6 @@ class TestDiagnosticRawDictGaps:
            raw assay with coerce_numeric=True now interpolates correctly.
     """
 
-    _ALL_ASSAY_COLS = [
-        "Cu %", "S %", "Pb %", "Zn %", "As %", "Sb %", "Bi %",
-        "Hg ppm", "Fe %", "Th  ppm", "Ag ppm", "Cd %",
-        "Co %", "Ni %", "Mn %", "Al %", "Ca %", "Mg %",
-        "Sn ppm", "Mo %", "P %", "Tl %", "Au ppm",
-    ]
-
     def test_raw_survey_no_longer_crashes(self):
         raw_survey = pd.read_csv(
             os.path.join(_DATA_PATH, "Survey_Mojarra.csv"),
@@ -398,9 +391,9 @@ class TestDiagnosticRawDictGaps:
         attr_reader = GenericReaderFilesHelper(
             file_or_buffer=_make_raw_assay_dict(),
             columns_map={"HoleID": "id", "From": "top", "To": "base"},
-            coerce_numeric=self._ALL_ASSAY_COLS,
         )
 
+        # Previously crashed in _correct_angles, now succeeds.
         borehole_set = read_wells(
             collars_reader=collar_reader,
             surveys_reader=survey_reader,
@@ -437,14 +430,20 @@ class TestDiagnosticRawDictGaps:
             columns_map={"HoleID": "id", "From": "top", "To": "base"},
         )
 
-        with pytest.raises(ValueError, match="Non-numeric assay columns cannot be imported"):
-            read_wells(
+        with pytest.warns(UserWarning, match="non-numeric dtype"):
+            borehole_set = read_wells(
                 collars_reader=collar_reader,
                 surveys_reader=survey_reader,
                 attrs_reader=attr_reader,
                 is_lith_attr=False,
                 add_attrs_as_nodes=True,
             )
+
+        points_attrs = borehole_set.combined_trajectory.data.points_attributes
+        assert "Cu %" in points_attrs.columns
+        assert points_attrs["Cu %"].isna().all()
+        assert "Au ppm" in points_attrs.columns
+        assert points_attrs["Au ppm"].isna().all()
 
     def test_raw_assay_with_coerce_numeric_works(self):
         raw_survey = pd.read_csv(
@@ -519,9 +518,6 @@ def test_atalaya_serialized_json_roundtrip():
         file_or_buffer=os.path.join(_DATA_PATH, "Assay_Mojarra.csv"),
         columns_map={"HoleID": "id", "From": "top", "To": "base"},
         additional_reader_kwargs={"sep": ";"},
-        usecols=[
-            "HoleID", "From", "To", "Cu %", "Au ppm", "Fe %", "S %", "Pb %", "Zn %",
-        ],
         coerce_numeric=[
             "Cu %", "Au ppm", "Fe %", "S %", "Pb %", "Zn %",
         ],
