@@ -4,12 +4,47 @@ from tests.conftest import RequirementsLevel, check_requirements
 
 import pytest
 import numpy as np
+import pandas as pd
 
 from subsurface import UnstructuredData, StructuredData, optional_requirements
+from subsurface.core.structs.base_structures._liquid_earth_mesh import _filter_numeric_columns
 from subsurface.core.structs.unstructured_elements import TriSurf
 from subsurface.modules.reader.read_netcdf import read_unstruct
 from subsurface.modules.reader.profiles.profiles_core import create_mesh_from_trace
 from subsurface.modules.visualization import to_pyvista_mesh_and_texture
+
+
+def test_filter_numeric_columns():
+    source = pd.DataFrame(
+        {
+            "native_integer": pd.Series([1, 2, 3], dtype="int64"),
+            "native_float": pd.Series([1.5, np.nan, 3.5], dtype="float64"),
+            "native_boolean": pd.Series([True, False, True], dtype="bool"),
+            "numeric_object": pd.Series(["1.5", None, "3.5"], dtype=object),
+            "mixed_object": pd.Series(["1.5", "<0.005", None], dtype=object),
+            "text_object": pd.Series(["sand", "clay", None], dtype=object),
+            "empty_object": pd.Series([None, None, None], dtype=object),
+        }
+    )
+
+    result = _filter_numeric_columns(source)
+
+    expected_columns = [
+        "native_integer",
+        "native_float",
+        "native_boolean",
+        "numeric_object",
+    ]
+    assert list(result.columns) == expected_columns
+
+    assert np.issubdtype(result["numeric_object"].dtype, np.floating)
+    expected_values = np.array([1.5, np.nan, 3.5])
+    np.testing.assert_array_almost_equal(
+        result["numeric_object"].to_numpy(), expected_values
+    )
+    assert result["numeric_object"].notna().equals(
+        source["numeric_object"].notna()
+    )
 
 
 @pytest.fixture(scope='module')
