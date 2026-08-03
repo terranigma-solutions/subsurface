@@ -3,7 +3,7 @@ import numpy as np
 from subsurface.modules.visualization import to_pyvista_line, init_plotter, to_pyvista_points, pyvista_to_matplotlib
 
 
-def _plot(scalar, trajectory, collars=None, lut: int = 100, image_2d=True, radius=None):
+def _plot(scalar, trajectory, collars=None, lut: int = 100, image_2d=True, radius=None, ve=1):
     if radius is None:
         radius = trajectory.radius
     s = to_pyvista_line(
@@ -14,7 +14,7 @@ def _plot(scalar, trajectory, collars=None, lut: int = 100, image_2d=True, radiu
     
     if scalar is not None:
         s = clip_nan_points(s, scalar_name=scalar)
-    p = init_plotter(image_2d=image_2d)
+    p = init_plotter(image_2d=image_2d, ve=ve)
     import matplotlib.pyplot as plt
     boring_cmap = plt.get_cmap("viridis", lut)
     p.add_mesh(s, cmap=boring_cmap)
