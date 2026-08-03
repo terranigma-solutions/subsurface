@@ -96,8 +96,11 @@ def _validate_survey_data(d):
         d['inc'] = 180
         d['azi'] = 0
 
-    # Drop wells that contain only one value, ensuring that we keep rows only when there are duplicates
-    d_no_singles = d[d.index.duplicated(keep=False)]
+    # A positive-depth singleton is a valid total-depth survey. The trajectory
+    # builder adds its missing collar station at measured depth zero.
+    station_count = d.groupby(level=0)['md'].transform('size')
+    valid_single_station = station_count.eq(1) & d['md'].gt(0)
+    d_no_singles = d[station_count.gt(1) | valid_single_station]
 
     return d_no_singles
 
@@ -155,5 +158,37 @@ def _validate_lith_data(d: pd.DataFrame, reader_helper: GenericReaderFilesHelper
     # * Make sure values are positive
     d['top'] = np.abs(d['top'])
     d['base'] = np.abs(d['base'])
+    _warn_about_ambiguous_lithology_intervals(d)
 
     return d
+
+
+def _warn_about_ambiguous_lithology_intervals(d: pd.DataFrame) -> None:
+    zero_thickness_count = int(d['top'].eq(d['base']).sum())
+    overlapping_well_count = 0
+    conflicting_interval_count = 0
+
+    for _, intervals in d.groupby(level=0, sort=False):
+        sorted_intervals = intervals.sort_values(['top', 'base'])
+        previous_base = sorted_intervals['base'].cummax().shift()
+        overlapping_well_count += int(sorted_intervals['top'].lt(previous_base).any())
+
+        lithologies_per_interval = intervals.groupby(
+            ['top', 'base'],
+            dropna=False,
+            observed=True,
+        )['component lith'].nunique(dropna=True)
+        conflicting_interval_count += int(lithologies_per_interval.gt(1).sum())
+
+    if not any((zero_thickness_count, overlapping_well_count, conflicting_interval_count)):
+        return
+
+    warnings.warn(
+        'Lithology data contains '
+        f'{zero_thickness_count} zero-thickness intervals, overlapping intervals in '
+        f'{overlapping_well_count} wells, and {conflicting_interval_count} interval '
+        'keys with conflicting lithologies. The records are preserved; resolve these '
+        'ambiguities before treating them as a canonical lithology log.',
+        UserWarning,
+        stacklevel=2,
+    )
