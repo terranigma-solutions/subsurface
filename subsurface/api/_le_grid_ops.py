@@ -36,12 +36,12 @@ def _axis_values(coordinate, dim):
             span = axis[-1] - axis[0]
             spacing = span / (axis.size - 1)
             steps = np.diff(axis)
-        if not np.isfinite(span) or not np.isfinite(spacing) or spacing <= 0 or np.any(steps <= 0):
+        if (not np.isfinite(span) or not np.isfinite(spacing) or spacing <= 0
+                or not np.all(np.isfinite(steps)) or np.any(steps <= 0)):
             raise ValueError(f"Axis {dim} must have positive finite ascending spacing")
         reconstructed = np.linspace(axis[0], axis[-1], axis.size)
         tolerance = spacing * AXIS_SPACING_RTOL
-        if (np.any(np.abs(steps - spacing) > tolerance)
-                or np.any(np.abs(reconstructed - axis) > tolerance)):
+        if np.any(np.abs(reconstructed - axis) > tolerance):
             raise ValueError(f"Axis {dim} is not uniform within the spacing-relative tolerance")
     return axis
 

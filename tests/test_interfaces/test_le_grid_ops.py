@@ -72,17 +72,59 @@ def test_invalid_coordinates_rejected(tmp_path, coords):
     assert not list(tmp_path.iterdir())
 
 
-def test_spacing_not_origin_controls_tolerance(tmp_path):
-    # Origin-relative allclose would accept this half-sample error.
-    grid = make_grid(coords={"dim0": [1e12, 1e12 + 1, 1e12 + 2.5, 1e12 + 3]})
+@pytest.mark.parametrize("origin,span,perturbation", [(1e6, 0.3, 0.025), (1e12, 3, 0.5), (1e16, 10, 2)])
+def test_spacing_not_origin_controls_tolerance(tmp_path, origin, span, perturbation):
+    # Origin-relative allclose would accept this sample-scale error.
+    axis = np.linspace(origin, origin + span, 4)
+    axis[2] += perturbation
+    assert np.all(np.diff(axis) > 0)
+    grid = make_grid(coords={"dim0": axis})
     with pytest.raises(ValueError, match="uniform"):
         ops.validate_le_grid(grid)
-    # Even a reader-generated linspace can have sample-scale rounding jitter.
-    grid = make_grid(coords={"dim0": np.linspace(1e16, 1e16 + 10, 4)})
-    source = tmp_path / "rounded.le"
-    source.write_bytes(grid.to_binary())
     with pytest.raises(ValueError, match="uniform"):
+        ops.write_le_grid(grid, tmp_path / "irregular.le", sources=[])
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("origin,span", [(1e6, 0.3), (1e12, 0.3), (1e16, 10)])
+def test_large_origin_rounded_linspace_roundtrip(tmp_path, origin, span):
+    axis = np.linspace(origin, origin + span, 4)
+    steps = np.diff(axis)
+    spacing = (axis[-1] - axis[0]) / (axis.size - 1)
+    assert np.all(np.isfinite(steps)) and np.all(steps > 0)
+    assert np.unique(steps).size > 1
+    assert np.any(np.abs(steps - spacing) > spacing * ops.AXIS_SPACING_RTOL)
+    grid = make_grid(dtype="int64", coords={"dim0": axis})
+    source = tmp_path / "rounded.le"
+    original = grid.to_binary()
+    source.write_bytes(original)
+    reader_grid = StructuredData.from_binary_le(source)
+    ops.validate_le_grid(reader_grid)
+    loaded = ops.load_le_grid(source)
+    np.testing.assert_array_equal(loaded.data.dim0, axis)
+    output = ops.write_le_grid(loaded, tmp_path / "copy.le", sources=[source])
+    restored = ops.load_le_grid(output)
+    assert restored.data.identical(grid.data)
+    assert restored.values.dtype == grid.values.dtype
+    assert restored.active_data_array_name == grid.active_data_array_name
+    assert source.read_bytes() == original
+    assert_no_temps(tmp_path)
+
+
+def test_large_origin_collapsed_linspace_rejected(tmp_path):
+    axis = np.linspace(1e16, 1e16 + 2, 4)
+    assert np.any(np.diff(axis) <= 0)
+    grid = make_grid(coords={"dim0": axis})
+    with pytest.raises(ValueError, match="ascending spacing"):
+        ops.validate_le_grid(grid)
+    with pytest.raises(ValueError, match="ascending spacing"):
+        ops.write_le_grid(grid, tmp_path / "collapsed-copy.le", sources=[])
+    source = tmp_path / "collapsed.le"
+    source.write_bytes(grid.to_binary())
+    with pytest.raises(ValueError, match="spacing.*representable"):
         ops.load_le_grid(source)
+    assert not (tmp_path / "collapsed-copy.le").exists()
+    assert_no_temps(tmp_path)
 
 
 def test_tight_reconstruction_tolerance(tmp_path):

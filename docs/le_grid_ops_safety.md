@@ -51,13 +51,18 @@ be finite and exactly representable as float64. Coordinates must be strictly
 ascending with finite positive spacing. Singleton axes preserve their position
 exactly, but provide no evidence of sample spacing or cell width.
 
-For a nonsingleton axis, let `s = (last - first) / (size - 1)`. Every adjacent
-step must differ from `s` by at most `s * 1e-10`, and every coordinate must differ
-from `linspace(first, last, size)` by at most the same amount. There is no absolute
-tolerance floor and no tolerance relative to world-coordinate magnitude.
+For a nonsingleton axis, let `s = (last - first) / (size - 1)` be the theoretical
+endpoint spacing. Every adjacent step must be finite and positive, and every
+coordinate must differ from the reader's `linspace(first, last, size)` by at most
+`s * 1e-10`. Individual steps are not compared to `s`: float64 rounding can
+produce alternating increments even when the coordinates reconstruct exactly,
+for example `linspace(1e6, 1e6 + 0.3, 4)`. Regularity means compatibility with this
+endpoint-derived reconstruction, not exact equality of rounded increments.
+There is no absolute tolerance floor or tolerance relative to world magnitude.
 `AXIS_SPACING_RTOL` is `1e-10`. A tiny origin-relative error that is substantial
-relative to spacing is rejected. Even reader-generated linspace axes are
-checked: huge origins can create unequal representable steps and are refused.
+relative to spacing is rejected. Reader-generated linspace axes are also checked
+for finite positive steps; large origins with collapsed increments are refused,
+but unequal positive increments caused by reconstruction rounding are accepted.
 Very small spacing may underflow the tolerance to zero, requiring exactness.
 
 Read-back coordinates are compared to the input using the same spacing-relative
