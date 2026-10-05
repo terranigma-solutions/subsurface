@@ -1,4 +1,5 @@
 import json
+import sys
 
 import numpy as np
 import pytest
@@ -205,6 +206,31 @@ def test_malformed_prefix_and_json(tmp_path, content, message):
     path = tmp_path / "bad.le"
     path.write_bytes(content)
     with pytest.raises(ValueError, match=message):
+        StructuredData.from_binary_le(path)
+
+
+@pytest.mark.parametrize("duplicate", ["field", "bound", "escaped_bound"])
+def test_duplicate_json_keys(tmp_path, duplicate):
+    encoded = json.dumps(valid_header())
+    if duplicate == "field":
+        encoded = encoded[:-1] + ', "dtype": "float32"}'
+    else:
+        key = "x" if duplicate == "bound" else r"\u0078"
+        encoded = encoded.replace('"x": [-2, 1]', f'"x": [-2, 1], "{key}": [-2, 1]')
+    header = encoded.encode("utf-8")
+    path = tmp_path / "duplicate.le"
+    path.write_bytes(len(header).to_bytes(4, "little") + header + bytes(96))
+    with pytest.raises(ValueError, match="Duplicate JSON object key"):
+        StructuredData.from_binary_le(path)
+
+
+@pytest.mark.parametrize("opening,closing", [(b"[", b"]"), (b'{"nested":', b"}")])
+def test_excessive_json_nesting(tmp_path, opening, closing):
+    depth = sys.getrecursionlimit() * 2
+    header = opening * depth + b"0" + closing * depth
+    path = tmp_path / "nested.le"
+    path.write_bytes(len(header).to_bytes(4, "little") + header)
+    with pytest.raises(ValueError, match="JSON header exceeds supported nesting depth"):
         StructuredData.from_binary_le(path)
 
 

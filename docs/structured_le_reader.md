@@ -18,6 +18,8 @@ Path("copy.le").write_bytes(grid.to_binary())
 The four-byte little-endian unsigned prefix gives the UTF-8 JSON header length
 (1 byte to 1 MiB). The current header has exactly `data_shape`, `bounds`,
 `transform`, `dtype`, and `data_name`. There is no version or array-order field.
+Duplicate JSON object keys, including nested bounds keys, are rejected. Headers
+exceeding the JSON parser's supported nesting depth raise `ValueError`.
 The payload is exactly one scalar array in Fortran order, with the first axis
 varying fastest. Truncated payloads and trailing bytes are rejected before
 allocating coordinates or reshaping values.

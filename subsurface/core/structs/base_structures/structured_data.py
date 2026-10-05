@@ -248,6 +248,14 @@ class StructuredData:
         flat bounds overrides are unsupported. Invalid files raise ValueError;
         filesystem errors propagate unchanged.
         """
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError(f"Duplicate JSON object key: {key}")
+                result[key] = value
+            return result
+
         with open(path, "rb") as source:
             prefix = source.read(4)
             if len(prefix) != 4:
@@ -259,9 +267,11 @@ class StructuredData:
             if len(header_bytes) != header_size:
                 raise ValueError("Truncated structured .le header")
             try:
-                header = json.loads(header_bytes.decode("utf-8"))
+                header = json.loads(header_bytes.decode("utf-8"), object_pairs_hook=unique_object)
+            except RecursionError as exc:
+                raise ValueError("Structured .le JSON header exceeds supported nesting depth") from exc
             except (UnicodeDecodeError, ValueError) as exc:
-                raise ValueError("Invalid structured .le JSON header") from exc
+                raise ValueError(f"Invalid structured .le JSON header: {exc}") from exc
             fields = {"data_shape", "bounds", "transform", "dtype", "data_name"}
             if not isinstance(header, dict) or set(header) != fields:
                 raise ValueError("Unsupported structured .le header fields")
