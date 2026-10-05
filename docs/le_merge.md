@@ -23,6 +23,13 @@ caller order, including repeated paths. Pass an iterable of paths, not one path.
   are accepted. Geometry and payload validation use the shared file tools.
 - Connectivity widths must match exactly, including width 0 versus width 1
   point representations. Lines, triangles, tetrahedra and hexahedra cannot mix.
+- Width-0 point connectivity must have either zero rows or one row per point
+  in every source and in the merged output. Partial row counts are ambiguous
+  and rejected, even though the reader accepts them. Mixing zero-row and
+  per-point policies on nonempty geometry is rejected because it would produce
+  a partial output incompatible with point splitting. Empty geometry does not
+  introduce a policy conflict. No rows are invented or discarded to normalize
+  these representations.
 - Attribute names, column order and per-column dtypes must match exactly on
   both associations. No schema union, missing-value fill or numeric coercion is
   performed. Mixed numeric and bool columns stay separate, without xarray
@@ -67,6 +74,8 @@ Output `data_attrs["le_tools"]` records `operation="merge"`, grouping arguments,
 ID policy, ID mapping and ordered sources. Each source records its index,
 absolute path and filename, plus its entire prior `le_tools` value when present.
 Different split/merge sibling provenance does not cause a metadata conflict.
+When present, reserved `le_tools` provenance must be a dictionary; null, scalar
+and list values are rejected rather than treated as arbitrary semantic metadata.
 All other equal metadata is preserved. This uses the existing JSON header and
 binary format, not a new container.
 
