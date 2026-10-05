@@ -58,7 +58,30 @@ An explicitly declared ID column with zero rows yields `object_ids=()` and
 `logical_object_count=0`. Groups without any members cannot be represented by
 these files. If an empty file has no ID column, requesting grouping still fails.
 Structured geometry counts are grid samples, **not geological objects or a
-promise about voxel-center/edge semantics**.
+voxel count**. Stored bounds describe coordinate sample extrema.
+
+### In-Memory Grouping
+
+Operation agents can reuse the helper directly without file I/O:
+
+```python
+from subsurface.api.le_inspection import group_object_ids
+
+ids = group_object_ids(cell_attributes, object_attribute="surface_id",
+                       association="cell", cell_width=3)
+```
+
+`group_object_ids(attributes, *, object_attribute, association, cell_width)`
+accepts a mapping or DataFrame of columns for the requested association and
+returns an ascending unique NumPy ID array, retaining its numeric dtype and
+original values (including int64 precision). `cell_width` is the number of nodes
+per cell: point grouping is required for widths 0/1, cell grouping otherwise.
+It uses the same finite, non-boolean numeric ID policy as file inspection and
+rejects absent columns, missing IDs, multidimensional columns, and incorrect
+associations with `ValueError`. Empty columns produce empty ID arrays. It does
+not modify attributes, validate geometry, or check geometry/attribute row counts;
+operations must validate those separately. This helper is exported from its
+module only, not the package root.
 
 ## Read And Validation Scope
 
@@ -80,9 +103,18 @@ always remains `False`. Requested grouping validates only its ID values and sets
 `grouping_validated=True`. Use the hardened full reader for payload/connectivity
 validation; this API does not offer a full-validation mode.
 
-Structured inspection currently recognizes three-dimensional regular
-axis-aligned scalar headers with finite ordered bounds and null transforms.
-Non-null transforms are rejected rather than silently ignored.
+Structured inspection follows the committed structured reader's header contract:
+one to three positive dimensions with default axes `dim0` (1D), `x/y` (2D), or
+`x/y/z` (3D). Bounds must map exactly those axes to finite ordered coordinate
+sample extrema representable without loss in float64. Singleton axes require
+equal extrema; larger axes require distinct extrema with a finite range. Flat
+bounds overrides are ambiguous and rejected, even if produced by the writer's
+optional bounds setter. The name must be nonempty, non-whitespace, and distinct
+from the axis names. Integer (8/16/32/64-bit signed or unsigned) and floating
+(16/32/64-bit) scalar dtypes are supported; boolean and complex are rejected.
+The header must contain exactly `data_shape`, `bounds`, `transform`, `dtype`, and
+`data_name`; transforms must be null. Geometry/payload validation and coordinate
+array reconstruction remain the full reader's responsibility.
 
 ## Foundation Integration
 
