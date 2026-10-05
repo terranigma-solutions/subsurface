@@ -52,7 +52,7 @@ def _meshes_to_unstruct(meshes: list[GOCADMesh]) -> UnstructuredData:
     simplex_array = meshes[0].vectorized_edges
     adder = 0
     for i in range(1, n_meshes):
-        adder += np.max(meshes[i - 1].vectorized_edges) + 1
+        adder += meshes[i - 1].vertices.shape[0]
         add_mesh = meshes[i].vectorized_edges + adder
         simplex_array = np.append(simplex_array, add_mesh, axis=0)
 
