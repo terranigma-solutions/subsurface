@@ -59,12 +59,17 @@ Sibling merge operations can treat `le_tools` as provenance while requiring all
 other dataset metadata to match strictly.
 
 Every destination is checked and every output is serialized and validated before
-any publishing begins. The shared writer publishes each file atomically with
-no-clobber hard links and cleans its temporary files. If publishing fails, this
-call rolls back already-created outputs, checking inode identity so it does not
-remove files replaced by another actor. Existing or unrelated files are never
-removed. Source bytes are never modified. Filesystem errors can also prevent
-rollback, and concurrent hostile directory/source replacement is out of scope.
+any publishing begins. The shared writer writes all outputs into a private
+temporary directory on the destination filesystem. Each staged inode is captured
+before final publication via an atomic no-clobber hard link. Rollback tracks the
+known inode before attempting the link, so even an error after successful
+publication removes the current output as well as earlier outputs. No destination
+stat is needed after publication. Inode checks ensure rollback does not remove
+racing destinations or files replaced by another actor. Existing or unrelated
+files are never removed. Source bytes are never modified. Staging files and the
+temporary directory are cleaned on success and failure; filesystem errors can
+prevent staging cleanup or rollback. Concurrent hostile directory/source
+replacement is out of scope.
 This multi-file operation is **not crash atomic**: process termination or machine
 failure can leave a prefix of outputs. There is no spatial selection, clipping,
 welding, topology repair, or CRS conversion.

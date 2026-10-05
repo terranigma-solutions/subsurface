@@ -3,6 +3,7 @@
 from copy import deepcopy
 import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Dict, Union
 
 import numpy as np
@@ -85,10 +86,21 @@ def split_le(source, output_directory, *, object_attribute: str,
 
     created = []
     try:
-        for destination, output in outputs:
-            write_le_mesh(output, destination, sources=(source,))
-            stat = destination.stat()
-            created.append((destination, stat.st_dev, stat.st_ino))
+        with TemporaryDirectory(dir=directory, prefix='.le_split.') as staging:
+            staged = []
+            for destination, output in outputs:
+                path = Path(staging) / destination.name
+                write_le_mesh(output, path, sources=(source,))
+                stat = path.stat()
+                staged.append((destination, path, stat.st_dev, stat.st_ino))
+            for destination, path, device, inode in staged:
+                if destination.resolve() == source.resolve() or (
+                        destination.exists() and os.path.samefile(destination, source)):
+                    raise ValueError("Destination must not alias the source path")
+                # Track the known staged inode before linking: publication can
+                # succeed even if the link call then raises. Racers never match.
+                created.append((destination, device, inode))
+                os.link(path, destination)
     except BaseException:
         for destination, device, inode in reversed(created):
             try:

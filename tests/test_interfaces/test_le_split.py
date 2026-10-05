@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -208,7 +209,7 @@ def test_later_invalid_geometry_is_preflighted(tmp_path):
     assert list(tmp_path.iterdir()) == [source]
 
 
-def test_publication_failure_rolls_back_only_created_files(tmp_path, monkeypatch):
+def test_staging_failure_does_not_publish_files(tmp_path, monkeypatch):
     source = source_mesh(tmp_path, ids=[1, 2, 1])
     before = source.read_bytes()
     unrelated = tmp_path / 'keep.txt'
@@ -230,13 +231,14 @@ def test_publication_failure_rolls_back_only_created_files(tmp_path, monkeypatch
 def test_racing_destination_is_not_deleted(tmp_path, monkeypatch):
     source = source_mesh(tmp_path, ids=[1, 2, 1])
     collision = tmp_path / 'object_000001.le'
+    original_link = os.link
 
-    def collide_second(mesh, destination, **kwargs):
+    def collide_second(staged, destination):
         if destination == collision:
             destination.write_bytes(b'other writer')
-        return write_le_mesh(mesh, destination, **kwargs)
+        return original_link(staged, destination)
 
-    monkeypatch.setattr(split_module, 'write_le_mesh', collide_second)
+    monkeypatch.setattr(os, 'link', collide_second)
     with pytest.raises(FileExistsError):
         split(source, tmp_path)
     assert set(tmp_path.iterdir()) == {source, collision}
@@ -248,18 +250,73 @@ def test_rollback_does_not_delete_replaced_output(tmp_path, monkeypatch):
     first = tmp_path / 'object_000000.le'
     replacement = tmp_path / 'replacement'
     replacement.write_bytes(b'unrelated replacement')
+    original_link = os.link
 
-    def replace_then_fail(mesh, destination, **kwargs):
-        if destination.name == 'object_000001.le':
+    def replace_then_fail(staged, destination):
+        if destination == tmp_path / 'object_000001.le':
             os.replace(replacement, first)
             raise OSError('publication failure after concurrent replacement')
-        return write_le_mesh(mesh, destination, **kwargs)
+        return original_link(staged, destination)
 
-    monkeypatch.setattr(split_module, 'write_le_mesh', replace_then_fail)
+    monkeypatch.setattr(os, 'link', replace_then_fail)
     with pytest.raises(OSError, match='publication failure'):
         split(source, tmp_path)
     assert set(tmp_path.iterdir()) == {source, first}
     assert first.read_bytes() == b'unrelated replacement'
+
+
+def test_error_after_final_publication_rolls_back_current_and_earlier(tmp_path, monkeypatch):
+    source = source_mesh(tmp_path, ids=[1, 2, 1])
+    before = source.read_bytes()
+    unrelated = tmp_path / 'keep.txt'
+    unrelated.write_bytes(b'keep')
+    original_link = os.link
+
+    def publish_then_fail(staged, destination):
+        original_link(staged, destination)
+        if destination == tmp_path / 'object_000001.le':
+            assert (tmp_path / 'object_000000.le').exists()
+            assert destination.exists()
+            raise OSError('error after final publication')
+
+    monkeypatch.setattr(os, 'link', publish_then_fail)
+    with pytest.raises(OSError, match='after final publication'):
+        split(source, tmp_path)
+    assert set(tmp_path.iterdir()) == {source, unrelated}
+    assert source.read_bytes() == before
+    assert unrelated.read_bytes() == b'keep'
+
+
+def test_shared_writer_error_after_staged_publication_never_publishes_outputs(tmp_path, monkeypatch):
+    source = source_mesh(tmp_path, ids=[1, 2, 1])
+    original_unlink = Path.unlink
+
+    def fail_temporary_cleanup(path, *args, **kwargs):
+        if path.name.startswith('.object_000001.le.') and path.suffix == '.tmp':
+            assert (path.parent / 'object_000001.le').exists()
+            raise OSError('shared writer cleanup error after staged publication')
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'unlink', fail_temporary_cleanup)
+    with pytest.raises(OSError, match='shared writer cleanup error'):
+        split(source, tmp_path)
+    assert list(tmp_path.iterdir()) == [source]
+
+
+def test_staged_stat_failure_never_publishes_outputs(tmp_path, monkeypatch):
+    source = source_mesh(tmp_path, ids=[1, 2, 1])
+    original_stat = Path.stat
+
+    def fail_staged_stat(path, *args, **kwargs):
+        if (path.parent.name.startswith('.le_split.') and path.name == 'object_000001.le'
+                and os.path.lexists(path)):
+            raise OSError('staged stat failure')
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'stat', fail_staged_stat)
+    with pytest.raises(OSError, match='staged stat failure'):
+        split(source, tmp_path)
+    assert list(tmp_path.iterdir()) == [source]
 
 
 def test_temporary_write_failure_cleans_and_rolls_back(tmp_path, monkeypatch):
