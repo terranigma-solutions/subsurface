@@ -5,6 +5,9 @@ from . import core
 from .modules import visualization
 from subsurface.core.structs import *
 from subsurface.api.le_inspection import inspect_le
+from subsurface.api.le_transform import transform_le
+from subsurface.api.le_split import split_le
+from subsurface.api.le_merge import merge_le
 from datetime import datetime
 import dotenv
 
