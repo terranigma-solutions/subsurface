@@ -19,6 +19,9 @@ def mesh(ids=(2 ** 60 + 7, 2 ** 60 + 8), width=3, metadata=None):
     attrs = pd.DataFrame({"object_id": np.asarray(ids, dtype=np.int64),
                           "value": np.array([0.25, 0.75], dtype=np.float32),
                           "valid": np.array([True, False])})
+    if width == 0:
+        cells = np.empty((len(vertex), 0), dtype=np.int32)
+        attrs = pd.concat([attrs] * 3, ignore_index=True)
     point_attrs = pd.DataFrame({"rank": np.arange(6, dtype=np.int16)})
     return LiquidEarthMesh(vertex, cells, attrs, point_attrs,
                            metadata if metadata is not None else {"crs": "local", "units": "m"})
@@ -242,3 +245,78 @@ def test_remapping_uses_int64_not_original_small_integer_width():
     merged = merge_meshes([item, item], object_attribute="id", association="point")
     assert merged.points_attributes["id"].dtype == np.dtype("int64")
     np.testing.assert_array_equal(merged.points_attributes["id"], np.arange(256))
+
+
+def width_zero_mesh(points, rows):
+    return LiquidEarthMesh(np.zeros((points, 3), dtype=np.float32),
+                           np.empty((rows, 0), dtype=np.int32),
+                           pd.DataFrame(index=range(rows)), pd.DataFrame(index=range(points)))
+
+
+@pytest.mark.parametrize("rows", [0, 6])
+@pytest.mark.parametrize("policy", ["source", "shared"])
+def test_width_zero_grouped_merge_preserves_split_compatible_row_policy(tmp_path, rows, policy):
+    first, second = width_zero_mesh(6, rows), width_zero_mesh(6, rows)
+    for item in (first, second):
+        item.points_attributes["id"] = np.array([4, 4, 8, 8, 4, 4], dtype=np.int64)
+    paths = save(tmp_path, [first, second])
+    result = merge_le(paths, tmp_path / "output.le", object_attribute="id", association="point",
+                      id_policy=policy)
+    merged = load_le_mesh(result.destination)
+    assert merged.cells.shape == (2 * rows, 0)
+    assert merged.cells.shape[0] in (0, len(merged.vertex))
+
+
+@pytest.mark.parametrize("rows", [1, 2, 5])
+@pytest.mark.parametrize("grouped", [False, True])
+def test_width_zero_partial_source_rejected_without_replacement(tmp_path, rows, grouped):
+    item = width_zero_mesh(6, rows)
+    item.points_attributes["id"] = np.arange(6, dtype=np.int64)
+    paths = save(tmp_path, [item])
+    output = tmp_path / "output.le"
+    output.write_bytes(b"existing")
+    kwargs = {"object_attribute": "id", "association": "point"} if grouped else {}
+    with pytest.raises(ValueError, match="zero rows or one row per point"):
+        merge_le(paths, output, overwrite=True, **kwargs)
+    assert output.read_bytes() == b"existing"
+
+
+@pytest.mark.parametrize("rows", [(0, 6), (6, 0)])
+@pytest.mark.parametrize("grouped", [False, True])
+def test_width_zero_mixed_policies_reject_partial_output(tmp_path, rows, grouped):
+    items = [width_zero_mesh(6, count) for count in rows]
+    if grouped:
+        for item in items:
+            item.points_attributes["id"] = np.arange(6, dtype=np.int64)
+    paths = save(tmp_path, items)
+    kwargs = {"object_attribute": "id", "association": "point"} if grouped else {}
+    output = tmp_path / "output.le"
+    with pytest.raises(ValueError, match="row policies would create a partial output"):
+        merge_le(paths, output, **kwargs)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("rows", [0, 6])
+@pytest.mark.parametrize("empty_first", [False, True])
+def test_width_zero_empty_geometry_does_not_conflict_with_row_policy(tmp_path, rows, empty_first):
+    items = [width_zero_mesh(6, rows), width_zero_mesh(0, 0)]
+    if empty_first:
+        items.reverse()
+    paths = save(tmp_path, items)
+    result = merge_le(paths, tmp_path / "output.le")
+    merged = load_le_mesh(result.destination)
+    assert merged.vertex.shape == (6, 3)
+    assert merged.cells.shape == (rows, 0)
+    assert merged.cells.shape[0] in (0, len(merged.vertex))
+
+
+@pytest.mark.parametrize("value", [None, [], "semantic", 7, False])
+@pytest.mark.parametrize("source_index", [0, 1])
+def test_reserved_provenance_requires_dict(tmp_path, value, source_index):
+    items = [mesh(), mesh()]
+    items[source_index].data_attrs["le_tools"] = value
+    paths = save(tmp_path, items)
+    output = tmp_path / "output.le"
+    with pytest.raises(ValueError, match="Reserved le_tools provenance must be a dictionary"):
+        merge_le(paths, output)
+    assert not output.exists()

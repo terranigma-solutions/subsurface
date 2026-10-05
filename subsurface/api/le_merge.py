@@ -65,6 +65,10 @@ def merge_meshes(meshes, *, object_attribute=None, association=None,
     for mesh in meshes:
         if mesh.cells.shape[1] != width:
             raise ValueError("Sources must have identical geometry/connectivity widths")
+        if width == 0 and mesh.cells.shape[0] not in (0, mesh.vertex.shape[0]):
+            raise ValueError("Width-0 point connectivity must have zero rows or one row per point")
+        if "le_tools" in mesh.data_attrs and not isinstance(mesh.data_attrs["le_tools"], dict):
+            raise ValueError("Reserved le_tools provenance must be a dictionary")
         semantic = {key: value for key, value in mesh.data_attrs.items() if key != "le_tools"}
         if json.dumps(semantic, sort_keys=True) != metadata_key:
             raise ValueError("Source semantic metadata (including CRS/units) conflicts")
@@ -80,6 +84,9 @@ def merge_meshes(meshes, *, object_attribute=None, association=None,
                                            association=association, cell_width=width))
         # Explicitly reject empty named schemas and other writer losses per source.
         serialize_le_mesh(mesh)
+
+    if width == 0 and sum(mesh.cells.shape[0] for mesh in meshes) not in (0, total_vertices):
+        raise ValueError("Width-0 point connectivity row policies would create a partial output")
 
     cell_frames, point_frames, cells = [], [], []
     mapping = [] if object_attribute is not None else None
