@@ -3,6 +3,163 @@ import numpy as np
 import pandas as pd
 
 _FORMAT_VERSION = 2
+MAX_LE_HEADER_BYTES = 16 * 1024 * 1024
+
+
+def read_le_header(binary_data):
+    """Parse a bounded LE prefix/header; no payload is required or decoded."""
+    if len(binary_data) < 4:
+        raise ValueError("LE header requires a 4-byte length prefix")
+    length = int.from_bytes(binary_data[:4], byteorder='little')
+    if not 0 < length <= MAX_LE_HEADER_BYTES:
+        raise ValueError("LE header length must be between 1 and 16 MiB")
+    if len(binary_data) < 4 + length:
+        raise ValueError("Truncated LE header")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"Duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        header = json.loads(bytes(binary_data[4:4 + length]).decode('utf-8'),
+                            object_pairs_hook=unique_object)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise ValueError("Invalid LE JSON header") from exc
+    if not isinstance(header, dict):
+        raise ValueError("LE header must be a JSON object")
+    return header, 4 + length
+
+
+def validate_unstructured_layout(header, payload_length=None):
+    """Validate supported schemas and return byte offsets without reading arrays.
+
+    Segment offsets are relative to the payload. This validates layout only;
+    connectivity values and boolean bytes are checked by ``from_binary``.
+    """
+    if not isinstance(header, dict):
+        raise ValueError("LE header must be a JSON object")
+    version = header.get('format_version', 1)
+    if type(version) is not int or version not in (1, 2):
+        raise ValueError("Unsupported LE format_version; expected 1 or 2")
+    if 'data_shape' in header:
+        raise ValueError("Expected an unstructured LE header, not a structured grid")
+
+    def shape(value, rank, label):
+        if (not isinstance(value, (list, tuple)) or len(value) != rank or
+                any(type(n) is not int or n < 0 for n in value)):
+            raise ValueError(f"{label} must contain {rank} nonnegative integer dimensions")
+        return tuple(value)
+
+    vertex_shape = shape(header.get('vertex_shape'), 2, 'vertex_shape')
+    if vertex_shape == (0, 0):
+        vertex_shape = (0, 3)
+    if vertex_shape[1] != 3:
+        raise ValueError("vertex_shape must have three XYZ columns")
+    wire_cell_shape = shape(header.get('cell_shape'), 2, 'cell_shape')
+    cell_shape = wire_cell_shape
+    if cell_shape[1] == 0 and cell_shape[0] > vertex_shape[0]:
+        raise ValueError("Zero-width point connectivity cannot have more rows than vertices")
+    widths = (0, 1, 2, 3, 4, 8)
+    legacy_attr_rows = 0
+    if version == 1 and 'cell_attr_shape' in header:
+        legacy_attr_rows = shape(header['cell_attr_shape'], 2, 'cell_attr_shape')[0]
+    # Four/eight indices can also be flattened lines. Attribute rows are the
+    # only shipped schema evidence that distinguishes those from a single cell.
+    infer_flattened = (version == 1 and cell_shape[0] == 1 and cell_shape[1] > 3 and
+                      (cell_shape[1] not in widths or legacy_attr_rows > 1))
+    if cell_shape[1] not in widths or infer_flattened:
+        if not infer_flattened:
+            raise ValueError("Unsupported cell_shape connectivity width")
+        candidates = [(cell_shape[1] // width, width) for width in (2, 3)
+                      if cell_shape[1] % width == 0]
+        if legacy_attr_rows > 0:
+            candidates = [candidate for candidate in candidates if candidate[0] == legacy_attr_rows]
+        if len(candidates) != 1:
+            raise ValueError("Ambiguous or unsupported legacy flattened connectivity; provide cell_attr_shape row count")
+        cell_shape = candidates[0]
+
+    data_attrs = header.get('xarray_attrs', {})
+    if not isinstance(data_attrs, dict):
+        raise ValueError("xarray_attrs must be a JSON object")
+    segments = []
+    offset = 0
+
+    def valid_names(names):
+        # JSON scalar column labels are emitted by the shipped pandas writer,
+        # including numeric and null labels. Do not coerce them to strings.
+        return (all(name is None or type(name) in (str, int, float, bool) for name in names) and
+                pd.Index(names, dtype=object).is_unique)
+
+    def segment(name, association, dtype, dimensions):
+        nonlocal offset
+        count = 1
+        for dimension in dimensions:
+            count *= dimension
+        byte_length = count * dtype.itemsize
+        segments.append(dict(name=name, association=association, dtype=dtype,
+                             shape=dimensions, byte_length=byte_length, offset=offset))
+        offset += byte_length
+
+    segment('vertex', 'geometry', np.dtype('float32'), vertex_shape)
+    segment('cells', 'geometry', np.dtype('int32'), wire_cell_shape)
+    for association, rows in (('cell', cell_shape[0]), ('vertex', vertex_shape[0])):
+        if version == 2:
+            key = association + '_attrs'
+            columns = header.get(key, [])
+            if not isinstance(columns, list):
+                raise ValueError(f"{key} must be a list")
+            names = []
+            for column in columns:
+                if not isinstance(column, dict):
+                    raise ValueError(f"{key} entries must be objects")
+                if 'name' not in column:
+                    raise ValueError(f"{key} requires column names")
+                name = column['name']
+                names.append(name)
+                dimensions = shape(column.get('shape'), 1, key + ' column shape')
+                if dimensions != (rows,):
+                    raise ValueError(f"{key} column row count does not match geometry")
+                try:
+                    if not isinstance(column.get('dtype'), str):
+                        raise TypeError()
+                    dtype = np.dtype(column['dtype'])
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"Unsupported {key} dtype") from exc
+                if not (dtype.kind in 'iu' and dtype.itemsize in (1, 2, 4, 8) or
+                        dtype.kind == 'f' and dtype.itemsize in (2, 4, 8) or
+                        dtype.kind == 'b' and dtype.itemsize == 1):
+                    raise ValueError(f"Unsupported {key} numeric dtype: {dtype}")
+                declared = column.get('byte_length')
+                expected = rows * dtype.itemsize
+                if type(declared) is not int or declared != expected:
+                    raise ValueError(f"{key} byte_length does not match shape and dtype")
+                segment(name, association, dtype, dimensions)
+            if not valid_names(names):
+                raise ValueError(f"{key} requires unique JSON scalar column names")
+        else:
+            key = association + '_attr'
+            dimensions = shape(header.get(key + '_shape', [0, 0]), 2, key + '_shape')
+            if dimensions != (0, 0) and dimensions[0] != rows:
+                raise ValueError(f"{key} row count does not match geometry")
+            names = header.get(key + '_names', [])
+            if (not isinstance(names, list) or len(names) != dimensions[1] or
+                    not valid_names(names)):
+                raise ValueError(f"{key} requires unique JSON scalar names matching its columns")
+            types = header.get(key + '_types')
+            if types is not None and (not isinstance(types, list) or len(types) != len(names)):
+                raise ValueError(f"{key}_types must match its columns (legacy payload is float32)")
+            segment(key, association, np.dtype('float32'), dimensions)
+            segments[-1]['names'] = names
+    if payload_length is not None:
+        if type(payload_length) is not int or payload_length < 0 or payload_length != offset:
+            raise ValueError(f"LE payload length mismatch: expected {offset} bytes, got {payload_length}")
+    return dict(format_version=version, vertex_shape=vertex_shape,
+                wire_cell_shape=wire_cell_shape, cell_shape=cell_shape,
+                segments=segments, payload_length=offset, data_attrs=data_attrs)
 
 
 def _validate_attribute_dataframe(df: pd.DataFrame, attr_name: str):
@@ -137,100 +294,45 @@ class LiquidEarthMesh:
                 parts.append(_serialize_column(self.points_attributes[col].to_numpy()))
         return b''.join(parts)
 
-    @staticmethod
-    def _read_attr_v1(body: bytes, offset: int, header: dict, attr_key: str, order: str = 'F'
-                     ) -> tuple[pd.DataFrame | None, int]:
-        shape = header.get(attr_key + '_shape', [0, 0])
-        if shape is None or shape[0] <= 0 or shape[1] <= 0:
-            return None, offset
-        num_attrs = int(np.prod(shape))
-        num_bytes = num_attrs * 4
-        values = np.frombuffer(body[offset:offset + num_bytes], dtype=np.float32, count=num_attrs)
-        offset += num_bytes
-        values = values.reshape(shape[:2], order=order)
-        names = header.get(attr_key + '_names', [])
-        return pd.DataFrame(values, columns=names), offset
-
-    @staticmethod
-    def _read_attr_v2(body: bytes, offset: int, columns_meta: list[dict]
-                      ) -> tuple[pd.DataFrame, int]:
-        columns = {}
-        for meta in columns_meta:
-            dtype_str = meta["dtype"]
-            count = int(np.prod(meta["shape"]))
-            byte_length = meta["byte_length"]
-
-            if dtype_str == 'bool':
-                raw = np.frombuffer(body[offset:offset + byte_length], dtype=np.uint8, count=count)
-                values = raw.astype(bool)
-            else:
-                values = np.frombuffer(body[offset:offset + byte_length], dtype=np.dtype(dtype_str), count=count)
-
-            columns[meta["name"]] = values
-            offset += byte_length
-
-        return pd.DataFrame(columns), offset
-
     @classmethod
     def from_binary(cls, binary_data, order='F'):
-        header_length_bytes = binary_data[:4]
-        header_length = int.from_bytes(header_length_bytes, byteorder='little')
-        header_json_bytes = binary_data[4:4 + header_length]
-        header = json.loads(header_json_bytes.decode('utf-8'))
-        body = binary_data[4 + header_length:]
-        offset = 0
-        format_version = header.get("format_version", 1)
-
-        vertex_shape = header.get('vertex_shape', [0, 0])
-        if vertex_shape[0] > 0 and vertex_shape[1] > 0:
-            num_vertices = int(np.prod(vertex_shape))
-            num_bytes = num_vertices * 4
-            vertex = np.frombuffer(body[offset:offset + num_bytes], dtype=np.float32, count=num_vertices)
-            offset += num_bytes
-            vertex = vertex.reshape(vertex_shape, order=order)
-        else:
-            vertex = None
-
-        cell_shape = header.get('cell_shape', [0, 0])
-        if cell_shape[0] > 0 and cell_shape[1] > 0:
-            num_cells = int(np.prod(cell_shape))
-            num_bytes = num_cells * 4
-            cells = np.frombuffer(body[offset:offset + num_bytes], dtype=np.int32, count=num_cells)
-            offset += num_bytes
-            cells = cells.reshape(cell_shape, order=order)
-
-            # Auto-reshape legacy flattened cells
-            if format_version == 1 and cells.shape[0] == 1 and cells.shape[1] > 3:
-                if cells.shape[1] % 3 == 0:
-                    cells = cells.reshape((-1, 3), order='C')
-                elif cells.shape[1] % 2 == 0:
-                    cells = cells.reshape((-1, 2), order='C')
-        else:
-            cells = None
-
-        if format_version >= 2:
-            cell_attrs_meta = header.get('cell_attrs', [])
-            if cell_attrs_meta:
-                cell_attr_values, offset = cls._read_attr_v2(body, offset, cell_attrs_meta)
+        """Decode a validated mesh; geometry order is supplied externally (F or C)."""
+        if order not in ('F', 'C'):
+            raise ValueError("LE array order must be 'F' or 'C'")
+        header, payload_offset = read_le_header(binary_data)
+        layout = validate_unstructured_layout(header, len(binary_data) - payload_offset)
+        body = memoryview(binary_data)[payload_offset:]
+        geometry = {}
+        attributes = {'cell': {}, 'vertex': {}}
+        frames = {}
+        for segment in layout['segments']:
+            start = segment['offset']
+            raw = body[start:start + segment['byte_length']]
+            dtype = segment['dtype']
+            if dtype.kind == 'b':
+                if np.any(np.frombuffer(raw, dtype=np.uint8) > 1):
+                    raise ValueError("Boolean attribute payload must contain only 0 or 1")
+            values = np.frombuffer(raw, dtype=dtype)
+            association = segment['association']
+            if association == 'geometry':
+                geometry[segment['name']] = values.reshape(segment['shape'], order=order)
+            elif layout['format_version'] == 1:
+                frames[association] = pd.DataFrame(values.reshape(segment['shape'], order=order),
+                                                   columns=segment['names'])
             else:
-                cell_attr_values = None
-
-            vertex_attrs_meta = header.get('vertex_attrs', [])
-            if vertex_attrs_meta:
-                vertex_attr_values, offset = cls._read_attr_v2(body, offset, vertex_attrs_meta)
-            else:
-                vertex_attr_values = None
-        else:
-            cell_attr_values, offset = cls._read_attr_v1(body, offset, header, 'cell_attr', order=order)
-            vertex_attr_values, offset = cls._read_attr_v1(body, offset, header, 'vertex_attr', order=order)
-
-        data_attrs = header.get('xarray_attrs', {})
-
-        return cls(
-            vertex=vertex,
-            cells=cells,
-            attributes=cell_attr_values,
-            points_attributes=vertex_attr_values,
-            data_attrs=data_attrs,
-        )
-
+                # pandas/xarray operations require native-endian numeric buffers.
+                if not dtype.isnative:
+                    values = values.astype(dtype.newbyteorder('='))
+                attributes[association][segment['name']] = values
+        cells = geometry['cells']
+        if layout['wire_cell_shape'] != layout['cell_shape']:
+            cells = cells.reshape(layout['cell_shape'], order='C')
+        if cells.size and (np.any(cells < 0) or np.any(cells >= layout['vertex_shape'][0])):
+            raise ValueError("Connectivity indices must be in range [0, n_points)")
+        for association, rows in (('cell', cells.shape[0]), ('vertex', geometry['vertex'].shape[0])):
+            if association not in frames:
+                frames[association] = pd.DataFrame(attributes[association], index=pd.RangeIndex(rows))
+            elif frames[association].shape == (0, 0):
+                frames[association] = pd.DataFrame(index=pd.RangeIndex(rows))
+        return cls(vertex=geometry['vertex'], cells=cells, attributes=frames['cell'],
+                   points_attributes=frames['vertex'], data_attrs=layout['data_attrs'])

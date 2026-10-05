@@ -147,42 +147,44 @@ class UnstructuredData:
         return cls(ds, default_cells_attributes_name, default_points_attributes_name)
 
     @classmethod
-    def from_binary_le(cls, path: str):
+    def from_binary_le(cls, path: str, *, order='F'):
+        """Read a prefixed LE mesh, restoring serialized dataset metadata.
+
+        Array order is not recorded in the file; pass ``order='C'`` for C-order
+        geometry exports. The public writer defaults to Fortran order.
+        """
         from ._liquid_earth_mesh import LiquidEarthMesh
         with open(path, 'rb') as f:
             bytes_data = f.read()
-        mesh = LiquidEarthMesh.from_binary(bytes_data)
+        mesh = LiquidEarthMesh.from_binary(bytes_data, order=order)
         unstruct = cls.from_array(
             vertex=mesh.vertex,
             cells=mesh.cells,
             cells_attr=mesh.attributes,
             vertex_attr=mesh.points_attributes,
-            xarray_attributes=None
+            xarray_attributes=mesh.data_attrs
         )
         return unstruct
 
     @classmethod
-    def from_binary_le_legacy(cls, path_to_binary: str, path_to_json: str):
-        import json
-        from ._liquid_earth_mesh import LiquidEarthMesh
+    def from_binary_le_legacy(cls, path_to_binary: str, path_to_json: str, *, order='F'):
+        """Read a sidecar header/body pair using the same validated LE decoder."""
+        from ._liquid_earth_mesh import LiquidEarthMesh, MAX_LE_HEADER_BYTES
 
         with open(path_to_binary, 'rb') as f:
             body_ = f.read()
-        with open(path_to_json, 'r') as f:
-            header_ = json.load(f)
-
-        header_json = json.dumps(header_)
-        header_json_bytes = header_json.encode('utf-8')
+        with open(path_to_json, 'rb') as f:
+            header_json_bytes = f.read(MAX_LE_HEADER_BYTES + 1)
         header_json_length = len(header_json_bytes)
         header_json_length_bytes = header_json_length.to_bytes(4, byteorder='little')
         file = header_json_length_bytes + header_json_bytes + body_
-        mesh = LiquidEarthMesh.from_binary(file)
+        mesh = LiquidEarthMesh.from_binary(file, order=order)
         unstruct = cls.from_array(
             vertex=mesh.vertex,
             cells=mesh.cells,
             cells_attr=mesh.attributes,
             vertex_attr=mesh.points_attributes,
-            xarray_attributes=None
+            xarray_attributes=mesh.data_attrs
         )
         return unstruct
 
