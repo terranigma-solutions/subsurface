@@ -9,7 +9,9 @@ import pytest
 
 from subsurface import inspect_le
 from subsurface.api.le_inspection import group_object_ids
-from subsurface.core.structs.base_structures._liquid_earth_mesh import LiquidEarthMesh
+from subsurface.core.structs.base_structures._liquid_earth_mesh import (
+    MAX_LE_HEADER_BYTES, LiquidEarthMesh, read_le_header, validate_unstructured_layout,
+)
 from subsurface.core.structs.base_structures.structured_data import StructuredData
 
 
@@ -317,11 +319,11 @@ def test_declared_geometry_counts(tmp_path, width):
 
 
 @pytest.mark.parametrize("header, message", [
-    ([], "must be an object"),
-    ({"format_version": 3}, "Unsupported format_version"),
-    ({"vertex_shape": [-1, 3], "cell_shape": [0, 3]}, "Invalid vertex_shape"),
-    ({"vertex_shape": [1, 2], "cell_shape": [0, 3]}, "three coordinates"),
-    ({"vertex_shape": [3, 3], "cell_shape": [1, 6]}, "ambiguous"),
+    ([], "must be a JSON object"),
+    ({"format_version": 3}, "Unsupported LE format_version"),
+    ({"vertex_shape": [-1, 3], "cell_shape": [0, 3]}, "vertex_shape"),
+    ({"vertex_shape": [1, 2], "cell_shape": [0, 3]}, "three XYZ columns"),
+    ({"vertex_shape": [3, 3], "cell_shape": [1, 6]}, "Ambiguous"),
     ({"vertex_shape": [0, 3], "cell_shape": [0, 3], "xarray_attrs": []}, "xarray_attrs"),
 ])
 def test_invalid_headers(tmp_path, header, message):
@@ -334,7 +336,7 @@ def test_invalid_headers(tmp_path, header, message):
     ({"dtype": "complex64"}, "dtype"),
     ({"shape": [2]}, "row count"),
     ({"byte_length": 5}, "byte_length"),
-    ({"name": None}, "unique strings"),
+    ({"name": []}, "unique JSON scalar"),
 ])
 def test_invalid_attribute_schema(tmp_path, change, message):
     column = dict(name="objects", dtype="int64", shape=[1], byte_length=8)
@@ -347,15 +349,15 @@ def test_invalid_attribute_schema(tmp_path, change, message):
 def test_duplicate_attribute_names(tmp_path):
     column = dict(name="objects", dtype="int64", shape=[1], byte_length=8)
     header = dict(format_version=2, vertex_shape=[3, 3], cell_shape=[1, 3], cell_attrs=[column, column])
-    with pytest.raises(ValueError, match="unique strings"):
+    with pytest.raises(ValueError, match="unique JSON scalar"):
         inspect_le(write_file(tmp_path, header, bytes(64)))
 
 
 @pytest.mark.parametrize("contents, message", [
     (b"\x02", "prefix"),
     ((100).to_bytes(4, "little") + b"{}", "Truncated JSON"),
-    ((2).to_bytes(4, "little") + b"xx", "Invalid JSON"),
-    ((1).to_bytes(4, "little") + b"\xff", "Invalid JSON"),
+    ((2).to_bytes(4, "little") + b"xx", "Invalid LE JSON"),
+    ((1).to_bytes(4, "little") + b"\xff", "Invalid LE JSON"),
 ])
 def test_invalid_prefix_and_json(tmp_path, contents, message):
     path = tmp_path / "invalid.le"
@@ -378,3 +380,144 @@ def test_file_length_validation(tmp_path, body):
     header = dict(format_version=2, vertex_shape=[3, 3], cell_shape=[1, 3])
     with pytest.raises(ValueError, match="payload length"):
         inspect_le(write_file(tmp_path, header, body))
+
+
+@pytest.mark.parametrize("version", [None, 1, 2])
+@pytest.mark.parametrize("cell_shape", [[0, 0], [0, 1], [0, 3], [0, 8]])
+def test_foundation_empty_layout_parity(tmp_path, version, cell_shape):
+    header = {"vertex_shape": [0, 0], "cell_shape": cell_shape}
+    if version is not None:
+        header["format_version"] = version
+    layout = validate_unstructured_layout(header, 0)
+    path = write_file(tmp_path, header)
+    result = inspect_le(path)
+    decoded = LiquidEarthMesh.from_binary(path.read_bytes())
+    assert result.shapes == {"vertex": layout["vertex_shape"], "cells": layout["cell_shape"]}
+    assert result.shapes["vertex"] == decoded.vertex.shape == (0, 3)
+    assert result.shapes["cells"] == decoded.cells.shape
+    assert result.vertex_count == result.cell_count == 0
+    assert result.format_version == layout["format_version"]
+    assert not result.payload_validated
+
+
+@pytest.mark.parametrize("version", [1, 2])
+@pytest.mark.parametrize("label", [7, 1.5, True, None, ""])
+def test_foundation_scalar_attribute_names_parity(tmp_path, version, label):
+    header = {"format_version": version, "vertex_shape": [4, 3], "cell_shape": [2, 2]}
+    values = np.array([[100, 7], [200, 9]], dtype=np.float32)
+    if version == 2:
+        header["cell_attrs"] = [dict(name=name, dtype="float32", shape=[2], byte_length=8)
+                                for name in (label, "objects")]
+    else:
+        header.update(cell_attr_shape=[2, 2], cell_attr_names=[label, "objects"])
+    body = bytes(64) + values.tobytes("F")
+    path = write_file(tmp_path, header, body)
+    layout = validate_unstructured_layout(header, len(body))
+    result = inspect_le(path, object_attribute="objects", association="cell")
+    assert result.logical_object_count == 2 and result.object_ids == (7.0, 9.0)
+    actual = result.attribute_schema["cell"][0]
+    assert actual["name"] == label and type(actual["name"]) is type(label)
+    assert actual["offset"] == layout["segments"][2]["offset"] == 64
+    decoded = LiquidEarthMesh.from_binary(path.read_bytes())
+    pd.testing.assert_index_equal(decoded.attributes.columns, pd.Index([label, "objects"]))
+
+
+@pytest.mark.parametrize("rows, width", [(2, 3), (3, 2), (4, 2)])
+def test_foundation_flattened_legacy_grouping_parity(tmp_path, monkeypatch, rows, width):
+    header = {"vertex_shape": [4, 3], "cell_shape": [1, rows * width],
+              "cell_attr_shape": [rows, 2], "cell_attr_names": [None, "objects"],
+              "cell_attr_types": ["float64", "int32"]}
+    attrs = np.column_stack((np.arange(rows), np.arange(rows) % 2)).astype(np.float32)
+    body = bytes((12 + rows * width) * 4) + attrs.tobytes("F")
+    path = write_file(tmp_path, header, body)
+    layout = validate_unstructured_layout(header, len(body))
+    decoded = LiquidEarthMesh.from_binary(path.read_bytes())
+    reads = track_reads(monkeypatch)
+    result = inspect_le(path, object_attribute="objects", association="cell")
+    assert result.cell_count == rows
+    assert result.shapes["cells"] == decoded.cells.shape == layout["cell_shape"] == (rows, width)
+    assert result.shapes["wire_cells"] == layout["wire_cell_shape"] == (1, rows * width)
+    column = result.attribute_schema["cell"][1]
+    assert column["dtype"] == "float32"
+    assert result.object_ids == (0.0, 1.0)
+    assert result.grouping_validated and not result.payload_validated
+    assert len(reads) == 3
+    assert reads[-1] == (4 + reads[1][1] + column["offset"], rows * 4)
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_foundation_point_offsets_after_cell_attributes(tmp_path, monkeypatch, version):
+    header = {"format_version": version, "vertex_shape": [4, 3], "cell_shape": [4, 0]}
+    cell_values = np.arange(4, dtype=np.float32)
+    point_values = np.array([9, 7, 9, 7], dtype=np.float32)
+    if version == 2:
+        header.update(cell_attrs=[dict(name=None, dtype="float32", shape=[4], byte_length=16)],
+                      vertex_attrs=[dict(name="objects", dtype="float32", shape=[4], byte_length=16)])
+    else:
+        header.update(cell_attr_shape=[4, 1], cell_attr_names=[None],
+                      vertex_attr_shape=[4, 1], vertex_attr_names=["objects"])
+    body = bytes(48) + cell_values.tobytes() + point_values.tobytes()
+    layout = validate_unstructured_layout(header, len(body))
+    path = write_file(tmp_path, header, body)
+    reads = track_reads(monkeypatch)
+    result = inspect_le(path, object_attribute="objects", association="point")
+    column = result.attribute_schema["point"][0]
+    assert column["offset"] == layout["segments"][-1]["offset"] == 64
+    assert result.attribute_schema["cell"][0]["name"] is None
+    assert result.object_ids == (7.0, 9.0)
+    assert reads[-1] == (4 + reads[1][1] + 64, 16)
+
+
+def test_foundation_big_endian_numeric_grouping(tmp_path):
+    values = np.array([2**60 + 1, -7], dtype=">i8")
+    header = {"format_version": 2, "vertex_shape": [4, 3], "cell_shape": [2, 2],
+              "cell_attrs": [dict(name="objects", dtype=">i8", shape=[2], byte_length=16)]}
+    path = write_file(tmp_path, header, bytes(64) + values.tobytes())
+    result = inspect_le(path, object_attribute="objects", association="cell")
+    assert result.attribute_schema["cell"][0]["dtype"] == ">i8"
+    assert result.object_ids == (-7, 2**60 + 1)
+
+
+@pytest.mark.parametrize("change", [
+    {"format_version": True}, {"format_version": 3}, {"vertex_shape": [4, 2]},
+    {"cell_shape": [5, 0]}, {"cell_shape": [2, 6]}, {"xarray_attrs": []},
+    {"cell_attrs": [{"name": "a", "dtype": "object", "shape": [2], "byte_length": 16}]},
+    {"cell_attrs": [{"dtype": "float32", "shape": [2], "byte_length": 8}]},
+    {"cell_attrs": [{"name": "a", "dtype": "int64", "shape": [2], "byte_length": 8}]},
+    {"format_version": 1, "cell_attr_shape": [0, 1], "cell_attr_names": ["a"]},
+    {"format_version": 1, "cell_attr_shape": [2, 1], "cell_attr_names": ["a"], "cell_attr_types": []},
+    {"format_version": 1, "cell_shape": [1, 6]},
+])
+def test_malformed_header_foundation_error_parity(tmp_path, change):
+    header = {"format_version": 2, "vertex_shape": [4, 3], "cell_shape": [2, 2]}
+    header.update(change)
+    with pytest.raises(ValueError) as foundation_error:
+        validate_unstructured_layout(header, 64)
+    with pytest.raises(ValueError) as inspection_error:
+        inspect_le(write_file(tmp_path, header, bytes(64)))
+    assert str(inspection_error.value) == str(foundation_error.value)
+
+
+@pytest.mark.parametrize("raw", [
+    b'{"vertex_shape":[0,3],"cell_shape":[0,3],"cell_shape":[0,3]}',
+    b'{"vertex_shape":[0,3],"cell_shape":[0,3],"xarray_attrs":{"id":1,"id":2}}',
+    b'{"data_shape":[1],"bounds":{"dim0":[0,0],"dim0":[0,0]},"dtype":"float32","data_name":"a","transform":null}',
+])
+def test_duplicate_json_keys_parser_parity(tmp_path, raw):
+    binary = len(raw).to_bytes(4, "little") + raw
+    path = tmp_path / "duplicate.le"
+    path.write_bytes(binary)
+    with pytest.raises(ValueError, match="Duplicate JSON key") as foundation_error:
+        read_le_header(binary)
+    with pytest.raises(ValueError, match="Duplicate JSON key") as inspection_error:
+        inspect_le(path)
+    assert str(inspection_error.value) == str(foundation_error.value)
+
+
+def test_foundation_header_limit_cannot_be_bypassed(tmp_path, monkeypatch):
+    path = tmp_path / "oversize.le"
+    path.write_bytes((MAX_LE_HEADER_BYTES + 1).to_bytes(4, "little"))
+    reads = track_reads(monkeypatch)
+    with pytest.raises(ValueError, match="Header length"):
+        inspect_le(path, max_header_bytes=MAX_LE_HEADER_BYTES * 2)
+    assert reads == [(0, 4)]

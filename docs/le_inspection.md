@@ -22,7 +22,9 @@ The summary includes:
 - `file_kind`: `"unstructured"` or `"structured"`.
 - `format_version`: 1 for existing headers without a version, or explicit 1/2.
 - `byte_size`: total size including the four-byte prefix and JSON header.
-- `shapes`: `vertex`/`cells`, or structured `data`, as dimension tuples.
+- `shapes`: normalized `vertex`/`cells`, or structured `data`, as dimension
+  tuples. Resolved legacy flattened connectivity also reports `wire_cells` for
+  the original stored shape. Empty `[0, 0]` vertices normalize to `(0, 3)`.
 - `vertex_count`, `cell_count`, `grid_sample_count`: applicable geometry counts;
   inapplicable counts are `None`.
 - `dataset_count`: one serialized dataset, not a geological object count.
@@ -30,6 +32,9 @@ The summary includes:
   have a `grid` entry for the serialized active array. Columns report `name`,
   wire `dtype`, and `shape`; unstructured columns also report `byte_length` and
   payload-relative `offset`.
+  Foundation-supported JSON scalar column labels (including numeric, null, and
+  empty string labels) remain unchanged in the schema. Grouping requests still
+  require a nonempty string `object_attribute`.
 - `metadata`: stored `xarray_attrs`; structured summaries additionally expose
   `bounds`, `transform`, and `data_name`. Unserialized metadata cannot be recovered.
 - `logical_object_count` and `object_ids`: `None` without explicit grouping;
@@ -88,12 +93,15 @@ module only, not the package root.
 Inspection reads only the four-byte little-endian length and bounded JSON header
 unless grouping is requested. It checks recognized versions, dimensions, numeric
 attribute schema and lengths, unique names, and exact total file length against
-the declared layout. The header limit is checked before reading JSON bytes.
+the declared layout. The header limit is checked before reading JSON bytes and
+cannot exceed foundation's 16 MiB limit. Foundation's `read_le_header` parser
+rejects duplicate JSON keys, including nested objects, for both file kinds.
 Version-2 grouping seeks directly to and reads only the requested column.
-Legacy embedded headers use the existing legacy float32 attribute decoder on
-the relevant attribute block, in default Fortran order, without reading geometry.
-Legacy sidecar files are not accepted. Ambiguous flattened connectivity is not
-guessed; unsupported connectivity widths are rejected.
+Legacy embedded headers use foundation-validated float32 column offsets in
+default Fortran order, also reading only the selected column without geometry.
+Legacy sidecar files are not accepted. Flattened legacy connectivity is resolved
+only when foundation's schema evidence is unambiguous, including attribute row
+counts; ambiguous layouts are rejected rather than guessed.
 
 `header_validated=True` and `payload_length_validated=True` do **not** mean
 payload contents are valid. Inspection does not check coordinate finiteness,
@@ -118,9 +126,9 @@ array reconstruction remain the full reader's responsibility.
 
 ## Foundation Integration
 
-The private `_header_layout` adapter is a temporary integration seam while the
-read-back foundation validator is developed on the parent branch. The coordinator
-should replace its schema checks with that committed validator's normalized
-layout, preserving bounded reads, offsets, summary fields, and validation-scope
-semantics. This is not a second public parsing API. No new runtime dependencies
-or changes to the existing serializers are required.
+Unstructured inspection delegates schema and exact payload-length validation to
+foundation's `validate_unstructured_layout`, then adapts its normalized shapes
+and payload-relative segments into summary fields. There is no separate
+unstructured schema validator. Structured header checks retain the structured
+reader contract above; all JSON parsing uses foundation's `read_le_header`.
+No new runtime dependencies or changes to existing serializers are required.
