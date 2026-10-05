@@ -225,13 +225,14 @@ class StructuredData:
         """Converts the structured data to a binary file
         
         Notes: 
-            Only the active data array is converted to binary for now 
+            Only the active data array is converted to binary for now.
+            Dataset attrs are included as xarray_attrs only when timestamp or
+            time_series_id is present, and must then be JSON-safe.
         """
 
         body_ = self._to_bytearray(order)
         header = self._set_binary_header()
 
-        import json
         header_json = json.dumps(header)
         header_json_bytes = header_json.encode('utf-8')
         header_json_length = len(header_json_bytes)
@@ -356,6 +357,10 @@ class StructuredData:
                 }
             case _:
                 raise NotImplementedError(f"StructuredDataType {self.type} not implemented yet")
+
+        if "timestamp" in self.data.attrs or "time_series_id" in self.data.attrs:
+            json.dumps(self.data.attrs, allow_nan=False)
+            header["xarray_attrs"] = dict(self.data.attrs)
 
         return header
 

@@ -158,6 +158,58 @@ Readers reconstruct geometry, supported numeric attributes, and dataset metadata
 
 ---
 
+## **Temporal Snapshots**
+
+Temporal data uses one ordinary `.le` snapshot per observation time, without a
+new payload format or an extra time coordinate in the binary body. Metadata is
+stored in the JSON header, for example:
+
+```json
+{
+  "xarray_attrs": {
+    "time_series_id": "temperature-series",
+    "timestamp": "2025-12-12T10:45:39Z",
+    "attribute_units": {"temperature": "degC"}
+  }
+}
+```
+
+For structured data, `StructuredData.to_binary()` and the split body/header
+interface include dataset attrs as `xarray_attrs` only when `timestamp` or
+`time_series_id` is present. All included attrs must be JSON-serializable;
+Python datetime and NumPy objects must be converted by the caller, and
+non-finite metadata numbers are rejected. Static structured headers and bytes
+remain unchanged, even when other dataset attrs exist. The active array,
+shape, bounds, dtype, and payload ordering are unchanged.
+
+Unstructured v2 headers already include dataset attrs. Both
+`UnstructuredData.from_binary_le()` and `from_binary_le_legacy()` restore
+`xarray_attrs` as dataset attrs, including when reading v1 payloads. Files
+without this field restore empty attrs. Temporal metadata does not change the
+v2 column encoding described above.
+
+The low-level binary interfaces do not validate timestamp syntax, normalize
+timezones, enforce paired metadata, or select a time slice. Callers exporting
+a series must supply a stable series ID and a UTC ISO 8601 observation timestamp
+after resolving the source timezone, and slice volumes to an ordinary 3D frame.
+A sidecar index can identify frames without changing `.le` files, for example:
+
+```json
+{
+  "schema_version": 1,
+  "time_series_id": "temperature-series",
+  "kind": "volume",
+  "frames": [
+    {"timestamp": "2025-12-12T10:45:39Z", "path": "volume_0000.le"},
+    {"timestamp": "2025-12-12T11:45:39Z", "path": "volume_0001.le"}
+  ]
+}
+```
+
+Index discovery and client playback are separate contracts; this metadata
+support does not implement them or establish compatibility with strict client
+header parsers.
+
 ## **Summary**
 
 - **File Layout**:  
