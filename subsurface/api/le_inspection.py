@@ -1,12 +1,15 @@
 """Bounded LiquidEarth header inspection and explicitly grouped object counts."""
 
-import json
 import math
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
+
+from subsurface.core.structs.base_structures._liquid_earth_mesh import (
+    MAX_LE_HEADER_BYTES, read_le_header, validate_unstructured_layout,
+)
 
 
 @dataclass(frozen=True)
@@ -29,13 +32,6 @@ class LEInspection:
     payload_length_validated: bool = True
     payload_validated: bool = False
     grouping_validated: bool = False
-
-
-def _shape(value, name, rank):
-    if (not isinstance(value, list) or len(value) != rank
-            or any(type(n) is not int or n < 0 for n in value)):
-        raise ValueError(f"Invalid {name}: expected {rank} nonnegative integer dimensions")
-    return tuple(value)
 
 
 def _dtype(value):
@@ -74,14 +70,7 @@ def group_object_ids(attributes, *, object_attribute: str, association: str, cel
     return np.unique(values)
 
 
-def _header_layout(header):
-    # Temporary integration seam: replace with foundation's validated layout.
-    version = header.get("format_version", 1)
-    if type(version) is not int or version not in (1, 2):
-        raise ValueError(f"Unsupported format_version: {version!r}")
-    metadata = header.get("xarray_attrs", {})
-    if not isinstance(metadata, dict):
-        raise ValueError("xarray_attrs must be an object")
+def _header_layout(header, payload_length):
     schema = {"cell": (), "point": ()}
     if "data_shape" in header:
         if "vertex_shape" in header or "cell_shape" in header:
@@ -121,52 +110,37 @@ def _header_layout(header):
         if header.get("transform") is not None:
             raise ValueError("Structured transforms are not supported")
         schema["grid"] = ({"name": header["data_name"], "dtype": str(dtype), "shape": shape},)
-        metadata = dict(metadata, bounds=bounds, transform=header.get("transform"),
-                        data_name=header["data_name"])
+        metadata = dict(bounds=bounds, transform=header.get("transform"), data_name=header["data_name"])
         payload_size = math.prod(shape) * dtype.itemsize
         if payload_size > np.iinfo(np.intp).max:
             raise ValueError("Structured payload length exceeds platform limits")
-        return "structured", version, {"data": shape}, schema, metadata, payload_size
+        return "structured", 1, {"data": shape}, schema, metadata, payload_size
 
-    vertex = _shape(header.get("vertex_shape"), "vertex_shape", 2)
-    cells = _shape(header.get("cell_shape"), "cell_shape", 2)
-    if vertex[1] != 3 and vertex != (0, 0):
-        raise ValueError("vertex_shape must have three coordinates")
-    if cells[1] not in (0, 1, 2, 3, 4, 8):
-        raise ValueError("Unsupported or ambiguous flattened cell_shape")
-    shapes = {"vertex": vertex, "cells": cells}
-    offset = (math.prod(vertex) + math.prod(cells)) * 4
-    for association, key, rows in (("cell", "cell", cells[0]), ("point", "vertex", vertex[0])):
-        columns = []
+    layout = validate_unstructured_layout(header, payload_length)
+    version = layout["format_version"]
+    shapes = {"vertex": layout["vertex_shape"], "cells": layout["cell_shape"]}
+    if layout["wire_cell_shape"] != layout["cell_shape"]:
+        shapes["wire_cells"] = layout["wire_cell_shape"]
+    columns = {"cell": [], "point": []}
+    for segment in layout["segments"]:
+        if segment["association"] == "geometry":
+            continue
+        association = "point" if segment["association"] == "vertex" else "cell"
         if version == 2:
-            entries = header.get(key + "_attrs", [])
-            if not isinstance(entries, list):
-                raise ValueError(f"{key}_attrs must be a list")
-            for entry in entries:
-                if not isinstance(entry, dict):
-                    raise ValueError("Attribute metadata must be an object")
-                shape = _shape(entry.get("shape"), "attribute shape", 1)
-                dtype = _dtype(entry.get("dtype"))
-                length = entry.get("byte_length")
-                if shape != (rows,) or type(length) is not int or length != rows * dtype.itemsize:
-                    raise ValueError("Attribute row count or byte_length mismatch")
-                columns.append(dict(name=entry.get("name"), dtype=str(dtype), shape=shape,
-                                    byte_length=length, offset=offset))
-                offset += length
+            columns[association].append(dict(
+                name=segment["name"], dtype=str(segment["dtype"]), shape=segment["shape"],
+                byte_length=segment["byte_length"], offset=segment["offset"],
+            ))
         else:
-            shape = _shape(header.get(key + "_attr_shape", [0, 0]), key + "_attr_shape", 2)
-            names = header.get(key + "_attr_names", [])
-            if not isinstance(names, list) or len(names) != shape[1] or (shape[1] and shape[0] != rows):
-                raise ValueError("Legacy attribute names or row count mismatch")
-            for index, name in enumerate(names):
-                columns.append(dict(name=name, dtype="float32", shape=(rows,), byte_length=rows * 4,
-                                    offset=offset + index * rows * 4))
-            offset += math.prod(shape) * 4
-        names = [column["name"] for column in columns]
-        if any(not isinstance(name, str) or not name for name in names) or len(set(names)) != len(names):
-            raise ValueError("Attribute names must be nonempty unique strings")
-        schema[association] = tuple(columns)
-    return "unstructured", version, shapes, schema, metadata, offset
+            rows = segment["shape"][0]
+            length = rows * segment["dtype"].itemsize
+            for index, name in enumerate(segment["names"]):
+                columns[association].append(dict(
+                    name=name, dtype=str(segment["dtype"]), shape=(rows,),
+                    byte_length=length, offset=segment["offset"] + index * length,
+                ))
+    schema = {association: tuple(entries) for association, entries in columns.items()}
+    return "unstructured", version, shapes, schema, layout["data_attrs"], layout["payload_length"]
 
 
 def inspect_le(
@@ -195,18 +169,13 @@ def inspect_le(
         if len(prefix) != 4:
             raise ValueError("Truncated header length prefix")
         length = int.from_bytes(prefix, "little")
-        if length <= 0 or length > max_header_bytes:
+        if length <= 0 or length > min(max_header_bytes, MAX_LE_HEADER_BYTES):
             raise ValueError("Header length exceeds limit or is empty")
         raw = stream.read(length)
         if len(raw) != length:
             raise ValueError("Truncated JSON header")
-        try:
-            header = json.loads(raw.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError) as error:
-            raise ValueError("Invalid JSON header") from error
-        if not isinstance(header, dict):
-            raise ValueError("JSON header must be an object")
-        kind, version, shapes, schema, metadata, payload_size = _header_layout(header)
+        header, payload_start = read_le_header(prefix + raw)
+        kind, version, shapes, schema, metadata, payload_size = _header_layout(header, size - payload_start)
         if size != 4 + length + payload_size:
             raise ValueError("File byte size does not match declared payload length")
         ids = None
@@ -221,24 +190,11 @@ def inspect_le(
                 raise ValueError(f"Missing grouping attribute {object_attribute!r} on {association}")
             if np.dtype(column["dtype"]).kind == "b":
                 raise ValueError("Grouping IDs must be numeric, not boolean")
-            if version == 2:
-                stream.seek(4 + length + column["offset"])
-                raw = stream.read(column["byte_length"])
-                if len(raw) != column["byte_length"]:
-                    raise ValueError("Truncated grouping column")
-                values = np.frombuffer(raw, dtype=column["dtype"])
-            else:
-                from subsurface.core.structs.base_structures._liquid_earth_mesh import LiquidEarthMesh
-
-                columns = schema[association]
-                block_length = sum(col["byte_length"] for col in columns)
-                stream.seek(4 + length + columns[0]["offset"])
-                raw = stream.read(block_length)
-                if len(raw) != block_length:
-                    raise ValueError("Truncated legacy attribute block")
-                key = "cell_attr" if association == "cell" else "vertex_attr"
-                frame, _ = LiquidEarthMesh._read_attr_v1(raw, 0, header, key, order="F")
-                values = frame[object_attribute].to_numpy() if frame is not None else np.empty(0, dtype=np.float32)
+            stream.seek(payload_start + column["offset"])
+            raw = stream.read(column["byte_length"])
+            if len(raw) != column["byte_length"]:
+                raise ValueError("Truncated grouping column")
+            values = np.frombuffer(raw, dtype=column["dtype"])
             ids = tuple(group_object_ids(
                 {object_attribute: values}, object_attribute=object_attribute,
                 association=association, cell_width=shapes["cells"][1],
