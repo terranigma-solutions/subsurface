@@ -48,6 +48,32 @@ def _dtype(value):
     return dtype
 
 
+def group_object_ids(attributes, *, object_attribute: str, association: str, cell_width: int) -> np.ndarray:
+    """Return sorted original IDs from a mapping/DataFrame of attribute columns.
+
+    The caller supplies the attributes for the explicit association: point for
+    cell_width <= 1, otherwise cell. The selected column must be one-dimensional
+    numeric, non-boolean and finite. Empty columns return an empty ID array.
+    This helper does not validate geometry or attribute-to-geometry row counts.
+    """
+    if not isinstance(object_attribute, str) or not object_attribute:
+        raise ValueError("object_attribute must be a nonempty string")
+    if association not in ("cell", "point"):
+        raise ValueError("association must be 'cell' or 'point'")
+    if type(cell_width) is not int or cell_width < 0:
+        raise ValueError("cell_width must be a nonnegative integer")
+    if (association == "point") != (cell_width <= 1):
+        raise ValueError("Use point association for point clouds and cell association for meshes")
+    if attributes is None or object_attribute not in attributes:
+        raise ValueError(f"Missing grouping attribute {object_attribute!r} on {association}")
+    values = np.asarray(attributes[object_attribute])
+    if values.ndim != 1 or values.dtype.kind not in "iuf":
+        raise ValueError("Grouping IDs must be a one-dimensional numeric column, not boolean")
+    if not np.isfinite(values).all():
+        raise ValueError("Grouping IDs must not be missing or nonfinite")
+    return np.unique(values)
+
+
 def _header_layout(header):
     # Temporary integration seam: replace with foundation's validated layout.
     version = header.get("format_version", 1)
@@ -60,21 +86,47 @@ def _header_layout(header):
     if "data_shape" in header:
         if "vertex_shape" in header or "cell_shape" in header:
             raise ValueError("Mixed structured and unstructured header")
-        shape = _shape(header["data_shape"], "data_shape", 3)
+        if set(header) != {"data_shape", "bounds", "transform", "dtype", "data_name"}:
+            raise ValueError("Unsupported structured header fields")
+        raw_shape = header["data_shape"]
+        if (not isinstance(raw_shape, list) or not 1 <= len(raw_shape) <= 3
+                or any(type(size) is not int or size <= 0 for size in raw_shape)):
+            raise ValueError("data_shape must contain one to three positive integer dimensions")
+        shape = tuple(raw_shape)
+        dims = ("dim0",) if len(shape) == 1 else ("x", "y", "z")[:len(shape)]
         dtype = _dtype(header.get("dtype"))
+        if dtype.kind == "b":
+            raise ValueError("Unsupported structured numeric dtype")
         bounds = header.get("bounds")
-        if (not isinstance(bounds, list) or len(bounds) != 6
-                or any(type(x) not in (int, float) or not math.isfinite(x) for x in bounds)
-                or any(bounds[i] > bounds[i + 1] for i in (0, 2, 4))):
-            raise ValueError("Invalid structured bounds")
-        if not isinstance(header.get("data_name"), str):
-            raise ValueError("Structured data_name must be a string")
+        if not isinstance(bounds, dict) or set(bounds) != set(dims):
+            raise ValueError("bounds must map each standard axis to sample extrema; flat bounds are ambiguous")
+        for dim, size in zip(dims, shape):
+            pair = bounds[dim]
+            if (not isinstance(pair, list) or len(pair) != 2
+                    or any(type(value) not in (int, float) for value in pair)):
+                raise ValueError(f"Invalid bounds for axis {dim}")
+            try:
+                low, high = map(float, pair)
+            except (OverflowError, ValueError) as error:
+                raise ValueError(f"Invalid bounds for axis {dim}") from error
+            if low != pair[0] or high != pair[1]:
+                raise ValueError(f"Bounds for axis {dim} lose precision in float64 coordinates")
+            if (not math.isfinite(low) or not math.isfinite(high)
+                    or not math.isfinite(high - low) or low > high
+                    or (size == 1 and low != high) or (size > 1 and low == high)):
+                raise ValueError(f"Invalid sample extrema for axis {dim}")
+        name = header["data_name"]
+        if not isinstance(name, str) or not name.strip() or name in dims:
+            raise ValueError("Structured data_name must be a nonempty string distinct from axis names")
         if header.get("transform") is not None:
             raise ValueError("Structured transforms are not supported")
         schema["grid"] = ({"name": header["data_name"], "dtype": str(dtype), "shape": shape},)
         metadata = dict(metadata, bounds=bounds, transform=header.get("transform"),
                         data_name=header["data_name"])
-        return "structured", version, {"data": shape}, schema, metadata, math.prod(shape) * dtype.itemsize
+        payload_size = math.prod(shape) * dtype.itemsize
+        if payload_size > np.iinfo(np.intp).max:
+            raise ValueError("Structured payload length exceeds platform limits")
+        return "structured", version, {"data": shape}, schema, metadata, payload_size
 
     vertex = _shape(header.get("vertex_shape"), "vertex_shape", 2)
     cells = _shape(header.get("cell_shape"), "cell_shape", 2)
@@ -187,9 +239,10 @@ def inspect_le(
                 key = "cell_attr" if association == "cell" else "vertex_attr"
                 frame, _ = LiquidEarthMesh._read_attr_v1(raw, 0, header, key, order="F")
                 values = frame[object_attribute].to_numpy() if frame is not None else np.empty(0, dtype=np.float32)
-            if not np.isfinite(values).all():
-                raise ValueError("Grouping IDs must not be missing or nonfinite")
-            ids = tuple(np.unique(values).tolist())
+            ids = tuple(group_object_ids(
+                {object_attribute: values}, object_attribute=object_attribute,
+                association=association, cell_width=shapes["cells"][1],
+            ).tolist())
     return LEInspection(
         file_kind=kind, format_version=version, byte_size=size, shapes=shapes,
         attribute_schema=schema, metadata=metadata,

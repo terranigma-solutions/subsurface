@@ -8,7 +8,9 @@ import pandas as pd
 import pytest
 
 from subsurface import inspect_le
+from subsurface.api.le_inspection import group_object_ids
 from subsurface.core.structs.base_structures._liquid_earth_mesh import LiquidEarthMesh
+from subsurface.core.structs.base_structures.structured_data import StructuredData
 
 
 def write_file(tmp_path, header, body=b""):
@@ -185,7 +187,7 @@ def test_legacy_embedded_header(tmp_path, points):
 
 
 def test_structured_sample_counts(tmp_path):
-    header = {"data_shape": [2, 3, 4], "bounds": [0, 1, 0, 2, 0, 3], "dtype": "float32",
+    header = {"data_shape": [2, 3, 4], "bounds": {"x": [0, 1], "y": [0, 2], "z": [0, 3]}, "dtype": "float32",
               "transform": None, "data_name": "density"}
     path = write_file(tmp_path, header, bytes(24 * 4))
     result = inspect_le(path)
@@ -202,22 +204,108 @@ def test_structured_sample_counts(tmp_path):
 
 
 @pytest.mark.parametrize("change, message", [
-    ({"data_shape": [2, 3]}, "data_shape"),
+    ({"data_shape": []}, "data_shape"),
+    ({"data_shape": [2, 3, 4, 5]}, "data_shape"),
+    ({"data_shape": [0, 3, 4]}, "data_shape"),
     ({"data_shape": [2, True, 4]}, "data_shape"),
     ({"dtype": "object"}, "dtype"),
+    ({"dtype": "bool"}, "dtype"),
+    ({"dtype": "complex64"}, "dtype"),
     ({"bounds": [1, 0, 0, 2, 0, 3]}, "bounds"),
-    ({"bounds": [0, float("nan"), 0, 2, 0, 3]}, "bounds"),
-    ({"bounds": [0, 1]}, "bounds"),
+    ({"bounds": {"x": [0, 1], "y": [0, 2]}}, "bounds"),
+    ({"bounds": {"x": [0, 1], "y": [0, 2], "wrong": [0, 3]}}, "bounds"),
+    ({"bounds": {"x": [False, 1], "y": [0, 2], "z": [0, 3]}}, "bounds"),
+    ({"bounds": {"x": [0], "y": [0, 2], "z": [0, 3]}}, "bounds"),
+    ({"bounds": {"x": [0, float("nan")], "y": [0, 2], "z": [0, 3]}}, "precision"),
+    ({"bounds": {"x": [1, 0], "y": [0, 2], "z": [0, 3]}}, "extrema"),
+    ({"bounds": {"x": [0, 0], "y": [0, 2], "z": [0, 3]}}, "extrema"),
+    ({"bounds": {"x": [2**60 + 1, 2**60 + 100], "y": [0, 2], "z": [0, 3]}}, "precision"),
     ({"data_name": 5}, "data_name"),
+    ({"data_name": " "}, "data_name"),
+    ({"data_name": "x"}, "data_name"),
     ({"transform": np.eye(4).tolist()}, "transforms"),
     ({"cell_shape": [0, 3]}, "Mixed"),
+    ({"unexpected": 5}, "header fields"),
 ])
 def test_invalid_structured_headers(tmp_path, change, message):
-    header = {"data_shape": [2, 3, 4], "bounds": [0, 1, 0, 2, 0, 3],
+    header = {"data_shape": [2, 3, 4], "bounds": {"x": [0, 1], "y": [0, 2], "z": [0, 3]},
               "dtype": "float32", "transform": None, "data_name": "density"}
     header.update(change)
     with pytest.raises(ValueError, match=message):
         inspect_le(write_file(tmp_path, header, bytes(96)))
+
+
+@pytest.mark.parametrize("shape", [(1,), (4,), (1, 3), (2, 1), (2, 3), (2, 3, 4), (1, 3, 1)])
+@pytest.mark.parametrize("dtype", ["float32", "float64", "int64", "uint16", "float16"])
+def test_public_structured_writer_inspection(tmp_path, monkeypatch, shape, dtype):
+    dims = ["dim0"] if len(shape) == 1 else ["x", "y", "z"][:len(shape)]
+    coords = {dim: np.arange(size, dtype=float) * 2.5 + 7 for dim, size in zip(dims, shape)}
+    data = StructuredData.from_numpy(np.arange(np.prod(shape)).reshape(shape),
+                                     coords=coords, data_array_name="density")
+    data.dtype = dtype
+    path = tmp_path / "public_writer.le"
+    path.write_bytes(data.to_binary())
+    reads = track_reads(monkeypatch)
+    result = inspect_le(path)
+    assert len(reads) == 2
+    assert result.shapes == {"data": shape}
+    assert result.grid_sample_count == np.prod(shape)
+    assert result.attribute_schema["grid"][0]["dtype"] == dtype
+    assert result.metadata["bounds"] == {dim: [values.min(), values.max()] for dim, values in coords.items()}
+    assert result.logical_object_count is None and not result.payload_validated
+
+
+def test_public_writer_flat_bounds_override_rejected(tmp_path):
+    data = StructuredData.from_numpy(np.zeros((2, 3, 4)),
+                                     coords={"x": [0, 1], "y": [0, 1, 2], "z": [0, 1, 2, 3]})
+    data.bounds = (0, 1, 0, 2, 0, 3)
+    path = tmp_path / "flat_bounds.le"
+    path.write_bytes(data.to_binary())
+    with pytest.raises(ValueError, match="flat bounds are ambiguous"):
+        inspect_le(path)
+
+
+def test_invalid_singleton_bounds(tmp_path):
+    header = {"data_shape": [1], "bounds": {"dim0": [0, 1]}, "dtype": "float32",
+              "transform": None, "data_name": "density"}
+    with pytest.raises(ValueError, match="sample extrema"):
+        inspect_le(write_file(tmp_path, header, bytes(4)))
+
+
+@pytest.mark.parametrize("association, width", [("point", 0), ("point", 1), ("cell", 3)])
+def test_in_memory_grouping(association, width):
+    original = np.array([2**60 + 1, -7, 2**60 + 1], dtype=np.int64)
+    attrs = pd.DataFrame({"objects": original})
+    ids = group_object_ids(attrs, object_attribute="objects", association=association, cell_width=width)
+    assert ids.dtype == np.dtype("int64")
+    assert ids.tolist() == [-7, 2**60 + 1]
+    np.testing.assert_array_equal(attrs["objects"], original)
+
+
+def test_in_memory_empty_grouping():
+    ids = group_object_ids({"objects": np.array([], dtype=np.int64)},
+                           object_attribute="objects", association="cell", cell_width=2)
+    assert ids.shape == (0,) and ids.dtype == np.dtype("int64")
+
+
+@pytest.mark.parametrize("attrs, attribute, association, width, message", [
+    ({}, "objects", "cell", 3, "Missing grouping"),
+    (None, "objects", "cell", 3, "Missing grouping"),
+    ({"objects": [True]}, "objects", "cell", 3, "not boolean"),
+    ({"objects": [np.nan]}, "objects", "cell", 3, "missing or nonfinite"),
+    ({"objects": [np.inf]}, "objects", "cell", 3, "missing or nonfinite"),
+    ({"objects": [None]}, "objects", "cell", 3, "numeric column"),
+    ({"objects": ["1"]}, "objects", "cell", 3, "numeric column"),
+    ({"objects": [[1]]}, "objects", "cell", 3, "one-dimensional"),
+    ({"objects": [1]}, "objects", "point", 3, "point association"),
+    ({"objects": [1]}, "objects", "cell", 1, "point association"),
+    ({"objects": [1]}, "objects", "vertex", 1, "association must"),
+    ({"objects": [1]}, "", "cell", 3, "nonempty string"),
+    ({"objects": [1]}, "objects", "cell", -1, "cell_width"),
+])
+def test_invalid_in_memory_grouping(attrs, attribute, association, width, message):
+    with pytest.raises(ValueError, match=message):
+        group_object_ids(attrs, object_attribute=attribute, association=association, cell_width=width)
 
 
 @pytest.mark.parametrize("width", [1, 2, 3, 4, 8])
