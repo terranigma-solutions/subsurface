@@ -9,6 +9,7 @@ import pytest
 
 from subsurface.core.structs.base_structures import UnstructuredData
 from subsurface.core.structs.base_structures import _liquid_earth_mesh as le
+from subsurface.core.utils._le_json import MAX_LE_JSON_DEPTH
 
 
 def _frame(header, payload=b""):
@@ -216,6 +217,21 @@ def test_deeply_nested_header_has_a_clear_error():
     raw = b'{"nested":' + b'[' * 10000 + b'0' + b']' * 10000 + b'}'
     with pytest.raises(ValueError, match="Invalid LE JSON"):
         le.read_le_header(len(raw).to_bytes(4, "little") + raw)
+
+
+@pytest.mark.parametrize("opening,closing", [(b"[", b"]"), (b'{"nested":', b"}")])
+def test_header_nesting_limit_is_explicit(opening, closing):
+    raw = b'{"nested":' + opening * (MAX_LE_JSON_DEPTH - 1) + b'0' + closing * (MAX_LE_JSON_DEPTH - 1) + b'}'
+    assert "nested" in le.read_le_header(len(raw).to_bytes(4, "little") + raw)[0]
+    raw = b'{"nested":' + opening * MAX_LE_JSON_DEPTH + b'0' + closing * MAX_LE_JSON_DEPTH + b'}'
+    with pytest.raises(ValueError, match="JSON header exceeds supported nesting depth"):
+        le.read_le_header(len(raw).to_bytes(4, "little") + raw)
+
+
+@pytest.mark.parametrize("text", ['[{' * 10000, '\\"[{' * 10000, '"\\' * 10000])
+def test_header_nesting_ignores_strings_and_escapes(text):
+    header = {"text": text, "array": [1]}
+    assert le.read_le_header(_frame(header))[0] == header
 
 
 def test_layout_segment_offsets_and_associations():
@@ -583,5 +599,23 @@ def test_legacy_type_labels_are_descriptive_not_wire_dtypes():
     mesh = le.LiquidEarthMesh.from_binary(binary)
     assert mesh.attributes[7].dtype == np.dtype('float32')
     header['cell_attr_types'] = []
+    with pytest.raises(ValueError, match="types"):
+        le.validate_unstructured_layout(header)
+
+
+@pytest.mark.parametrize("reader", ["current", "sidecar"])
+@pytest.mark.parametrize("version", [None, 1])
+def test_shipped_empty_legacy_attributes_retain_a_dtype(tmp_path, reader, version):
+    header = _header(version)
+    vertex, cells, payload = _geometry()
+    header.update(cell_attr_types=["float64"], vertex_attr_types=["float64"])
+    restored = _public_read(tmp_path, _frame(header, payload), reader)
+    np.testing.assert_array_equal(restored.vertex, vertex)
+    np.testing.assert_array_equal(restored.cells, cells)
+    assert restored.attributes.empty
+    assert restored.points_attributes.empty
+    with pytest.raises(ValueError, match="payload length"):
+        _public_read(tmp_path, _frame(header, payload + b"extra"), reader)
+    header["vertex_attr_types"] = ["float64", "float64"]
     with pytest.raises(ValueError, match="types"):
         le.validate_unstructured_layout(header)

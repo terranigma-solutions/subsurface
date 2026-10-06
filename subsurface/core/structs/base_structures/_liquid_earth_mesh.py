@@ -2,6 +2,8 @@ import json
 import numpy as np
 import pandas as pd
 
+from subsurface.core.utils._le_json import validate_le_json_nesting
+
 _FORMAT_VERSION = 2
 MAX_LE_HEADER_BYTES = 16 * 1024 * 1024
 
@@ -24,8 +26,10 @@ def read_le_header(binary_data):
             result[key] = value
         return result
 
+    header_bytes = bytes(binary_data[4:4 + length])
+    validate_le_json_nesting(header_bytes)
     try:
-        header = json.loads(bytes(binary_data[4:4 + length]).decode('utf-8'),
+        header = json.loads(header_bytes.decode('utf-8'),
                             object_pairs_hook=unique_object)
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise ValueError("Invalid LE JSON header") from exc
@@ -150,7 +154,9 @@ def validate_unstructured_layout(header, payload_length=None):
                     not valid_names(names)):
                 raise ValueError(f"{key} requires unique JSON scalar names matching its columns")
             types = header.get(key + '_types')
-            if types is not None and (not isinstance(types, list) or len(types) != len(names)):
+            # Shipped empty legacy dataframes can retain one descriptive dtype.
+            type_counts = (0, 1) if dimensions == (0, 0) else (len(names),)
+            if types is not None and (not isinstance(types, list) or len(types) not in type_counts):
                 raise ValueError(f"{key}_types must match its columns (legacy payload is float32)")
             segment(key, association, np.dtype('float32'), dimensions)
             segments[-1]['names'] = names
