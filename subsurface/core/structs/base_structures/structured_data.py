@@ -8,6 +8,8 @@ from typing import Dict, List, Tuple, Union, Literal
 import numpy as np
 import xarray as xr
 
+from subsurface.core.utils._le_json import validate_le_json_nesting
+
 from ....optional_requirements import require_pyvista
 
 
@@ -266,6 +268,7 @@ class StructuredData:
             header_bytes = source.read(header_size)
             if len(header_bytes) != header_size:
                 raise ValueError("Truncated structured .le header")
+            validate_le_json_nesting(header_bytes)
             try:
                 header = json.loads(header_bytes.decode("utf-8"), object_pairs_hook=unique_object)
             except RecursionError as exc:

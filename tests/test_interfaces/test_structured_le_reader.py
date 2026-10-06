@@ -1,5 +1,4 @@
 import json
-import sys
 
 import numpy as np
 import pytest
@@ -7,6 +6,7 @@ import xarray as xr
 
 from subsurface import StructuredData
 from subsurface.core.structs.base_structures.structured_data import StructuredDataType
+from subsurface.core.utils._le_json import MAX_LE_JSON_DEPTH
 
 
 pytestmark = pytest.mark.core
@@ -226,12 +226,20 @@ def test_duplicate_json_keys(tmp_path, duplicate):
 
 @pytest.mark.parametrize("opening,closing", [(b"[", b"]"), (b'{"nested":', b"}")])
 def test_excessive_json_nesting(tmp_path, opening, closing):
-    depth = sys.getrecursionlimit() * 2
+    depth = MAX_LE_JSON_DEPTH + 1
     header = opening * depth + b"0" + closing * depth
     path = tmp_path / "nested.le"
     path.write_bytes(len(header).to_bytes(4, "little") + header)
     with pytest.raises(ValueError, match="JSON header exceeds supported nesting depth"):
         StructuredData.from_binary_le(path)
+
+
+def test_json_nesting_ignores_brackets_and_escapes_in_names(tmp_path):
+    header = valid_header()
+    header["data_name"] = '\\"[{' * 10000
+    path = write_file(tmp_path, header, bytes(96))
+    restored = StructuredData.from_binary_le(path)
+    assert restored.active_data_array_name == header["data_name"]
 
 
 def test_missing_file(tmp_path):
