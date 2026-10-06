@@ -58,7 +58,13 @@ There is no fallback for filesystems without hardlink support.
 On exceptions, rollback deletes only destination entries whose device/inode
 matches the owned staged file captured before publication. This includes a link
 that succeeds before raising, while preserving unrelated files and concurrent
-racers. Rollback attempts all owned destinations even if one cleanup fails;
+racers. Failed-publication rollback runs while all staging files remain alive,
+so an unpublished inode cannot be recycled before its destination is checked.
+These ownership records are consumed before staging cleanup, even if rollback
+fails; they are never retried after their inode references are released. If
+staging cleanup fails after successful publication, the published links retain
+the inode references and those outputs are rolled back too.
+Rollback attempts all owned destinations even if one cleanup fails;
 a filesystem cleanup error is raised chained from the triggering error.
 Temporary-directory cleanup is attempted on success and failure.
 
