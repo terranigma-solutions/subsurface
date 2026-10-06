@@ -143,19 +143,19 @@ def test_plot_attributes_pyvista(get_unstructured_data_with_attribute):
 def test_read_from_multiple_files():
     reader_vertex_args = GenericReaderFilesHelper(
         file_or_buffer=input_path + '/kim_vertices.csv',
-        col_names=['x', 'y', 'z']
+        col_names=['x', 'y', 'z'], header=None, separator=','
     )
     reader_edges_args = GenericReaderFilesHelper(
         file_or_buffer=input_path + '/kim_cells.csv',
-        col_names=['e1', 'e2', 'e3']
+        col_names=['e1', 'e2', 'e3'], header=None, separator=','
     )
     reader_cells_attrs_args = GenericReaderFilesHelper(
         file_or_buffer=input_path + '/kim_cell_attributes.csv',
-        col_names=['lith']
+        col_names=['lith'], header=None, separator=','
     )
     reader_vertex_attrs_args = GenericReaderFilesHelper(
         file_or_buffer=input_path + '/kim_point_attributes.csv',
-        col_names=['lith_vertex']
+        col_names=['lith_vertex'], header=None, separator=','
     )
 
     reader_unstruc = ReaderUnstructuredHelper(
@@ -166,6 +166,10 @@ def test_read_from_multiple_files():
     )
 
     ud = read_2d_mesh_to_unstruct(reader_unstruc)
+    assert ud.vertex.shape == (68743, 3)
+    assert ud.cells.shape == (136566, 3)
+    assert ud.attributes.shape == (136566, 1)
+    assert ud.points_attributes.shape == (68743, 1)
     ts = TriSurf(ud)
     s = to_pyvista_mesh(ts)
     pv_plot([s], image_2d=True, ve=10)
