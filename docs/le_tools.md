@@ -61,6 +61,11 @@ File operations support prefixed unstructured files in the existing default
 Fortran geometry order. The reader also supports documented sidecars, but file
 operations do not. Array order is not encoded in the format.
 
+Prefixed JSON headers are limited to 16 MiB for unstructured read-back and 1 MiB
+for structured read-back. Both readers reject more than 128 nested JSON
+containers before decoding, independently of Python's recursion behavior.
+Quoted brackets and escaped quotes do not count toward the nesting limit.
+
 Coordinates serialize as float32 and connectivity as int32. Floating attributes
 follow the shipped exact-integral-to-int64/otherwise-float32 rule. Float32
 rounding/underflow are documented, while finite overflow, unsupported coercion,

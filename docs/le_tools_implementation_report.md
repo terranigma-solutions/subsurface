@@ -165,6 +165,30 @@ previous optional-dependency/fixture explanations. Whitespace checks passed.
 
 The stable Task 7 code revision before this report update is `4bfa083`.
 
+## TeamCity Compatibility Follow-Up
+
+The submitted stack exposed two regressions under TeamCity's Python 3.14 and
+one pre-existing CSV fixture failure on the exact `main` base revision.
+Fixes were committed from the bottom of the stack, then propagated upward:
+
+- `readback-foundation` accepts the shipped legacy `(0, 0)` attribute shape with
+  one leftover descriptive dtype, without relaxing payload lengths or populated
+  attribute schemas. Synthetic current/sidecar regression tests cover this case.
+- A shared pre-decode scanner enforces a 128-container JSON nesting limit,
+  accounting for strings and escapes instead of depending on `RecursionError`.
+  `structured-reader` applies the same scanner and uses deterministic depth tests.
+- The headerless Kim mesh CSV fixture explicitly selects comma delimiters and
+  disables header inference for all four files. Count assertions ensure no first
+  data rows are dropped. No global CSV-reader defaults were changed.
+
+All eleven stack levels passed interface/structure tests under Python 3.14.
+Final interface/structure/point-cloud verification passed **1746 tests with 37
+skips**, under both Python 3.11 and Python 3.14. The foundation also passed the
+actual two external Weisweiler legacy meshes and the Kim CSV mesh test under
+Python 3.14 with offscreen rendering. A read-only review found no introduced
+correctness issues. Historical test counts and revision tables above are retained
+as records of the original implementation, not the resubmitted branch tips.
+
 ## Deferred Scope
 
 General structured resampling and mosaics remain outside the completed restricted
