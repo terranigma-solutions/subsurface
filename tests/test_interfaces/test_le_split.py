@@ -265,6 +265,68 @@ def test_rollback_does_not_delete_replaced_output(tmp_path, monkeypatch):
     assert first.read_bytes() == b'unrelated replacement'
 
 
+def test_failed_publication_rollback_precedes_cleanup_and_inode_reuse(tmp_path, monkeypatch):
+    source = source_mesh(tmp_path, ids=[1, 2, 1])
+    collision = tmp_path / 'object_000001.le'
+    original_link = os.link
+    original_lstat = Path.lstat
+    original_temporary_directory = split_module.TemporaryDirectory
+    state = {'cleaned': False, 'checked_live': False}
+
+    class RecyclingCleanup(original_temporary_directory):
+        def cleanup(self):
+            super().cleanup()
+            state['cleaned'] = True
+            # Deterministically model inode reuse after the staging link dies.
+            collision.write_bytes(b'unrelated racer after cleanup')
+
+    def fail_final_link(staged, destination):
+        if destination == collision:
+            state['staged'] = staged
+            state['identity'] = staged.stat()
+            destination.write_bytes(b'unrelated racer before cleanup')
+            raise FileExistsError('racing destination')
+        return original_link(staged, destination)
+
+    def recycled_lstat(path, *args, **kwargs):
+        stat = original_lstat(path, *args, **kwargs)
+        if path == collision:
+            if state['cleaned']:
+                fields = list(stat)
+                fields[1] = state['identity'].st_ino
+                fields[2] = state['identity'].st_dev
+                return os.stat_result(fields)
+            assert state['staged'].exists()
+            state['checked_live'] = True
+        return stat
+
+    monkeypatch.setattr(split_module, 'TemporaryDirectory', RecyclingCleanup)
+    monkeypatch.setattr(os, 'link', fail_final_link)
+    monkeypatch.setattr(Path, 'lstat', recycled_lstat)
+    with pytest.raises(FileExistsError, match='racing destination'):
+        split(source, tmp_path)
+    assert state['checked_live'] and state['cleaned']
+    assert set(tmp_path.iterdir()) == {source, collision}
+    assert collision.read_bytes() == b'unrelated racer after cleanup'
+
+
+def test_cleanup_error_after_success_rolls_back_published_outputs(tmp_path, monkeypatch):
+    source = source_mesh(tmp_path, ids=[1, 2, 1])
+    original_temporary_directory = split_module.TemporaryDirectory
+
+    class FailingCleanup(original_temporary_directory):
+        def cleanup(self):
+            assert (tmp_path / 'object_000000.le').exists()
+            assert (tmp_path / 'object_000001.le').exists()
+            super().cleanup()
+            raise OSError('staging cleanup failed after publication')
+
+    monkeypatch.setattr(split_module, 'TemporaryDirectory', FailingCleanup)
+    with pytest.raises(OSError, match='cleanup failed after publication'):
+        split(source, tmp_path)
+    assert list(tmp_path.iterdir()) == [source]
+
+
 def test_error_after_final_publication_rolls_back_current_and_earlier(tmp_path, monkeypatch):
     source = source_mesh(tmp_path, ids=[1, 2, 1])
     before = source.read_bytes()

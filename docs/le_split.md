@@ -64,9 +64,14 @@ temporary directory on the destination filesystem. Each staged inode is captured
 before final publication via an atomic no-clobber hard link. Rollback tracks the
 known inode before attempting the link, so even an error after successful
 publication removes the current output as well as earlier outputs. No destination
-stat is needed after publication. Inode checks ensure rollback does not remove
-racing destinations or files replaced by another actor. Existing or unrelated
-files are never removed. Source bytes are never modified. Staging files and the
+stat is needed after publication. Failed-publication rollback runs before staging
+cleanup, while staging links keep all tracked inodes alive, including those whose
+publication failed. These checks are never retried after cleanup, when an
+unpublished inode could be recycled for an unrelated file. Cleanup errors after
+successful publication still trigger rollback of the published output links.
+Inode checks ensure rollback does not remove racing destinations or files
+replaced by another actor. Existing or unrelated files are never removed.
+Source bytes are never modified. Staging files and the
 temporary directory are cleaned on success and failure; filesystem errors can
 prevent staging cleanup or rollback. Concurrent hostile directory/source
 replacement is out of scope.

@@ -85,6 +85,16 @@ def split_le(source, output_directory, *, object_attribute: str,
         outputs.append((destination, output))
 
     created = []
+
+    def rollback():
+        for destination, device, inode in reversed(created):
+            try:
+                stat = destination.lstat()
+                if (stat.st_dev, stat.st_ino) == (device, inode):
+                    destination.unlink()
+            except FileNotFoundError:
+                pass
+
     try:
         with TemporaryDirectory(dir=directory, prefix='.le_split.') as staging:
             staged = []
@@ -93,21 +103,26 @@ def split_le(source, output_directory, *, object_attribute: str,
                 write_le_mesh(output, path, sources=(source,))
                 stat = path.stat()
                 staged.append((destination, path, stat.st_dev, stat.st_ino))
-            for destination, path, device, inode in staged:
-                if destination.resolve() == source.resolve() or (
-                        destination.exists() and os.path.samefile(destination, source)):
-                    raise ValueError("Destination must not alias the source path")
-                # Track the known staged inode before linking: publication can
-                # succeed even if the link call then raises. Racers never match.
-                created.append((destination, device, inode))
-                os.link(path, destination)
-    except BaseException:
-        for destination, device, inode in reversed(created):
             try:
-                stat = destination.lstat()
-                if (stat.st_dev, stat.st_ino) == (device, inode):
-                    destination.unlink()
-            except FileNotFoundError:
-                pass
+                for destination, path, device, inode in staged:
+                    if destination.resolve() == source.resolve() or (
+                            destination.exists() and os.path.samefile(destination, source)):
+                        raise ValueError("Destination must not alias the source path")
+                    # Track before linking, including errors after publication.
+                    created.append((destination, device, inode))
+                    os.link(path, destination)
+            except BaseException:
+                try:
+                    # Staging links keep even unpublished inodes alive, so a
+                    # racer cannot recycle their identities during rollback.
+                    rollback()
+                finally:
+                    # Never retry these ownership checks after staging cleanup.
+                    created.clear()
+                raise
+    except BaseException:
+        # After successful publication, output links retain the tracked inodes
+        # even if staging cleanup raises.
+        rollback()
         raise
     return destinations
