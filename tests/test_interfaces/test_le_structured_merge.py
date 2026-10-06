@@ -1,3 +1,4 @@
+import json
 import os
 
 import numpy as np
@@ -58,6 +59,37 @@ def test_each_axis_dtype_and_file_order(tmp_path, shape, axis, dtype):
         for dim in tile.active_data_array.dims:
             assert not np.shares_memory(result.data[dim].values, tile.data[dim].values)
     assert not list(tmp_path.glob(".*.tmp"))
+
+
+@pytest.mark.parametrize("declaration,alias", [("float32", "f4"), ("int16", "i2"),
+                                              ("f4", "float32"), ("i2", "int16"),
+                                              ("<f4", "<f"), (">f4", ">f"),
+                                              ("<i2", "<h"), (">i2", ">h")])
+@pytest.mark.parametrize("count", [1, 2])
+def test_dtype_declaration_and_wire_header_preserved(tmp_path, declaration, alias, count):
+    tiles = [grid(dtype=declaration), grid(start=1.5, dtype=alias)][:count]
+    tiles[0].dtype = declaration
+    if count == 2:
+        tiles[1].dtype = alias
+        assert tiles[0].values.dtype == tiles[1].values.dtype
+    declarations = [tile.dtype for tile in tiles]
+    result = merge_structured_grids(tiles, axis="dim0")
+    assert result.dtype == declaration
+    assert result.values.dtype == tiles[0].values.dtype
+    binary = result.to_binary()
+    header_size = int.from_bytes(binary[:4], "little")
+    assert json.loads(binary[4:4 + header_size])["dtype"] == declaration
+
+    paths = sources_for(tmp_path, tiles)
+    output = merge_structured_le(paths, tmp_path / "out.le", axis="dim0")
+    restored = ops.load_le_grid(output)
+    assert restored.dtype == declaration
+    assert restored.values.dtype == tiles[0].values.dtype
+    np.testing.assert_array_equal(restored.values, result.values)
+    binary = output.read_bytes()
+    header_size = int.from_bytes(binary[:4], "little")
+    assert json.loads(binary[4:4 + header_size])["dtype"] == declaration
+    assert [tile.dtype for tile in tiles] == declarations
 
 
 @pytest.mark.parametrize("dtype", ["int64", "uint64", ">i8"])

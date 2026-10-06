@@ -104,7 +104,7 @@ def merge_structured_grids(grids, *, axis, spacing=None) -> StructuredData:
               for dim in dims}
     result = StructuredData.from_numpy(values, coords=coords,
                                        data_array_name=reference.active_data_array_name)
-    result.dtype = values.dtype.str
+    result.dtype = reference.dtype
     validate_le_grid(result)
     return result
 

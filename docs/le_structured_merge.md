@@ -24,7 +24,10 @@ unsupported metadata. Rank, dimension order, active-array name and scalar dtype
 (including byte order) must match exactly. Scalar values are copied in input
 order, without interpolation or conversion, including categorical integers,
 signed/unsigned extremes, floating NaNs, infinities and signed zero. Output uses
-the existing Fortran-order wire format; no provenance fields are added.
+the existing Fortran-order wire format; no provenance fields are added. The first
+source's declared `dtype` string is preserved verbatim in memory and in the wire
+header. Compatible aliases in later sources are accepted only when their scalar
+array dtypes match exactly, including byte order.
 
 Nonmerge axes must have equal shapes and positions within `1e-10` times the
 reference axis's endpoint-derived spacing. Nonmerge singleton positions must
