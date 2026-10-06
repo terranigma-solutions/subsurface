@@ -17,3 +17,6 @@ from .le_inspection import inspect_le
 from .le_transform import transform_le
 from .le_split import split_le
 from .le_merge import merge_le
+from .le_structured_transform import transform_structured_le
+from .le_structured_split import split_structured_le
+from .le_structured_merge import merge_structured_le

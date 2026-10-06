@@ -77,8 +77,62 @@ Structured read-back and inspection use coordinate extrema, inclusive stored
 endpoints, Fortran scalar ordering, and explicit singleton handling. Flat bounds
 overrides and non-null structured transforms are rejected because their
 semantics are unresolved. Only the serialized active array can be recovered.
-Structured operations (Task 7) and new container design (Task 8) are deferred.
-No CRS conversion, resampling, clipping, or topology repair is performed.
+Restricted structured operations (Task 7) are available as separate explicit APIs
+described below. General resampling/mosaics remain outside scope. The user has
+removed multi-object container design (Task 8) from scope. No CRS conversion,
+resampling, clipping, or topology repair is performed.
+
+## Structured Operations
+
+```python
+from pathlib import Path
+import numpy as np
+from subsurface import (
+    transform_structured_le, split_structured_le, merge_structured_le,
+)
+
+matrix = np.eye(4)
+matrix[:3, 3] = [10, 20, -5]  # Three-dimensional source grid.
+translated = transform_structured_le("volume.le", "translated_volume.le", matrix)
+
+directory = Path("tiles")
+directory.mkdir()
+tiles = split_structured_le(
+    translated, directory,
+    windows={"left": {"x": (0, 10)}, "right": {"x": (10, 20)}},
+)
+merged = merge_structured_le(tiles.values(), "merged_volume.le", axis="x")
+```
+
+The three file functions are exported from both `subsurface` and `subsurface.api`
+and return absolute output paths (a label-to-path mapping for split). The example
+selects twenty X samples; omitted axes retain all their samples.
+
+- Transform supports only translation and strictly positive diagonal scaling.
+  It changes coordinates, not scalar values. Rank-one `dim0` maps to X; rank-two
+  maps to X/Y, with unused matrix axes required to remain identity/zero translation.
+- Split windows use half-open integer `(start, stop)` index ranges. Axes are not
+  squeezed, singleton samples retain their positions, and overlapping explicit
+  windows are allowed. Filenames are deterministic ordinals, never raw labels.
+- Merge concatenates adjacent grids along one explicit axis in caller order.
+  Rank, active-array name, exact scalar dtype, and nonmerge coordinates must
+  agree. Overlaps, gaps, reversed order, and incompatible spacing are rejected.
+  If all merge-axis tiles are singletons, supply explicit positive `spacing`;
+  their original spacing is not recoverable from the files.
+
+The shared safety boundary verifies temporary files through the public reader
+before publication. Unsupported in-memory metadata/arrays/layouts are rejected
+instead of dropped. The existing volume format has no provenance/CRS metadata
+fields; none are invented. Scalar dtype declarations, integer bits, categorical
+labels, and NaN/Inf values are preserved without interpolation. Endpoint coordinate
+reconstruction uses a `1e-10 * spacing` tolerance, not world-coordinate magnitude.
+Numerically ambiguous transformations or adjacency are rejected, including some
+otherwise valid mathematical cases at large origins. Multi-file split is not
+crash atomic, and operations process arrays in memory.
+
+See [structured transform](le_structured_transform.md),
+[structured split](le_structured_split.md), [structured merge](le_structured_merge.md),
+and [output safety](le_grid_ops_safety.md) for detailed policies.
 
 See [inspection](le_inspection.md), [transforms](le_transform.md),
 [split](le_split.md), [merge](le_merge.md), [structured reader](structured_le_reader.md),

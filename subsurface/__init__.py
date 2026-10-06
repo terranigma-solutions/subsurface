@@ -8,6 +8,9 @@ from subsurface.api.le_inspection import inspect_le
 from subsurface.api.le_transform import transform_le
 from subsurface.api.le_split import split_le
 from subsurface.api.le_merge import merge_le
+from subsurface.api.le_structured_transform import transform_structured_le
+from subsurface.api.le_structured_split import split_structured_le
+from subsurface.api.le_structured_merge import merge_structured_le
 from datetime import datetime
 import dotenv
 
