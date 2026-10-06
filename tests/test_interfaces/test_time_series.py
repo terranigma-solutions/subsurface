@@ -103,6 +103,7 @@ def test_trajectory_mismatch(tmp_path, change):
     elif change == "cells":
         second.data.cells.values[0] = [0, 2]
     elif change == "position":
+        second.data["vertex_attrs"] = second.data.vertex_attrs.copy(deep=True)
         second.data.vertex_attrs.loc[dict(vertex_attr="position")] = [0., 1., 3.]
     elif change == "schema":
         second.data = second.data.assign_coords(vertex_attr=["position", "other"])
