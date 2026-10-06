@@ -1,9 +1,14 @@
 import enum
+import json
+import math
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Union, Literal
 
 import numpy as np
 import xarray as xr
+
+from subsurface.core.utils._le_json import validate_le_json_nesting
 
 from ....optional_requirements import require_pyvista
 
@@ -233,6 +238,109 @@ class StructuredData:
         header_json_length_bytes = header_json_length.to_bytes(4, byteorder='little')
         file = header_json_length_bytes + header_json_bytes + body_
         return file
+
+    @classmethod
+    def from_binary_le(cls, path: Union[str, Path]):
+        """Read the current regular axis-aligned scalar .le format.
+
+        Coordinates are reconstructed from sample extrema, including singleton
+        axes. Only the active array is stored; other arrays and source metadata
+        cannot be recovered. Payloads must use the writer's default Fortran
+        order (the file does not record order). Non-null transforms and ambiguous
+        flat bounds overrides are unsupported. Invalid files raise ValueError;
+        filesystem errors propagate unchanged.
+        """
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError(f"Duplicate JSON object key: {key}")
+                result[key] = value
+            return result
+
+        with open(path, "rb") as source:
+            prefix = source.read(4)
+            if len(prefix) != 4:
+                raise ValueError("Truncated structured .le header prefix")
+            header_size = int.from_bytes(prefix, byteorder="little")
+            if not 0 < header_size <= 1024 * 1024:
+                raise ValueError("Structured .le header size must be between 1 and 1048576 bytes")
+            header_bytes = source.read(header_size)
+            if len(header_bytes) != header_size:
+                raise ValueError("Truncated structured .le header")
+            validate_le_json_nesting(header_bytes)
+            try:
+                header = json.loads(header_bytes.decode("utf-8"), object_pairs_hook=unique_object)
+            except RecursionError as exc:
+                raise ValueError("Structured .le JSON header exceeds supported nesting depth") from exc
+            except (UnicodeDecodeError, ValueError) as exc:
+                raise ValueError(f"Invalid structured .le JSON header: {exc}") from exc
+            fields = {"data_shape", "bounds", "transform", "dtype", "data_name"}
+            if not isinstance(header, dict) or set(header) != fields:
+                raise ValueError("Unsupported structured .le header fields")
+            if header["transform"] is not None:
+                raise ValueError("Non-null structured .le transforms are unsupported")
+
+            shape = header["data_shape"]
+            if (not isinstance(shape, list) or not 1 <= len(shape) <= 3
+                    or any(type(size) is not int or size <= 0 for size in shape)):
+                raise ValueError("data_shape must contain one to three positive integer dimensions")
+            dims = cls._default_dim_names(len(shape))
+            bounds = header["bounds"]
+            if not isinstance(bounds, dict) or set(bounds) != set(dims):
+                raise ValueError("bounds must map each standard axis to its sample extrema; flat bounds are ambiguous")
+            coords = {}
+            for dim, size in zip(dims, shape):
+                pair = bounds[dim]
+                if (not isinstance(pair, list) or len(pair) != 2
+                        or any(type(value) not in (int, float) for value in pair)):
+                    raise ValueError(f"Invalid bounds for axis {dim}")
+                try:
+                    low, high = map(float, pair)
+                except (OverflowError, ValueError) as exc:
+                    raise ValueError(f"Invalid bounds for axis {dim}") from exc
+                if low != pair[0] or high != pair[1]:
+                    raise ValueError(f"Bounds for axis {dim} lose precision in float64 coordinates")
+                if (not math.isfinite(low) or not math.isfinite(high)
+                        or not math.isfinite(high - low) or low > high
+                        or (size == 1 and low != high) or (size > 1 and low == high)):
+                    raise ValueError(f"Invalid sample extrema for axis {dim}")
+                coords[dim] = (low, high)
+
+            name = header["data_name"]
+            if not isinstance(name, str) or not name.strip() or name in dims:
+                raise ValueError("data_name must be a nonempty string distinct from axis names")
+            dtype_name = header["dtype"]
+            try:
+                if not isinstance(dtype_name, str):
+                    raise TypeError("dtype must be a string")
+                dtype = np.dtype(dtype_name)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Invalid structured .le numeric dtype") from exc
+            if not (dtype.kind in "iu" and dtype.itemsize in (1, 2, 4, 8)
+                    or dtype.kind == "f" and dtype.itemsize in (2, 4, 8)):
+                raise ValueError("Unsupported structured .le numeric dtype")
+
+            payload_start = source.tell()
+            source.seek(0, 2)
+            payload_size = source.tell() - payload_start
+            expected_size = math.prod(shape) * dtype.itemsize
+            if expected_size > np.iinfo(np.intp).max or payload_size != expected_size:
+                raise ValueError("Structured .le payload length does not match shape and dtype")
+            source.seek(payload_start)
+            payload = source.read(expected_size)
+            if len(payload) != expected_size:
+                raise ValueError("Truncated structured .le payload")
+
+        # The bounds already exclude the VTK outer endpoint. Including both
+        # stored endpoints restores from_pyvista's endpoint=False coordinates.
+        coords = {dim: np.linspace(*coords[dim], num=size) for dim, size in zip(dims, shape)}
+        if any(np.any(np.diff(axis) <= 0) for axis in coords.values()):
+            raise ValueError("Structured .le coordinate spacing is not representable in float64")
+        values = np.frombuffer(payload, dtype=dtype).reshape(shape, order="F").copy()
+        result = cls.from_numpy(values, coords=coords, data_array_name=name, dim_names=dims)
+        result.dtype = dtype_name
+        return result
 
     def _set_binary_header(self) -> Dict:
         data_array = self.active_data_array
