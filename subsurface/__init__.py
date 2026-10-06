@@ -4,6 +4,7 @@ import subsurface.modules.writer
 from . import core
 from .modules import visualization
 from subsurface.core.structs import *
+from subsurface.api.le_inspection import inspect_le
 from datetime import datetime
 import dotenv
 
