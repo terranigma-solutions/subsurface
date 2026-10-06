@@ -278,3 +278,142 @@ def test_cleanup_failure_attempts_remaining_owned_files(tmp_path, monkeypatch):
     assert second.exists()
     assert source.read_bytes() == original
     assert not list(tmp_path.glob(".le_structured_split.*"))
+
+
+@pytest.mark.parametrize("publish_current", [False, True])
+def test_rollback_checks_keep_all_staged_inodes_alive(tmp_path, monkeypatch, publish_current):
+    source = source_file(tmp_path)
+    original = source.read_bytes()
+    first = tmp_path / "grid_000000.le"
+    second = tmp_path / "grid_000001.le"
+    real_link = os.link
+    real_lstat = Path.lstat
+    staged = {}
+    checked = []
+
+    def fail_current_link(src, dst, *args, **kwargs):
+        dst = Path(dst)
+        if dst.parent == tmp_path:
+            staged[dst] = Path(src)
+            if dst == second:
+                if publish_current:
+                    real_link(src, dst, *args, **kwargs)
+                raise OSError("publication failure")
+        return real_link(src, dst, *args, **kwargs)
+
+    def check_lifetime(path, *args, **kwargs):
+        if path in staged:
+            assert set(staged) == {first, second}
+            assert all(staging_file.exists() for staging_file in staged.values())
+            checked.append(path)
+        return real_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr(split.os, "link", fail_current_link)
+    monkeypatch.setattr(Path, "lstat", check_lifetime)
+    with pytest.raises(OSError, match="publication failure"):
+        split.split_structured_le(source, tmp_path, windows={"a": {}, "b": {}})
+    assert checked == [second, first]
+    assert_clean(tmp_path, source, original)
+
+
+@pytest.mark.parametrize("deny_rollback", [False, True])
+def test_recycled_unpublished_inode_after_staging_cleanup_is_not_checked(
+        tmp_path, monkeypatch, deny_rollback):
+    source = source_file(tmp_path)
+    original = source.read_bytes()
+    first = tmp_path / "grid_000000.le"
+    second = tmp_path / "grid_000001.le"
+    real_temporary = split.TemporaryDirectory
+    real_link = os.link
+    real_lstat = Path.lstat
+    real_unlink = Path.unlink
+    unpublished_stat = None
+    cleanup_finished = False
+    late_checks = []
+
+    class RecycleAfterCleanup:
+        def __init__(self, **kwargs):
+            self.temporary = real_temporary(**kwargs)
+
+        def __enter__(self):
+            return self.temporary.__enter__()
+
+        def __exit__(self, *args):
+            nonlocal cleanup_finished
+            result = self.temporary.__exit__(*args)
+            cleanup_finished = True
+            second.write_bytes(b"unrelated writer after cleanup")
+            return result
+
+    def fail_unpublished_link(src, dst, *args, **kwargs):
+        nonlocal unpublished_stat
+        if Path(dst) == second:
+            unpublished_stat = Path(src).stat()
+            raise OSError("publication failure")
+        return real_link(src, dst, *args, **kwargs)
+
+    def recycled_lstat(path, *args, **kwargs):
+        if path == second and cleanup_finished:
+            late_checks.append(path)
+            # Deterministically model legal reuse of the now-unreferenced inode.
+            # No source/staging file or live published inode is replaced.
+            return unpublished_stat
+        return real_lstat(path, *args, **kwargs)
+
+    def denied_unlink(path, *args, **kwargs):
+        if path == first and deny_rollback:
+            raise PermissionError("rollback denied")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(split, "TemporaryDirectory", RecycleAfterCleanup)
+    monkeypatch.setattr(split.os, "link", fail_unpublished_link)
+    monkeypatch.setattr(Path, "lstat", recycled_lstat)
+    monkeypatch.setattr(Path, "unlink", denied_unlink)
+    message = "rollback denied" if deny_rollback else "publication failure"
+    with pytest.raises(OSError, match=message):
+        split.split_structured_le(source, tmp_path, windows={"a": {}, "b": {}})
+    assert cleanup_finished
+    assert late_checks == []
+    assert second.read_bytes() == b"unrelated writer after cleanup"
+    assert first.exists() == deny_rollback
+    assert source.read_bytes() == original
+    assert not list(tmp_path.glob(".le_structured_split.*"))
+
+
+def test_staging_cleanup_failure_after_success_rolls_back_publications(tmp_path, monkeypatch):
+    source = source_file(tmp_path)
+    original = source.read_bytes()
+    real_temporary = split.TemporaryDirectory
+    real_lstat = Path.lstat
+    first = tmp_path / "grid_000000.le"
+    second = tmp_path / "grid_000001.le"
+    checked = []
+    cleanup_finished = False
+
+    class FailAfterCleanup:
+        def __init__(self, **kwargs):
+            self.temporary = real_temporary(**kwargs)
+
+        def __enter__(self):
+            return self.temporary.__enter__()
+
+        def __exit__(self, *args):
+            nonlocal cleanup_finished
+            assert first.exists() and second.exists()
+            self.temporary.__exit__(*args)
+            cleanup_finished = True
+            raise OSError("staging cleanup failure")
+
+    def check_published_reference(path, *args, **kwargs):
+        if cleanup_finished and path in (first, second):
+            assert not list(tmp_path.glob(".le_structured_split.*"))
+            assert path.exists()
+            checked.append(path)
+        return real_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr(split, "TemporaryDirectory", FailAfterCleanup)
+    monkeypatch.setattr(Path, "lstat", check_published_reference)
+    with pytest.raises(OSError, match="staging cleanup failure"):
+        split.split_structured_le(source, tmp_path, windows={"a": {}, "b": {}})
+    assert checked == [second, first]
+    assert_clean(tmp_path, source, original)

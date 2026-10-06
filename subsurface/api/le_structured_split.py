@@ -89,22 +89,13 @@ def split_structured_le(source, output_directory, *, windows) -> Dict[str, Path]
         return {}
 
     created = []
-    try:
-        with TemporaryDirectory(dir=directory, prefix=".le_structured_split.") as staging:
-            staged = []
-            for destination, output in outputs:
-                path = Path(staging) / destination.name
-                write_le_grid(output, path, sources=(source,))
-                stat = path.stat()
-                staged.append((destination, path, stat.st_dev, stat.st_ino))
-            for destination, path, device, inode in staged:
-                check_destination(destination)
-                # A link may publish successfully and then raise; track ownership first.
-                created.append((destination, device, inode))
-                os.link(path, destination)
-    except BaseException as error:
+
+    def rollback(error):
+        # Never retry failed-publication ownership checks after staging is gone.
+        owned = created[:]
+        created.clear()
         cleanup_error = None
-        for destination, device, inode in reversed(created):
+        for destination, device, inode in reversed(owned):
             try:
                 stat = destination.lstat()
                 if (stat.st_dev, stat.st_ino) == (device, inode):
@@ -115,5 +106,28 @@ def split_structured_le(source, output_directory, *, windows) -> Dict[str, Path]
                 cleanup_error = failure
         if cleanup_error is not None:
             raise cleanup_error from error
+
+    try:
+        with TemporaryDirectory(dir=directory, prefix=".le_structured_split.") as staging:
+            staged = []
+            for destination, output in outputs:
+                path = Path(staging) / destination.name
+                write_le_grid(output, path, sources=(source,))
+                stat = path.stat()
+                staged.append((destination, path, stat.st_dev, stat.st_ino))
+            try:
+                for destination, path, device, inode in staged:
+                    check_destination(destination)
+                    # A link may publish successfully and then raise; track ownership first.
+                    created.append((destination, device, inode))
+                    os.link(path, destination)
+            except BaseException as error:
+                # Keep staged inode references alive throughout publication rollback.
+                rollback(error)
+                raise
+    except BaseException as error:
+        # After successful publication, destination links retain the owned inodes
+        # even if temporary-directory cleanup fails.
+        rollback(error)
         raise
     return destinations
