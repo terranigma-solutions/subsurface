@@ -135,3 +135,25 @@ def test_overlap_gap_and_reversed_tiles_do_not_publish(tmp_path):
             merge_structured_le(tiles.values(), output, axis="dim0")
         assert not output.exists()
     assert source.read_bytes() == original
+
+
+def test_nonmerge_singletons_survive_full_pipeline(tmp_path):
+    values = np.array([2 ** 63 + 1, 2 ** 63 + 3, 2 ** 63 + 5], dtype=np.uint64).reshape(3, 1, 1)
+    grid = StructuredData.from_numpy(values, coords={"x": [0, 2, 4], "y": [5], "z": [-10]},
+                                     data_array_name="category")
+    grid.dtype = "uint64"
+    source = write_le_grid(grid, tmp_path / "source.le", sources=[])
+    matrix = np.diag([2, 3, 4, 1])
+    matrix[:3, 3] = [1, 2, 3]
+    transformed = transform_structured_le(source, tmp_path / "transformed.le", matrix)
+    directory = tmp_path / "tiles"
+    directory.mkdir()
+    tiles = split_structured_le(transformed, directory,
+                                windows={"a": {"x": (0, 2)}, "b": {"x": (2, 3)}})
+    output = merge_structured_le(tiles.values(), tmp_path / "merged.le", axis="x")
+    restored = StructuredData.from_binary_le(output)
+    np.testing.assert_array_equal(restored.values, values)
+    assert restored.shape == (3, 1, 1)
+    np.testing.assert_array_equal(restored.data.x, [1, 5, 9])
+    np.testing.assert_array_equal(restored.data.y, [17])
+    np.testing.assert_array_equal(restored.data.z, [-37])

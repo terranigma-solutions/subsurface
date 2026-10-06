@@ -123,8 +123,10 @@ selects twenty X samples; omitted axes retain all their samples.
 The shared safety boundary verifies temporary files through the public reader
 before publication. Unsupported in-memory metadata/arrays/layouts are rejected
 instead of dropped. The existing volume format has no provenance/CRS metadata
-fields; none are invented. Scalar dtype declarations, integer bits, categorical
-labels, and NaN/Inf values are preserved without interpolation. Endpoint coordinate
+fields; none are invented. Callers must establish compatible coordinate frames
+and units because absent file metadata cannot be checked. Scalar dtype
+declarations, integer bits, categorical labels, and NaN/Inf values are preserved
+without interpolation. Endpoint coordinate
 reconstruction uses a `1e-10 * spacing` tolerance, not world-coordinate magnitude.
 Numerically ambiguous transformations or adjacency are rejected, including some
 otherwise valid mathematical cases at large origins. Multi-file split is not
