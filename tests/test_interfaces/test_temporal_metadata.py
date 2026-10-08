@@ -104,6 +104,25 @@ def test_structured_temporal_attrs_must_be_json_safe(structured_snapshot, value,
         structured_snapshot.default_data_array_to_binary_legacy()
 
 
+def test_structured_temporal_metadata_roundtrip(structured_snapshot, temporal_attrs, tmp_path):
+    structured_snapshot.data.attrs.update(temporal_attrs)
+    path = tmp_path / "volume_0000.le"
+    path.write_bytes(structured_snapshot.to_binary())
+
+    restored = StructuredData.from_binary_le(path)
+    assert restored.data.attrs == temporal_attrs
+    np.testing.assert_array_equal(restored.values, structured_snapshot.values)
+
+
+@pytest.mark.parametrize("xarray_attrs", [[], "metadata", None])
+def test_structured_reader_rejects_non_object_xarray_attrs(structured_snapshot, tmp_path, xarray_attrs):
+    header, body = _split_binary(structured_snapshot.to_binary())
+    path = tmp_path / "bad.le"
+    path.write_bytes(_pack_binary({**header, "xarray_attrs": xarray_attrs}, body))
+    with pytest.raises(ValueError, match="xarray_attrs must be a JSON object"):
+        StructuredData.from_binary_le(path)
+
+
 @pytest.fixture
 def unstructured_snapshot():
     return UnstructuredData.from_array(

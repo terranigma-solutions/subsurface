@@ -245,8 +245,9 @@ class StructuredData:
         """Read the current regular axis-aligned scalar .le format.
 
         Coordinates are reconstructed from sample extrema, including singleton
-        axes. Only the active array is stored; other arrays and source metadata
-        cannot be recovered. Payloads must use the writer's default Fortran
+        axes. Only the active array is stored; other arrays cannot be recovered,
+        and source metadata only when the header carries ``xarray_attrs``
+        (temporal snapshots). Payloads must use the writer's default Fortran
         order (the file does not record order). Non-null transforms and ambiguous
         flat bounds overrides are unsupported. Invalid files raise ValueError;
         filesystem errors propagate unchanged.
@@ -277,8 +278,12 @@ class StructuredData:
             except (UnicodeDecodeError, ValueError) as exc:
                 raise ValueError(f"Invalid structured .le JSON header: {exc}") from exc
             fields = {"data_shape", "bounds", "transform", "dtype", "data_name"}
-            if not isinstance(header, dict) or set(header) != fields:
+            # Temporal snapshots additionally carry their source metadata.
+            if not isinstance(header, dict) or set(header) - {"xarray_attrs"} != fields:
                 raise ValueError("Unsupported structured .le header fields")
+            xarray_attrs = header.get("xarray_attrs", {})
+            if not isinstance(xarray_attrs, dict):
+                raise ValueError("xarray_attrs must be a JSON object")
             if header["transform"] is not None:
                 raise ValueError("Non-null structured .le transforms are unsupported")
 
@@ -341,6 +346,7 @@ class StructuredData:
         values = np.frombuffer(payload, dtype=dtype).reshape(shape, order="F").copy()
         result = cls.from_numpy(values, coords=coords, data_array_name=name, dim_names=dims)
         result.dtype = dtype_name
+        result.data.attrs.update(xarray_attrs)
         return result
 
     def _set_binary_header(self) -> Dict:
