@@ -181,7 +181,10 @@ def _validate_attribute_dataframe(df: pd.DataFrame, attr_name: str):
         )
 
 
-def _column_metadata(df: pd.DataFrame, order: str) -> list[dict]:
+def _column_metadata(df: pd.DataFrame, order: str, pack_integral_floats: bool = True) -> list[dict]:
+    """Describe serialized columns. Integral float columns are stored as int64
+    unless ``pack_integral_floats`` is False (temporal snapshots need a stored
+    dtype that does not depend on the values)."""
     meta = []
     for col in df.columns:
         series = df[col]
@@ -195,7 +198,7 @@ def _column_metadata(df: pd.DataFrame, order: str) -> list[dict]:
             stored_dtype = 'bool'
             byte_length = values.size
         elif np.issubdtype(dtype, np.floating):
-            if np.all(np.mod(values, 1) == 0):
+            if pack_integral_floats and np.all(np.mod(values, 1) == 0):
                 int_vals = values.astype(np.int64)
                 if np.all(int_vals.astype(np.float64) == values):
                     stored_dtype = 'int64'
@@ -222,13 +225,13 @@ def _column_metadata(df: pd.DataFrame, order: str) -> list[dict]:
     return meta
 
 
-def _serialize_column(values: np.ndarray) -> bytes:
+def _serialize_column(values: np.ndarray, pack_integral_floats: bool = True) -> bytes:
     if np.issubdtype(values.dtype, np.integer):
         return values.tobytes('C')
     elif np.issubdtype(values.dtype, np.bool_):
         return values.astype(np.uint8).tobytes('C')
     else:
-        if np.issubdtype(values.dtype, np.floating):
+        if pack_integral_floats and np.issubdtype(values.dtype, np.floating):
             if np.all(np.mod(values, 1) == 0):
                 int_vals = values.astype(np.int64)
                 if np.all(int_vals.astype(np.float64) == values):

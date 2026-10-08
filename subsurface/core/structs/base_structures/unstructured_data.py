@@ -287,13 +287,14 @@ class UnstructuredData:
         
         cell_attrs_filtered = _filter_numeric_columns(self.attributes)
         vertex_attrs_filtered = _filter_numeric_columns(self.points_attributes)
-        
+        pack = self._pack_integral_floats
+
         header = {
                 "format_version"   : 2,
                 "vertex_shape"     : self.vertex.shape,
                 "cell_shape"       : self.cells.shape,
-                "cell_attrs"       : _column_metadata(cell_attrs_filtered, 'C') if not cell_attrs_filtered.empty else [],
-                "vertex_attrs"     : _column_metadata(vertex_attrs_filtered, 'C') if not vertex_attrs_filtered.empty else [],
+                "cell_attrs"       : _column_metadata(cell_attrs_filtered, 'C', pack) if not cell_attrs_filtered.empty else [],
+                "vertex_attrs"     : _column_metadata(vertex_attrs_filtered, 'C', pack) if not vertex_attrs_filtered.empty else [],
                 "xarray_attrs"     : self.data.attrs
         }
         return header
@@ -306,13 +307,20 @@ class UnstructuredData:
         vertex = self.vertex.astype('float32').tobytes(order)
         cells = self.cells.astype('int32').tobytes(order)
 
+        pack = self._pack_integral_floats
         parts = [vertex, cells]
         for col in cell_attrs_filtered.columns:
-            parts.append(_serialize_column(cell_attrs_filtered[col].to_numpy()))
+            parts.append(_serialize_column(cell_attrs_filtered[col].to_numpy(), pack))
         for col in vertex_attrs_filtered.columns:
-            parts.append(_serialize_column(vertex_attrs_filtered[col].to_numpy()))
+            parts.append(_serialize_column(vertex_attrs_filtered[col].to_numpy(), pack))
 
         return b''.join(parts)
+
+    @property
+    def _pack_integral_floats(self) -> bool:
+        # Temporal snapshots must keep the same stored dtype in every frame, so
+        # integral-valued float columns are not packed as int64 for them.
+        return "timestamp" not in self.data.attrs and "time_series_id" not in self.data.attrs
 
     def _validate(self):
         try:

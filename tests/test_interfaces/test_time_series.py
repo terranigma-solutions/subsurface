@@ -30,9 +30,34 @@ def volume():
 
 
 def decode(path):
-    binary = path.read_bytes()
+    return decode_bytes(path.read_bytes())
+
+
+def decode_bytes(binary):
     length = int.from_bytes(binary[:4], "little")
     return json.loads(binary[4:4 + length]), binary[4 + length:]
+
+
+def test_trajectory_frames_keep_stored_dtypes_when_values_are_integral(tmp_path):
+    def frame(change):
+        return UnstructuredData.from_array(
+            vertex=np.array([[0., 0., 0.], [1., 0., 0.], [2., 0., 0.]]), cells="lines",
+            vertex_attr=pd.DataFrame({"position": [0., 1., 2.], "change": change}))
+
+    # Static writes still pack integral floats as int64; temporal frames must not.
+    static_header, _ = decode_bytes(frame([0., 0., 0.]).to_binary())
+    assert {a["name"]: a["dtype"] for a in static_header["vertex_attrs"]}["change"] == "int64"
+
+    frames = [("2025-01-01T00:00:00Z", frame([0.5, -0.1, 0.])),
+              ("2025-01-01T01:00:00Z", frame([0., 0., 0.]))]
+    path = export_time_series(iter(frames), tmp_path / "series", time_series_id="m", kind="trajectory")
+    layouts = []
+    for entry in json.loads(path.read_text())["frames"]:
+        header, _ = decode(path.parent / entry["path"])
+        layouts.append([(a["name"], a["dtype"], a["byte_length"]) for a in header["vertex_attrs"]])
+        mesh = LiquidEarthMesh.from_binary((path.parent / entry["path"]).read_bytes())
+        assert mesh.points_attributes["change"].dtype == np.float32
+    assert layouts[0] == layouts[1] == [("position", "float32", 12), ("change", "float32", 12)]
 
 
 def test_trajectory_sorted_metadata_and_missing_values(tmp_path):
