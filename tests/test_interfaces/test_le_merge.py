@@ -320,3 +320,38 @@ def test_reserved_provenance_requires_dict(tmp_path, value, source_index):
     with pytest.raises(ValueError, match="Reserved le_tools provenance must be a dictionary"):
         merge_le(paths, output)
     assert not output.exists()
+
+
+def test_source_labels_replace_local_paths_and_make_outputs_location_independent(tmp_path):
+    outputs = []
+    labels = ["surfaces/a.le@etag-1", "nested/dir/b.le@etag-2"]
+    for name in ("first", "second"):
+        directory = tmp_path / name
+        directory.mkdir()
+        paths = save(directory, [mesh(), mesh()])
+        result = merge_le(paths, directory / "merged.le", object_attribute="object_id",
+                          association="cell", source_labels=iter(labels))
+        sources = load_le_mesh(result.destination).data_attrs["le_tools"]["sources"]
+        assert [entry["path"] for entry in sources] == labels
+        assert [entry["name"] for entry in sources] == ["a.le@etag-1", "b.le@etag-2"]
+        outputs.append(result.destination.read_bytes())
+    assert outputs[0] == outputs[1]
+
+
+def test_in_memory_merge_records_labels_verbatim():
+    merged = merge_meshes([mesh(), mesh()], source_labels=["a.le", "b.le"])
+    assert [entry["path"] for entry in merged.data_attrs["le_tools"]["sources"]] == ["a.le", "b.le"]
+
+
+@pytest.mark.parametrize("labels,error", [(["only-one.le"], ValueError), ("a.le", TypeError),
+                                          (["a.le", ""], TypeError), (["a.le", None], TypeError)])
+def test_invalid_source_labels_rejected_before_writing(tmp_path, labels, error):
+    paths = save(tmp_path, [mesh(), mesh()])
+    with pytest.raises(error, match="source_labels"):
+        merge_le(paths, tmp_path / "merged.le", source_labels=labels)
+    assert not (tmp_path / "merged.le").exists()
+
+
+def test_sources_and_source_labels_are_exclusive():
+    with pytest.raises(ValueError, match="not both"):
+        merge_meshes([mesh()], sources=["a.le"], source_labels=["a.le"])

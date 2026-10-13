@@ -54,7 +54,10 @@ All dataset metadata is preserved except the reserved `le_tools` provenance
 dictionary. Each output records `operation`, absolute resolved `source`,
 `object_attribute`, `association`, and original `object_id` there. Existing
 `le_tools` dictionaries are retained under `previous`; a non-dictionary value is
-rejected. Other metadata, including coordinate-system semantics, is unchanged.
+rejected. Pass `source_label="..."` (a non-empty string such as a blob path plus
+version) to record that label as `source` instead of the local path. Outputs then
+do not depend on where the source was downloaded, so retried jobs produce
+identical bytes. Other metadata, including coordinate-system semantics, is unchanged.
 Sibling merge operations can treat `le_tools` as provenance while requiring all
 other dataset metadata to match strictly.
 

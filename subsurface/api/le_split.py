@@ -4,7 +4,7 @@ from copy import deepcopy
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 import numpy as np
 
@@ -14,7 +14,7 @@ from subsurface.core.structs.base_structures._liquid_earth_mesh import LiquidEar
 
 
 def split_le(source, output_directory, *, object_attribute: str,
-             association: str) -> Dict[Union[int, float], Path]:
+             association: str, source_label: Optional[str] = None) -> Dict[Union[int, float], Path]:
     """Write one new file per sorted original ID; return ID-to-absolute-Path mapping.
 
     Use cell association for meshes and point association for point clouds.
@@ -22,8 +22,12 @@ def split_le(source, output_directory, *, object_attribute: str,
     exist or alias the source. All outputs are preflighted and serialized before
     publication. On publication failure, files created by this call are removed.
     This is not a crash-atomic multi-file transaction. See ``docs/le_split.md``
-    for point connectivity, precision, and provenance policies.
+    for point connectivity, precision, and provenance policies. An optional
+    ``source_label`` (e.g. a blob path) is recorded in provenance instead of the
+    absolute resolved source path.
     """
+    if source_label is not None and (type(source_label) is not str or not source_label):
+        raise TypeError("source_label must be a non-empty string")
     source = Path(source).absolute()
     directory = Path(output_directory).absolute()
     if not directory.is_dir():
@@ -68,7 +72,7 @@ def split_le(source, output_directory, *, object_attribute: str,
                 cell_rows = np.flatnonzero(np.isin(mesh.cells[:, 0], point_rows))
                 cells = np.searchsorted(point_rows, mesh.cells[cell_rows]).astype(np.int32)
         metadata = deepcopy(mesh.data_attrs)
-        provenance = dict(operation='split', source=str(source.resolve()),
+        provenance = dict(operation='split', source=source_label if source_label is not None else str(source.resolve()),
                           object_attribute=object_attribute, association=association,
                           object_id=object_id)
         if 'le_tools' in metadata:

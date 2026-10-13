@@ -4,7 +4,7 @@ import copy
 import json
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Optional, List, Dict, Any
 
 import numpy as np
@@ -24,14 +24,16 @@ class LEMergeResult:
 
 
 def merge_meshes(meshes, *, object_attribute=None, association=None,
-                 id_policy="source", sources=None) -> LiquidEarthMesh:
+                 id_policy="source", sources=None, source_labels=None) -> LiquidEarthMesh:
     """Concatenate meshes without welding, coercing schemas, or mutating inputs.
 
     Grouping requires both arguments and follows inspection's association rules.
     ``source`` assigns consecutive int64 IDs in source order, then sorted original
     ID order; ``shared`` explicitly preserves globally shared IDs. Original exact
     Python numeric values and nested source provenance are kept under ``le_tools``.
-    Optional sources are path labels, one per mesh. See docs/le_merge.md.
+    Optional sources are path labels, one per mesh. Optional source_labels are
+    recorded verbatim instead (e.g. blob paths), never resolved against the local
+    filesystem; supply at most one of the two. See docs/le_merge.md.
     """
     if (object_attribute is None) != (association is None):
         raise ValueError("object_attribute and association must be supplied together")
@@ -44,13 +46,17 @@ def merge_meshes(meshes, *, object_attribute=None, association=None,
         raise ValueError("At least one source is required")
     if any(not isinstance(mesh, LiquidEarthMesh) for mesh in meshes):
         raise TypeError("Expected LiquidEarthMesh inputs")
-    if sources is None:
-        paths = [None] * len(meshes)
+    if sources is not None and source_labels is not None:
+        raise ValueError("Supply sources or source_labels, not both")
+    if source_labels is not None:
+        labels = _check_source_labels(source_labels, len(meshes))
+    elif sources is None:
+        labels = [None] * len(meshes)
     else:
         if isinstance(sources, (str, bytes, os.PathLike)):
             raise TypeError("sources must be an iterable of paths")
-        paths = [Path(source).absolute() for source in sources]
-        if len(paths) != len(meshes):
+        labels = [str(Path(source).absolute()) for source in sources]
+        if len(labels) != len(meshes):
             raise ValueError("sources must contain one path per mesh")
 
     # Count before concatenation or serialization, so index overflow never wraps.
@@ -93,7 +99,7 @@ def merge_meshes(meshes, *, object_attribute=None, association=None,
     provenance = []
     offset = 0
     next_id = 0
-    for index, (mesh, path) in enumerate(zip(meshes, paths)):
+    for index, (mesh, label) in enumerate(zip(meshes, labels)):
         cell_frame = mesh.attributes.copy(deep=True)
         point_frame = mesh.points_attributes.copy(deep=True)
         if object_attribute is not None:
@@ -112,8 +118,8 @@ def merge_meshes(meshes, *, object_attribute=None, association=None,
         point_frames.append(point_frame)
         cells.append(mesh.cells.astype(np.int64) + offset)
         offset += mesh.vertex.shape[0]
-        entry = {"source_index": index, "path": str(path) if path is not None else None,
-                 "name": path.name if path is not None else None}
+        entry = {"source_index": index, "path": label,
+                 "name": PurePosixPath(label).name if label is not None else None}
         if "le_tools" in mesh.data_attrs:
             entry["le_tools"] = copy.deepcopy(mesh.data_attrs["le_tools"])
         provenance.append(entry)
@@ -132,22 +138,39 @@ def merge_meshes(meshes, *, object_attribute=None, association=None,
     return merged
 
 
+def _check_source_labels(source_labels, count) -> List[str]:
+    if isinstance(source_labels, (str, bytes, os.PathLike)):
+        raise TypeError("source_labels must be an iterable of strings")
+    labels = list(source_labels)
+    if any(type(label) is not str or not label for label in labels):
+        raise TypeError("source_labels must contain non-empty strings")
+    if len(labels) != count:
+        raise ValueError("source_labels must contain one label per source")
+    return labels
+
+
 def merge_le(sources, destination, *, object_attribute=None, association=None,
-             id_policy="source", overwrite=False) -> LEMergeResult:
+             id_policy="source", overwrite=False, source_labels=None) -> LEMergeResult:
     """Atomically merge ordered .le paths; reject aliases and incompatible data.
 
     No grouping is inferred. The default source identity policy only remaps an
     explicitly selected ID column; all other attributes keep their wire values.
     Returns an absolute destination Path and the provenance ID mapping, or None
     without grouping. Existing outputs require overwrite=True; inputs are never
-    replaced, even when overwrite is enabled.
+    replaced, even when overwrite is enabled. Optional ``source_labels`` (one
+    string per source) replace the absolute paths recorded in provenance, so
+    outputs do not depend on where the inputs happen to be stored locally.
     """
     if isinstance(sources, (str, bytes, os.PathLike)):
         raise TypeError("sources must be an iterable of source paths")
     paths = tuple(Path(source).absolute() for source in sources)
     if not paths:
         raise ValueError("At least one source is required")
-    merged = merge_meshes([load_le_mesh(path) for path in paths], sources=paths,
+    if source_labels is not None:
+        provenance = dict(source_labels=_check_source_labels(source_labels, len(paths)))
+    else:
+        provenance = dict(sources=paths)
+    merged = merge_meshes([load_le_mesh(path) for path in paths], **provenance,
                           object_attribute=object_attribute, association=association,
                           id_policy=id_policy)
     output = write_le_mesh(merged, destination, sources=paths, overwrite=overwrite)
