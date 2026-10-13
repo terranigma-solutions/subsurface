@@ -12,7 +12,7 @@ print(result.id_mapping)
 ```
 
 `merge_le(sources, destination, *, object_attribute=None, association=None,
-id_policy="source", overwrite=False)` returns `LEMergeResult` containing an
+id_policy="source", overwrite=False, source_labels=None)` returns `LEMergeResult` containing an
 absolute destination `Path` and a JSON-native list of ID mapping entries, or
 `None` for the mapping if grouping was not requested. Sources are consumed in
 caller order, including repeated paths. Pass an iterable of paths, not one path.
@@ -73,6 +73,9 @@ Float IDs retain their decoded wire values, not pre-export float64 precision.
 Output `data_attrs["le_tools"]` records `operation="merge"`, grouping arguments,
 ID policy, ID mapping and ordered sources. Each source records its index,
 absolute path and filename, plus its entire prior `le_tools` value when present.
+Optional `source_labels` (one non-empty string per source, e.g. blob path plus
+version) are recorded verbatim as `path`, with their last `/` component as
+`name`, so outputs do not depend on local download locations.
 Different split/merge sibling provenance does not cause a metadata conflict.
 When present, reserved `le_tools` provenance must be a dictionary; null, scalar
 and list values are rejected rather than treated as arbitrary semantic metadata.
@@ -92,9 +95,10 @@ int64 rule, otherwise float32. Finite float overflow is rejected; float32
 rounding and underflow are allowed. Nonfinite nongrouping attributes are retained.
 
 `merge_meshes(meshes, *, object_attribute=None, association=None,
-id_policy="source", sources=None)` is the in-memory equivalent. It accepts
+id_policy="source", sources=None, source_labels=None)` is the in-memory equivalent. It accepts
 `LiquidEarthMesh`, returns a new validated mesh and does not mutate inputs.
 Optional `sources` supplies one path label per mesh for provenance; absent labels
-produce null paths/names, not invented filesystem sources. Its mapping is in
+produce null paths/names, not invented filesystem sources. `sources` labels are
+made absolute; `source_labels` are kept verbatim. Supply at most one of the two. Its mapping is in
 `mesh.data_attrs["le_tools"]["id_mapping"]`. It intentionally avoids conversion
 through `UnstructuredData` to preserve independent column dtypes.

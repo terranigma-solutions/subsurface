@@ -401,3 +401,24 @@ def test_reserved_metadata_requires_dictionary(tmp_path):
     with pytest.raises(ValueError, match='le_tools'):
         split(source, tmp_path)
     assert list(tmp_path.iterdir()) == [source]
+
+
+def test_source_label_replaces_local_path_and_makes_outputs_location_independent(tmp_path):
+    outputs = []
+    for name in ('first', 'second'):
+        directory = tmp_path / name
+        directory.mkdir()
+        source = source_mesh(directory, ids=[1, 2, 1])
+        mapping = split_le(source, directory, object_attribute='id', association='cell',
+                           source_label='surfaces/combined.le@etag-1')
+        assert load_le_mesh(mapping[1]).data_attrs['le_tools']['source'] == 'surfaces/combined.le@etag-1'
+        outputs.append([path.read_bytes() for path in mapping.values()])
+    assert outputs[0] == outputs[1]
+
+
+@pytest.mark.parametrize('label', ['', 3, b'surfaces/a.le'])
+def test_invalid_source_label_rejected_before_writing(tmp_path, label):
+    source = source_mesh(tmp_path, ids=[1, 2, 1])
+    with pytest.raises(TypeError, match='source_label'):
+        split_le(source, tmp_path, object_attribute='id', association='cell', source_label=label)
+    assert sorted(path.name for path in tmp_path.iterdir()) == ['source.le']
