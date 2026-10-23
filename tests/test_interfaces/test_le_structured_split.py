@@ -34,6 +34,28 @@ def assert_clean(tmp_path, source, original):
     assert set(tmp_path.iterdir()) == {source}
 
 
+def test_custom_window_output_names(tmp_path):
+    source = source_file(tmp_path)
+    windows = {'west': {'dim0': (0, 2)}, 'east': {'dim0': (2, 5)}}
+    outputs = split.split_structured_le(source, tmp_path, windows=windows,
+                                       output_names={'west': 'western.le', 'east': 'eastern.le'})
+    assert [p.name for p in outputs.values()] == ['western.le', 'eastern.le']
+    original = load_le_grid(source)
+    for key, path in outputs.items():
+        expected = split.split_structured_grid(original, windows[key])
+        np.testing.assert_array_equal(load_le_grid(path).values, expected.values)
+
+
+@pytest.mark.parametrize('names', [{'west': 'one.le'}, {'west': 'same.le', 'east': 'same.le'},
+                                  {'west': '../escape.le', 'east': 'east.le'}])
+def test_invalid_window_output_names_write_nothing(tmp_path, names):
+    source = source_file(tmp_path)
+    original = source.read_bytes()
+    with pytest.raises(ValueError):
+        split.split_structured_le(source, tmp_path, windows={'west': {}, 'east': {}}, output_names=names)
+    assert_clean(tmp_path, source, original)
+
+
 @pytest.mark.parametrize("shape", [(5,), (4, 5), (3, 4, 5), (1, 4), (3, 1, 5)])
 @pytest.mark.parametrize("dtype", ["int8", "int16", "int32", "int64", "uint8", "uint16",
                                    "uint32", "uint64", "float16", "float32", "float64", ">i8", ">f8"])

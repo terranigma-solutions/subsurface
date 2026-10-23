@@ -17,7 +17,11 @@ triangles, tetrahedra, and hexahedra; `point` for connectivity widths zero or on
 Wrong associations or missing columns raise `ValueError`. An explicitly named
 empty grouping column returns `{}` without writing files.
 
-Outputs are deterministically named `object_000000.le`, `object_000001.le`, etc.
+Outputs default to deterministic names `object_000000.le`, `object_000001.le`, etc.
+Pass `output_names={1: "sandstone.le", 2: "limestone.le"}` to choose filenames.
+The mapping must cover exactly all original numeric IDs, and values must be unique
+`.le` filenames without directory components. Files are written under
+`output_directory`; omitting the mapping preserves the default names.
 IDs never become path components. The output directory must already exist.
 There is no overwrite option: existing files, directories, dangling symlinks,
 and source aliases (including hard links) are rejected before publication.

@@ -11,14 +11,18 @@ outputs = split_structured_le(
 )
 ```
 
-`split_structured_le(source, output_directory, *, windows)` returns a dictionary
+`split_structured_le(source, output_directory, *, windows, output_names=None)` returns a dictionary
 mapping caller labels to absolute `Path` objects in caller iteration order.
 The directory must already exist. Labels must be nonempty strings; even path-like
-labels never enter filenames. Outputs are deterministic ordinal names
+labels never automatically enter filenames. Outputs default to deterministic ordinal names
 `grid_000000.le`, `grid_000001.le`, and so on. Existing files and dangling
 symlinks are rejected; there is no overwrite option. An empty windows mapping
 returns `{}` and creates no outputs, but still requires a valid source and
 existing output directory.
+
+Pass `output_names={"left": "western.le", "overlap": "overlapping.le"}` to choose
+filenames under `output_directory`. The mapping must cover exactly the window
+labels and contain unique `.le` filenames without directory components.
 
 Each window is a mapping from standard axes (`dim0` for rank one, `x,y` for rank
 two, `x,y,z` for rank three) to half-open integer `(start, stop)` pairs. Tuple

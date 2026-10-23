@@ -10,11 +10,13 @@ import numpy as np
 
 from subsurface.api._le_file_ops import load_le_mesh, serialize_le_mesh, write_le_mesh
 from subsurface.api.le_inspection import group_object_ids
+from subsurface.api._le_output_names import split_destinations
 from subsurface.core.structs.base_structures._liquid_earth_mesh import LiquidEarthMesh
 
 
 def split_le(source, output_directory, *, object_attribute: str,
-             association: str, source_label: Optional[str] = None) -> Dict[Union[int, float], Path]:
+             association: str, source_label: Optional[str] = None,
+             output_names: Optional[Dict[Union[int, float], str]] = None) -> Dict[Union[int, float], Path]:
     """Write one new file per sorted original ID; return ID-to-absolute-Path mapping.
 
     Use cell association for meshes and point association for point clouds.
@@ -25,6 +27,8 @@ def split_le(source, output_directory, *, object_attribute: str,
     for point connectivity, precision, and provenance policies. An optional
     ``source_label`` (e.g. a blob path) is recorded in provenance instead of the
     absolute resolved source path.
+    Optional ``output_names`` maps every original numeric ID to a unique .le
+    filename inside output_directory; omitted names use the ordinal defaults.
     """
     if source_label is not None and (type(source_label) is not str or not source_label):
         raise TypeError("source_label must be a non-empty string")
@@ -37,6 +41,7 @@ def split_le(source, output_directory, *, object_attribute: str,
     frame = mesh.points_attributes if association == 'point' else mesh.attributes
     ids = group_object_ids(frame, object_attribute=object_attribute,
                            association=association, cell_width=width)
+    destinations = split_destinations(directory, [value.item() for value in ids], output_names, 'object')
     if not len(ids):
         return {}
     if width == 0 and mesh.cells.shape[0] not in (0, len(mesh.vertex)):
@@ -44,10 +49,6 @@ def split_le(source, output_directory, *, object_attribute: str,
     if 'le_tools' in mesh.data_attrs and not isinstance(mesh.data_attrs['le_tools'], dict):
         raise ValueError("Reserved le_tools metadata must be a dictionary")
 
-    destinations = {
-        object_id.item(): directory / f'object_{ordinal:06d}.le'
-        for ordinal, object_id in enumerate(ids)
-    }
     for destination in destinations.values():
         if destination.resolve() == source.resolve() or (
                 destination.exists() and os.path.samefile(destination, source)):

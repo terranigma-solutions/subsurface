@@ -43,6 +43,31 @@ def split(source, directory, association='cell', attribute='id'):
     return split_le(source, directory, object_attribute=attribute, association=association)
 
 
+def test_custom_output_names_preserve_id_mapping(tmp_path):
+    source = source_mesh(tmp_path, ids=[4.25, -2.5, 4.25])
+    outputs = split_le(source, tmp_path, object_attribute='id', association='cell',
+                       output_names={4.25: 'sandstone.le', -2.5: 'limestone.le'})
+    assert list(outputs) == [-2.5, 4.25]
+    assert [p.name for p in outputs.values()] == ['limestone.le', 'sandstone.le']
+    for object_id, path in outputs.items():
+        assert (load_le_mesh(path).attributes['id'] == object_id).all()
+
+
+@pytest.mark.parametrize('names', [
+    {1: 'one.le'}, {1: 'one.le', 2: 'two.le', 3: 'three.le'},
+    {1: 'same.le', 2: 'same.le'}, {1: '../escape.le', 2: 'two.le'},
+    {1: '/absolute.le', 2: 'two.le'}, {1: 'nested/file.le', 2: 'two.le'},
+    {1: 'wrong.txt', 2: 'two.le'}, {1: 'source.le', 2: 'two.le'},
+])
+def test_invalid_output_names_write_nothing(tmp_path, names):
+    source = source_mesh(tmp_path, ids=[1, 2, 1])
+    original = source.read_bytes()
+    with pytest.raises(ValueError):
+        split_le(source, tmp_path, object_attribute='id', association='cell', output_names=names)
+    assert list(tmp_path.iterdir()) == [source]
+    assert source.read_bytes() == original
+
+
 def test_shared_unused_vertices_sparse_int64_and_all_attributes(tmp_path):
     low, high = 2 ** 60 + 1, 2 ** 60 + 3
     source = source_mesh(tmp_path, ids=np.array([high, low, high], dtype=np.int64),

@@ -50,10 +50,12 @@ def split_structured_grid(grid: StructuredData, ranges) -> StructuredData:
     return result
 
 
-def split_structured_le(source, output_directory, *, windows) -> Dict[str, Path]:
+def split_structured_le(source, output_directory, *, windows, output_names=None) -> Dict[str, Path]:
     """Write ordered independent windows and return labels to absolute paths.
 
-    Output names are ``grid_000000.le``, etc., never caller labels. The output
+    Output names default to ``grid_000000.le``, etc., never caller labels.
+    Optional ``output_names`` maps every window label to a unique .le filename.
+    The output
     directory must exist and all destinations must be new and not source aliases.
     An empty mapping returns ``{}`` with no outputs after source validation.
     All windows are preflighted and staged with verified readback before any
@@ -67,7 +69,9 @@ def split_structured_le(source, output_directory, *, windows) -> Dict[str, Path]
     if not isinstance(windows, Mapping):
         raise TypeError("windows must be an ordered label-to-window mapping")
     grid = load_le_grid(source)
-    destinations = {}
+    from subsurface.api._le_output_names import split_destinations
+
+    destinations = split_destinations(directory, windows, output_names, 'grid')
     outputs = []
 
     def check_destination(destination):
@@ -77,13 +81,12 @@ def split_structured_le(source, output_directory, *, windows) -> Dict[str, Path]
         if os.path.lexists(destination):
             raise FileExistsError(f"Destination already exists: {destination}")
 
-    for ordinal, (label, ranges) in enumerate(windows.items()):
+    for label, ranges in windows.items():
         if not isinstance(label, str) or not label:
             raise ValueError("Window labels must be nonempty strings")
-        destination = directory / f"grid_{ordinal:06d}.le"
+        destination = destinations[label]
         check_destination(destination)
         output = split_structured_grid(grid, ranges)
-        destinations[label] = destination
         outputs.append((destination, output))
     if not outputs:
         return {}
