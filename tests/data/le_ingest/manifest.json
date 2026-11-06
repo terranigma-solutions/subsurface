@@ -1,0 +1,131 @@
+{
+  "generator": "tests/data/le_ingest/generate.py",
+  "generated_at_commit": "6d532e6458dad00eede367641b98c7bccceef10a",
+  "versions": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "xarray": "2026.4.0"
+  },
+  "fixtures": [
+    {
+      "path": "mesh/plain.le",
+      "family": "mesh",
+      "role": "mesh",
+      "writer": "UnstructuredData.from_array(...).to_binary(order='F')",
+      "sha256": "eedd6da21bf922da3c97e6f61f8e528810e947d1c717211ec738131f1df92a7a",
+      "size": 201
+    },
+    {
+      "path": "mesh/attributes.le",
+      "family": "mesh",
+      "role": "mesh",
+      "writer": "UnstructuredData.from_array(...).to_binary(order='F')",
+      "sha256": "35af403b99ed675efc17320a7e9c2d6b7fc2f83ed0dd4cb519deca9f8ebe0402",
+      "size": 447
+    },
+    {
+      "path": "mesh/textured.le",
+      "family": "mesh",
+      "role": "mesh",
+      "writer": "UnstructuredData.from_array(...).to_binary(order='F')",
+      "sha256": "590ce191ba622a37a1a6d8db57c892d2e288cd6344ab368cc01e5998cfd85b58",
+      "size": 367
+    },
+    {
+      "path": "mesh/textured.png",
+      "family": "mesh",
+      "role": "texture",
+      "writer": "generate._png (RGB, 8-bit)",
+      "sha256": "3d27b4ed2fdfdb12b533f2ddf6e113f5f6ad516b1acd9ebb3ed1de5476ec51c6",
+      "size": 75
+    },
+    {
+      "path": "mesh/textured_integral_uv.le",
+      "family": "mesh",
+      "role": "mesh",
+      "writer": "UnstructuredData.from_array(...).to_binary(order='F') (integral UVs are stored as int64)",
+      "sha256": "ce93e039d1915725fc8d1d0dec3618f39c6f612b606df7f8f2d0224fada71ead",
+      "size": 395
+    },
+    {
+      "path": "mesh/textured_rgba.png",
+      "family": "mesh",
+      "role": "texture",
+      "writer": "generate._png (RGBA, 8-bit)",
+      "sha256": "70573fd934ef71e4c48e0dd2089c7732d0410d8e9845ab16716a030efb5c4f47",
+      "size": 70
+    },
+    {
+      "path": "pointcloud/points.le",
+      "family": "pointcloud",
+      "role": "pointcloud",
+      "writer": "UnstructuredData.from_array(...).to_binary(order='F') with SpecialCellCase.POINTS",
+      "sha256": "f56f2b97d0c9b6d58e294db8415dcc586f129bd4d718b567d175420959742c36",
+      "size": 674
+    },
+    {
+      "path": "pointcloud/points_no_cells.le",
+      "family": "pointcloud",
+      "role": "pointcloud",
+      "writer": "UnstructuredData.from_array(...).to_binary(order='F') with (n, 0) cells",
+      "sha256": "648725b755622c4f6a75abfe80e5db18d1df094c42b47499729971e9da523979",
+      "size": 201
+    },
+    {
+      "path": "volume/grid.le",
+      "family": "volume",
+      "role": "volume",
+      "writer": "StructuredData.from_numpy(...).to_binary('F')",
+      "sha256": "23f5d0b4940160e76bd1363bf58c44401723b812a25b2889ae8895077282e479",
+      "size": 257
+    },
+    {
+      "path": "volume/grid_singleton.le",
+      "family": "volume",
+      "role": "volume",
+      "writer": "StructuredData.from_numpy(...).to_binary('F') (singleton z)",
+      "sha256": "9d79c2a6447a1623d3d4307efa33430720e54ba784195610f9b98b2f7af97cb0",
+      "size": 209
+    },
+    {
+      "path": "raster/scalar.le",
+      "family": "raster",
+      "role": "raster",
+      "writer": "StructuredData.from_numpy(...).to_binary('F')",
+      "sha256": "f3a237ce91a7f22a528b4c96caf29d92bf79540b9573564228c95ba84badf0c7",
+      "size": 208
+    },
+    {
+      "path": "raster/rgb.le",
+      "family": "raster",
+      "role": "raster",
+      "writer": "StructuredData.from_numpy(...).to_binary('F') (dims x, y, channel as in subsurface-le)",
+      "sha256": "3bad5b097ece4650b4c830c15f55874d7c4e68a804a87d10da6e3ba3727a8a14",
+      "size": 300
+    },
+    {
+      "path": "raster/rgba.le",
+      "family": "raster",
+      "role": "raster",
+      "writer": "StructuredData.from_numpy(...).to_binary('F') (dims x, y, channel as in subsurface-le)",
+      "sha256": "7525053078a91015d03ec7502d10586831b7431519004b19b89eac3c87441c4d",
+      "size": 349
+    },
+    {
+      "path": "wells/supersimple_collars.le",
+      "family": "wells",
+      "role": "collars",
+      "writer": "read_wells(...).collars.data.to_binary()",
+      "sha256": "aa1ded7cef831f832cfde6595bee83895ba14878603c214a2b6f72c0e3ec2473",
+      "size": 161
+    },
+    {
+      "path": "wells/supersimple_trajectory.le",
+      "family": "wells",
+      "role": "trajectory",
+      "writer": "read_wells(...).combined_trajectory.data.to_binary()",
+      "sha256": "8e6c77b714eaeb5b1f3d0e08e0ab53d1ab17a309814ebce5ad434498f9827487",
+      "size": 2113
+    }
+  ]
+}

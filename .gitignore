@@ -105,3 +105,6 @@ venv.bak/
 /.idea/codeStyles/codeStyleConfig.xml
 .idea
 .junie
+# Native .le ingestion fixtures (tests/data/le_ingest/generate.py)
+!tests/data/le_ingest/**/*.le
+!tests/data/le_ingest/manifest.json
