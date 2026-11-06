@@ -210,6 +210,13 @@ Index discovery and client playback are separate contracts; this metadata
 support does not implement them or establish compatibility with strict client
 header parsers.
 
+## **Ingestion Profiles**
+
+LiquidEarth accepts uploaded `.le` files only after full validation against a
+family profile (mesh, volume, raster, point cloud, wells); see
+[le_validation.md](le_validation.md). The profiles are narrower than this
+format: they follow what the LiquidEarth loaders read.
+
 ## **Summary**
 
 - **File Layout**:  

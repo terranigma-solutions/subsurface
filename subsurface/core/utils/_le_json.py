@@ -1,7 +1,7 @@
 MAX_LE_JSON_DEPTH = 128
 
 
-def validate_le_json_nesting(header_bytes):
+def validate_le_json_nesting(header_bytes, max_depth=MAX_LE_JSON_DEPTH):
     """Bound JSON container nesting independently of the interpreter's decoder."""
     depth = 0
     quoted = False
@@ -18,7 +18,7 @@ def validate_le_json_nesting(header_bytes):
             quoted = True
         elif character in (91, 123):
             depth += 1
-            if depth > MAX_LE_JSON_DEPTH:
+            if depth > max_depth:
                 raise ValueError("Invalid LE JSON header: JSON header exceeds supported nesting depth")
         elif character in (93, 125):
             depth -= 1
