@@ -192,6 +192,17 @@ def _source_name(label, index) -> str:
     return PurePosixPath(label).name if label is not None else f"source {index}"
 
 
+def _label_source_name(name, index) -> str:
+    """Source name for a renamed label: the file name without a version suffix
+    (``a.le@0x8D...`` from source labels such as blob path plus version) or ``.le``."""
+    if not name:
+        return f"source {index}"
+    version = name.lower().rfind(".le@")
+    if version >= 0:
+        name = name[:version + 3]
+    return name[:-3] if name.lower().endswith(".le") else name
+
+
 def _describe_columns(frame) -> str:
     return ", ".join(f"{name} ({dtype})" for name, dtype in frame.dtypes.items()) or "none"
 
@@ -231,9 +242,7 @@ def _merge_label_maps(key, maps, mapping, provenance, id_policy):
                 continue
             unique = label
             if unique in merged:
-                name = provenance[index]["name"] or f"source {index}"
-                if name.lower().endswith(".le"):
-                    name = name[:-3]
+                name = _label_source_name(provenance[index]["name"], index)
                 unique, count = f"{label} ({name})", 2
                 while unique in merged:
                     unique, count = f"{label} ({name} {count})", count + 1
