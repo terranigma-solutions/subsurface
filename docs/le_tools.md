@@ -46,7 +46,8 @@ container's homogeneous xarray attribute matrices.
   drops unreferenced vertices from cell groups, and preserves original IDs.
   Filenames are safe deterministic ordinals; the return value maps IDs to paths.
 - Merging concatenates without welding and requires identical attribute
-  names/order/dtypes and equal semantic dataset metadata, including CRS/units.
+  names/order/dtypes and equal semantic dataset metadata, including CRS/units
+  (label maps such as DXF layer names are combined; see `le_merge.md`).
   Default explicit grouping uses `(source_index, original_id)` identity and
   consecutive int64 output IDs. Only `id_policy="shared"` declares globally
   shared IDs. `le_tools` metadata records source provenance and exact ID mapping.

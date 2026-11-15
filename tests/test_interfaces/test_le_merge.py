@@ -355,3 +355,27 @@ def test_invalid_source_labels_rejected_before_writing(tmp_path, labels, error):
 def test_sources_and_source_labels_are_exclusive():
     with pytest.raises(ValueError, match="not both"):
         merge_meshes([mesh()], sources=["a.le"], source_labels=["a.le"])
+
+
+@pytest.mark.parametrize("present", [(True, True), (False, True)])
+def test_bounds_are_recalculated_not_compared(present):
+    first, second = mesh(), mesh()
+    second.vertex = second.vertex + np.float32(100)
+    for item, has_bounds in zip((first, second), present):
+        if has_bounds:
+            item.data_attrs["bounds"] = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
+    merged = merge_meshes([first, second])
+    assert merged.data_attrs["bounds"] == [0.0, 115.0, 1.0, 116.0, 2.0, 117.0]
+    assert "bounds" not in merge_meshes([mesh(), mesh()]).data_attrs
+    empty = empty_mesh()
+    empty.data_attrs["bounds"] = None
+    assert merge_meshes([empty, empty_mesh()]).data_attrs["bounds"] is None
+
+
+def test_different_attributes_error_names_sources_and_columns():
+    first, second = mesh(), mesh()
+    second.attributes = pd.DataFrame(index=range(2))
+    with pytest.raises(ValueError, match=r'different cell attribute names: "a\.le" has object_id \(int64\), '
+                                         r'value \(float32\), valid \(bool\), "b\.le" has none\. '
+                                         r"Meshes from different file types"):
+        merge_meshes([first, second], source_labels=["a.le", "b.le"])
