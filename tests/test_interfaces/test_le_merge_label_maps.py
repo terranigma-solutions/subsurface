@@ -65,6 +65,18 @@ def test_repeated_label_without_source_names_and_repeated_names():
     assert merged.data_attrs["cell_attr_map"] == {"Faults": 0, "Faults (a)": 1, "Faults (a 2)": 2}
 
 
+def test_renamed_label_drops_the_version_of_a_source_label():
+    item = layered([("Faults", 1)])
+    labels = ["static_mesh/GM - Igneous.le@0x8DF1", "static_mesh/GM - Faults.LE@0x8DF4304BDDC09B9",
+              "static_mesh/plain"]
+    merged = merge_meshes([item, item, item], source_labels=labels, **GROUP)
+    assert merged.data_attrs["cell_attr_map"] == {
+            "Faults": 0, "Faults (GM - Faults)": 1, "Faults (plain)": 2}
+    renamed = merged.data_attrs["le_tools"]["renamed_labels"]
+    assert [entry["merged_label"] for entry in renamed] == ["Faults (GM - Faults)", "Faults (plain)"]
+    assert merged.data_attrs["le_tools"]["sources"][1]["name"] == "GM - Faults.LE@0x8DF4304BDDC09B9"
+
+
 @pytest.mark.parametrize("policy,expected", [("source", {"B": 0, "C": 1}), ("shared", {"B": 2, "C": 3})])
 def test_split_parts_of_one_file_keep_only_present_ids(tmp_path, policy, expected):
     source = layered([("A", 1), ("B", 2), ("C", 3)])

@@ -64,6 +64,7 @@ under those keys that is not a string-to-integer object is compared strictly.
 - `id_policy="source"` writes `label -> merged_id` for every present entry, in
   source order. When a label is already taken by an earlier source, it becomes
   `"<label> (<source name>)"`, where the source name is the provenance `name`
+  without a version suffix after `.le@` (as in a blob path plus version) and
   without its `.le` suffix (`source <index>` without one), with a counter if
   that is taken too. Each rename is recorded in `le_tools["renamed_labels"]`
   as `source_index`, `label`, `merged_label` and `merged_id`.
