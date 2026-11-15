@@ -34,11 +34,48 @@ caller order, including repeated paths. Pass an iterable of paths, not one path.
   both associations. No schema union, missing-value fill or numeric coercion is
   performed. Mixed numeric and bool columns stay separate, without xarray
   matrix promotion. Only the chosen grouping column may be replaced with int64.
+  The error names both sources and their columns with dtypes. When column
+  names differ (e.g. a DXF `Id` column against an OBJ mesh without one), it
+  also says that meshes from different file types cannot be merged yet.
 - All semantic dataset metadata must be equal, including coordinate CRS, units,
   transforms and other keys. Missing metadata is distinct from present metadata.
   No CRS/unit inference or reprojection occurs. JSON object key order is ignored;
   JSON value representations must otherwise match (for example, `1` and `1.0`
   differ). Reserved `le_tools` provenance is exempt from compatibility equality.
+  A conflict error names the differing keys, e.g. `Sources have different
+  "crs" metadata`. Label maps (below) and `bounds` are the exceptions.
+- `bounds` is derived from geometry, so it is never compared. When any source
+  has it, the output's `bounds` is recalculated like `transform_le` does:
+  `[xmin, xmax, ymin, ymax, zmin, zmax]` from the merged float32 vertices, or
+  `None` for empty geometry.
+
+## Label Maps
+
+A label map is a `cell_attr_map` or `point_attr_map` metadata value that is an
+object of string to integer, such as the DXF reader's layer names
+(`{"<layer name>": <id>}`, IDs from 1 in alphabetical layer order). A value
+under those keys that is not a string-to-integer object is compared strictly.
+
+- With grouping, the map of the grouped association (`cell_attr_map` for
+  `association="cell"`) is not compared. It is rebuilt from the ID mapping
+  instead. Entries whose ID does not occur in their source are dropped, since
+  split parts carry their whole original map. A source without a map
+  contributes no labels. The other association's map is compared strictly.
+- `id_policy="source"` writes `label -> merged_id` for every present entry, in
+  source order. When a label is already taken by an earlier source, it becomes
+  `"<label> (<source name>)"`, where the source name is the provenance `name`
+  without its `.le` suffix (`source <index>` without one), with a counter if
+  that is taken too. Each rename is recorded in `le_tools["renamed_labels"]`
+  as `source_index`, `label`, `merged_label` and `merged_id`.
+- `id_policy="shared"` takes the union of the present entries. A label with
+  different IDs in different sources, or an ID with different labels in
+  different sources, is rejected.
+- Without grouping, IDs are not remapped, so both label maps must be equal in
+  every source (including absent in every source). Differing maps are rejected
+  with a message to keep object IDs, i.e. merge with grouping.
+
+`le_tools["renamed_labels"]` is present only when a grouped label map was
+rebuilt. `le_tools["id_mapping"]` is unchanged.
 - Every vertex is concatenated, including unused vertices. Each source's cells
   are offset by the cumulative preceding vertex count. No vertex welding,
   topology repair or connectivity reordering occurs. More than `int32.max + 1`
