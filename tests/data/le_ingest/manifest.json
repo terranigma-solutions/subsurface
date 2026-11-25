@@ -1,6 +1,6 @@
 {
   "generator": "tests/data/le_ingest/generate.py",
-  "generated_at_commit": "6d532e6458dad00eede367641b98c7bccceef10a",
+  "generated_at_commit": "9193219e11689008dc60ce2575f01260687b786f",
   "versions": {
     "numpy": "2.4.6",
     "pandas": "3.0.3",
@@ -86,6 +86,14 @@
       "writer": "StructuredData.from_numpy(...).to_binary('F') (singleton z)",
       "sha256": "9d79c2a6447a1623d3d4307efa33430720e54ba784195610f9b98b2f7af97cb0",
       "size": 209
+    },
+    {
+      "path": "volume/dataset.le",
+      "family": "volume",
+      "role": "volume",
+      "writer": "StructuredData(...).to_binary('F', format_version=2) (generate.dataset_v2)",
+      "sha256": "0c95638ebc0b615587819ec17fd282770e0d0c276fc5b1f687f90d6877254f92",
+      "size": 923
     },
     {
       "path": "raster/scalar.le",

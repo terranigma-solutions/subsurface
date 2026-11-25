@@ -21,6 +21,7 @@ The summary includes:
 
 - `file_kind`: `"unstructured"` or `"structured"`.
 - `format_version`: 1 for existing headers without a version, or explicit 1/2.
+  Structured format 2 grids (datasets) report 2.
 - `byte_size`: total size including the four-byte prefix and JSON header.
 - `shapes`: normalized `vertex`/`cells`, or structured `data`, as dimension
   tuples. Resolved legacy flattened connectivity also reports `wire_cells` for
@@ -29,14 +30,20 @@ The summary includes:
   inapplicable counts are `None`.
 - `dataset_count`: one serialized dataset, not a geological object count.
 - `attribute_schema`: `cell` and `point` column tuples; structured files also
-  have a `grid` entry for the serialized active array. Columns report `name`,
+  have a `grid` entry for the serialized active array. In format 2, `grid`
+  lists every data variable in payload order, the active one first, each with
+  its `dims` and a variable `shape` that may add dimensions such as
+  `component`, plus `byte_length` and payload-relative `offset`. Columns report `name`,
   wire `dtype`, and `shape`; unstructured columns also report `byte_length` and
   payload-relative `offset`.
   Foundation-supported JSON scalar column labels (including numeric, null, and
   empty string labels) remain unchanged in the schema. Grouping requests still
   require a nonempty string `object_attribute`.
 - `metadata`: stored `xarray_attrs`; structured summaries additionally expose
-  `bounds`, `transform`, and `data_name`. Unserialized metadata cannot be recovered.
+  `bounds`, `transform`, and `data_name` (in format 2, the active variable), and
+  format 2 summaries the labels of non-spatial dimensions as `coords`. These
+  keys replace dataset attrs of the same name. Unserialized metadata cannot be
+  recovered.
 - `logical_object_count` and `object_ids`: `None` without explicit grouping;
   otherwise the count and ascending unique original numeric IDs.
 - `header_validated`, `payload_length_validated`, `grouping_validated`, and
@@ -123,6 +130,13 @@ from the axis names. Integer (8/16/32/64-bit signed or unsigned) and floating
 The header must contain exactly `data_shape`, `bounds`, `transform`, `dtype`, and
 `data_name`; transforms must be null. Geometry/payload validation and coordinate
 array reconstruction remain the full reader's responsibility.
+
+A structured header with `format_version` is format 2 and gets the header checks
+of the format 2 reader (`header_layout_v2`): fields, dims, labels, variable
+dims, dtypes and byte lengths. Its bounds follow the same rules as above, and the
+file length must equal the sum of the variables' byte lengths. Inspection does not
+apply `validate_le`'s volume profile (float32, `component` labels, finite or NaN
+values); ingest does.
 
 ## Foundation Integration
 

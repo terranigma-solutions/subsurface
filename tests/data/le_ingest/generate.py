@@ -52,6 +52,24 @@ def _grid(values, coords, name, dims=None):
     return StructuredData.from_numpy(values, coords=coords, data_array_name=name, dim_names=dims).to_binary("F")
 
 
+def dataset_v2() -> StructuredData:
+    """The format 2 golden grid: 4 x 3 x 2, a scalar and a 3D vector, values encoding their own index.
+
+    temperature[i, j, k] = i + 10 j + 100 k, displacement[i, j, k, c] = (i + 10 j + 100 k) * (-1) ** c + 1000 c,
+    and one no-data voxel: displacement[3, 2, 1] is NaN in every component. LiquidEarth's reader is tested
+    against the same file.
+    """
+    i, j, k = np.meshgrid(np.arange(4), np.arange(3), np.arange(2), indexing="ij")
+    index = (i + 10 * j + 100 * k).astype(np.float32)
+    vector = np.stack([index + 1000 * c if c % 2 == 0 else -index + 1000 * c for c in range(3)], axis=-1)
+    vector[3, 2, 1, :] = np.nan
+    return StructuredData(xr.Dataset(
+            {"temperature" : (("x", "y", "z"), index, {"units": "degC"}),
+             "displacement": (("x", "y", "z", "component"), vector, {"units": "m", "kind": "displacement"})},
+            coords={"x": np.linspace(100.0, 130.0, 4), "y": np.linspace(-20.0, 0.0, 3), "z": np.linspace(-50.0, -40.0, 2),
+                    "component": ["x", "y", "z"]}), "temperature")
+
+
 def _wells():
     def reader(name):
         return GenericReaderFilesHelper(file_or_buffer=str(BOREHOLE / name))
@@ -95,6 +113,8 @@ def fixtures():
             ("volume/grid_singleton.le", "volume", "volume", structured + " (singleton z)", _grid(
                 rng.random((3, 4, 1)).astype(np.float32),
                 {"x": np.linspace(0, 20, 3), "y": np.linspace(0, 30, 4), "z": np.array([-45.0])}, "density")),
+            ("volume/dataset.le", "volume", "volume", "StructuredData(...).to_binary('F', format_version=2) (generate.dataset_v2)",
+             dataset_v2().to_binary("F", format_version=2)),
             ("raster/scalar.le", "raster", "raster", structured, _grid(
                 np.where(np.arange(12).reshape(4, 3) == 5, np.nan, rng.random((4, 3)) * 100).astype(np.float32),
                 {"x": raster_x, "y": raster_y}, "topography")),

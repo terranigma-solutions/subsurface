@@ -10,6 +10,8 @@ import xarray as xr
 
 from subsurface.core.utils._le_json import validate_le_json_nesting
 
+from . import _structured_le_v2
+
 from ....optional_requirements import require_pyvista
 
 
@@ -221,14 +223,25 @@ class StructuredData:
 
         return bytearray_le, header
 
-    def to_binary(self, order: Literal["K", "A", "C", "F"] = 'F') -> bytes:
+    def to_binary(self, order: Literal["K", "A", "C", "F"] = 'F', *, format_version: Literal[1, 2] = 1) -> bytes:
         """Converts the structured data to a binary file
         
         Notes: 
-            Only the active data array is converted to binary for now.
+            Version 1 (the default) stores only the active data array.
             Dataset attrs are included as xarray_attrs only when timestamp or
             time_series_id is present, and must then be JSON-safe.
+
+            Version 2 stores every data variable with its dimension names and
+            attrs, the labels of non-spatial dimensions and the dataset attrs.
+            It is written in Fortran order only and raises ValueError for
+            anything it cannot store. See docs/le_spec.md.
         """
+        if format_version == 2:
+            if self.type != StructuredDataType.REGULAR_AXIS_ALIGNED:
+                raise NotImplementedError(f"StructuredDataType {self.type} not implemented yet")
+            return _structured_le_v2.to_binary_v2(self, order)
+        if format_version != 1:
+            raise ValueError(f"Unsupported structured .le format_version: {format_version!r}")
 
         body_ = self._to_bytearray(order)
         header = self._set_binary_header()
@@ -242,9 +255,13 @@ class StructuredData:
 
     @classmethod
     def from_binary_le(cls, path: Union[str, Path]):
-        """Read the current regular axis-aligned scalar .le format.
+        """Read a regular axis-aligned structured .le file, format 1 or 2.
 
-        Coordinates are reconstructed from sample extrema, including singleton
+        Format 2 files (with ``format_version``) restore every data variable,
+        its dims and attrs, non-spatial dimension labels and the dataset attrs;
+        the first stored variable is the active one.
+
+        Format 1: coordinates are reconstructed from sample extrema, including singleton
         axes. Only the active array is stored; other arrays cannot be recovered,
         and source metadata only when the header carries ``xarray_attrs``
         (temporal snapshots). Payloads must use the writer's default Fortran
@@ -277,6 +294,8 @@ class StructuredData:
                 raise ValueError("Structured .le JSON header exceeds supported nesting depth") from exc
             except (UnicodeDecodeError, ValueError) as exc:
                 raise ValueError(f"Invalid structured .le JSON header: {exc}") from exc
+            if isinstance(header, dict) and "format_version" in header:
+                return _structured_le_v2.read_v2(cls, header, source, cls._bounds_to_extrema)
             fields = {"data_shape", "bounds", "transform", "dtype", "data_name"}
             # Temporal snapshots additionally carry their source metadata.
             if not isinstance(header, dict) or set(header) - {"xarray_attrs"} != fields:
@@ -292,26 +311,7 @@ class StructuredData:
                     or any(type(size) is not int or size <= 0 for size in shape)):
                 raise ValueError("data_shape must contain one to three positive integer dimensions")
             dims = cls._default_dim_names(len(shape))
-            bounds = header["bounds"]
-            if not isinstance(bounds, dict) or set(bounds) != set(dims):
-                raise ValueError("bounds must map each standard axis to its sample extrema; flat bounds are ambiguous")
-            coords = {}
-            for dim, size in zip(dims, shape):
-                pair = bounds[dim]
-                if (not isinstance(pair, list) or len(pair) != 2
-                        or any(type(value) not in (int, float) for value in pair)):
-                    raise ValueError(f"Invalid bounds for axis {dim}")
-                try:
-                    low, high = map(float, pair)
-                except (OverflowError, ValueError) as exc:
-                    raise ValueError(f"Invalid bounds for axis {dim}") from exc
-                if low != pair[0] or high != pair[1]:
-                    raise ValueError(f"Bounds for axis {dim} lose precision in float64 coordinates")
-                if (not math.isfinite(low) or not math.isfinite(high)
-                        or not math.isfinite(high - low) or low > high
-                        or (size == 1 and low != high) or (size > 1 and low == high)):
-                    raise ValueError(f"Invalid sample extrema for axis {dim}")
-                coords[dim] = (low, high)
+            coords = cls._bounds_to_extrema(header["bounds"], dims, shape)
 
             name = header["data_name"]
             if not isinstance(name, str) or not name.strip() or name in dims:
@@ -348,6 +348,30 @@ class StructuredData:
         result.dtype = dtype_name
         result.data.attrs.update(xarray_attrs)
         return result
+
+    @staticmethod
+    def _bounds_to_extrema(bounds, dims, shape) -> Dict[str, Tuple[float, float]]:
+        """Check a header's ``bounds`` and return the (low, high) sample extrema of each axis."""
+        if not isinstance(bounds, dict) or set(bounds) != set(dims):
+            raise ValueError("bounds must map each standard axis to its sample extrema; flat bounds are ambiguous")
+        coords = {}
+        for dim, size in zip(dims, shape):
+            pair = bounds[dim]
+            if (not isinstance(pair, list) or len(pair) != 2
+                    or any(type(value) not in (int, float) for value in pair)):
+                raise ValueError(f"Invalid bounds for axis {dim}")
+            try:
+                low, high = map(float, pair)
+            except (OverflowError, ValueError) as exc:
+                raise ValueError(f"Invalid bounds for axis {dim}") from exc
+            if low != pair[0] or high != pair[1]:
+                raise ValueError(f"Bounds for axis {dim} lose precision in float64 coordinates")
+            if (not math.isfinite(low) or not math.isfinite(high)
+                    or not math.isfinite(high - low) or low > high
+                    or (size == 1 and low != high) or (size > 1 and low == high)):
+                raise ValueError(f"Invalid sample extrema for axis {dim}")
+            coords[dim] = (low, high)
+        return coords
 
     def _set_binary_header(self) -> Dict:
         data_array = self.active_data_array

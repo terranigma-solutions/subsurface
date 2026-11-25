@@ -61,6 +61,11 @@ _INT32_MIN, _INT32_MAX = -2 ** 31, 2 ** 31 - 1
 _FLOAT32_MAX = float(np.finfo(np.float32).max)
 _UNSTRUCTURED_KEYS = frozenset({"format_version", "vertex_shape", "cell_shape", "cell_attrs", "vertex_attrs", "xarray_attrs"})
 _STRUCTURED_KEYS = frozenset({"data_shape", "bounds", "transform", "dtype", "data_name"})
+_STRUCTURED_V2_KEYS = frozenset({"format_version", "data_shape", "dims", "bounds", "transform", "coords", "data_vars",
+                                 "xarray_attrs"})
+_VARIABLE_KEYS = frozenset({"name", "dims", "dtype", "byte_length", "attrs"})
+# Format 2 volume variables: a scalar per voxel, or a vector of 2 or 3 components in the grid's axes.
+_SCALAR_DIMS, _VECTOR_DIMS = ("x", "y", "z"), ("x", "y", "z", "component")
 _COLUMN_KEYS = frozenset({"name", "dtype", "shape", "byte_length"})
 # Exactly the dtype spellings that Unity's LiquidEarthMesh.ReadAttributeColumn reads.
 _ATTRIBUTE_DTYPES = {
@@ -95,6 +100,15 @@ class LEAttribute:
 
 
 @dataclass(frozen=True)
+class LEGridVariable:
+    """A data variable of a format 2 grid."""
+
+    name: str
+    dims: Tuple[str, ...]
+    shape: Tuple[int, ...]
+
+
+@dataclass(frozen=True)
 class LEFileReport:
     """What a validated .le file holds; only counts, shapes and names, never values."""
 
@@ -107,8 +121,9 @@ class LEFileReport:
     cell_width: Optional[int] = None
     attributes: Tuple[LEAttribute, ...] = ()
     data_shape: Optional[Tuple[int, ...]] = None
-    data_name: Optional[str] = None
+    data_name: Optional[str] = None  # format 2: the first (active) variable
     channels: Optional[int] = None
+    grid_variables: Tuple[LEGridVariable, ...] = ()  # format 2 only
     well_count: Optional[int] = None
     metadata_keys: Tuple[str, ...] = ()
 
@@ -289,7 +304,8 @@ def _validate_file(buffer, family, role):
                     attributes=tuple(LEAttribute(c.name, c.dtype, c.association) for c in parsed.columns),
                     metadata_keys=tuple(sorted(parsed.metadata)))
     else:
-        base.update(data_shape=parsed.shape, data_name=parsed.name, channels=parsed.channels)
+        base.update(data_shape=parsed.shape, data_name=parsed.name, channels=parsed.channels,
+                    grid_variables=parsed.variables)
     base.update(report_fields)
     return LEFileReport(**base), context
 
@@ -595,6 +611,7 @@ class _Structured:
     name: str
     channels: Optional[int]
     offset: int
+    variables: Tuple[LEGridVariable, ...] = ()
 
     @property
     def family(self):
@@ -607,6 +624,8 @@ def _structured(buffer, header, offset, role):
     attrs = header.get("xarray_attrs")
     if isinstance(attrs, dict) and _TEMPORAL_KEYS & set(attrs):
         _fail("unsupported_profile", role, "time-series .le files (snapshots and masters) are not supported")
+    if "format_version" in header:
+        return _structured_v2(buffer, header, offset, role)
     extra = sorted(set(header) - _STRUCTURED_KEYS)
     if extra:
         _fail("unsupported_profile", role, f"unsupported header fields: {', '.join(map(str, extra[:5]))}")
@@ -635,7 +654,20 @@ def _structured(buffer, header, offset, role):
         sizes = shape
         if name in dims or name.lower() in _COLOR_CHANNELS:
             _fail("unsupported_profile", role, f"data_name {name!r} is reserved")
-    bounds = header["bounds"]
+    _check_bounds(header["bounds"], dims, sizes, role)
+    count = math.prod(shape)
+    if len(buffer) - offset != count * 4:
+        _fail("malformed", role, f"payload length mismatch: expected {count * 4} bytes, got {len(buffer) - offset}")
+    for _, chunk in _chunks(buffer, offset, np.dtype("<f4"), count):
+        if channels is not None:
+            if (~np.isnan(chunk) & ((chunk < 0) | (chunk > 255))).any():
+                _fail("unsupported_profile", role, "colour raster values must be 0..255 or NaN")
+        elif np.isinf(chunk).any():
+            _fail("unsupported_profile", role, "grid values must be finite or NaN")
+    return _Structured("structured", tuple(shape), name, channels, offset)
+
+
+def _check_bounds(bounds, dims, sizes, role):
     if not isinstance(bounds, dict) or set(bounds) != set(dims):
         _fail("malformed", role, f"bounds must map exactly the axes {', '.join(dims)} to sample extrema")
     for dim, size in zip(dims, sizes):
@@ -651,16 +683,83 @@ def _structured(buffer, header, offset, role):
             _fail("malformed", role, f"invalid sample extrema for axis {dim}")
         if max(abs(low), abs(high)) > _FLOAT32_MAX:
             _fail("unsupported_profile", role, f"bounds for axis {dim} exceed the float32 range")
-    count = math.prod(shape)
-    if len(buffer) - offset != count * 4:
-        _fail("malformed", role, f"payload length mismatch: expected {count * 4} bytes, got {len(buffer) - offset}")
-    for _, chunk in _chunks(buffer, offset, np.dtype("<f4"), count):
-        if channels is not None:
-            if (~np.isnan(chunk) & ((chunk < 0) | (chunk > 255))).any():
-                _fail("unsupported_profile", role, "colour raster values must be 0..255 or NaN")
-        elif np.isinf(chunk).any():
-            _fail("unsupported_profile", role, "grid values must be finite or NaN")
-    return _Structured("structured", tuple(shape), name, channels, offset)
+
+
+def _structured_v2(buffer, header, offset, role):
+    """A format 2 volume: float32 scalar and vector variables on one x, y, z grid."""
+    extra = sorted(set(header) - _STRUCTURED_V2_KEYS)
+    if extra:
+        _fail("unsupported_profile", role, f"unsupported header fields: {', '.join(map(str, extra[:5]))}")
+    missing = sorted(_STRUCTURED_V2_KEYS - set(header))
+    if missing:
+        _fail("malformed", role, f"missing header fields: {', '.join(missing)}")
+    if type(header["format_version"]) is not int or header["format_version"] != 2:
+        _fail("unsupported_profile", role, "structured .le files must have format_version 2 or none")
+    if not isinstance(header["xarray_attrs"], dict):
+        _fail("malformed", role, "xarray_attrs must be a JSON object")
+    shape = header["data_shape"]
+    if (not isinstance(shape, list) or len(shape) != 3 or
+            any(type(size) is not int or not 1 <= size <= _INT32_MAX for size in shape)):
+        _fail("unsupported_profile", role, "format 2 grids must be volumes: data_shape holds three positive integers")
+    dims = header["dims"]
+    if not isinstance(dims, dict) or any(type(size) is not int for size in dims.values()):
+        _fail("malformed", role, "dims must map dimension names to integer sizes")
+    if any(dims.get(dim) != size for dim, size in zip(_SCALAR_DIMS, shape)):
+        _fail("malformed", role, "dims must hold x, y and z with the sizes of data_shape")
+    if set(dims) - set(_VECTOR_DIMS):
+        _fail("unsupported_profile", role, "format 2 volumes may only add a 'component' dimension")
+    if "component" in dims and dims["component"] not in (2, 3):
+        _fail("unsupported_profile", role, "vectors must have 2 or 3 components")
+    _check_bounds(header["bounds"], _SCALAR_DIMS, shape, role)
+    if header["transform"] is not None:
+        _fail("unsupported_profile", role, "grid transforms are not supported")
+    labels = header["coords"]
+    if not isinstance(labels, dict) or set(labels) - {"component"}:
+        _fail("malformed", role, "coords may only label the 'component' dimension")
+    if "component" in dims and labels.get("component") != list(_SCALAR_DIMS[:dims["component"]]):
+        # Clients map components to the grid's axes by position.
+        _fail("unsupported_profile", role, "component labels must be ['x', 'y'] or ['x', 'y', 'z']")
+    if "component" in labels and "component" not in dims:
+        _fail("malformed", role, "coords label a dimension that dims does not list")
+
+    declared = header["data_vars"]
+    if not isinstance(declared, list) or not declared:
+        _fail("malformed", role, "data_vars must be a nonempty list")
+    if len(declared) > MAX_ATTRIBUTE_COLUMNS:
+        _fail("unsupported_profile", role, f"more than {MAX_ATTRIBUTE_COLUMNS} grid variables")
+    variables, names, position = [], set(), offset
+    for variable in declared:
+        if not isinstance(variable, dict) or set(variable) != _VARIABLE_KEYS:
+            _fail("malformed", role, f"each data variable must have exactly the fields {', '.join(sorted(_VARIABLE_KEYS))}")
+        name = variable["name"]
+        if not isinstance(name, str) or not name.strip() or name in names or name in _VECTOR_DIMS:
+            _fail("malformed", role, "data variable names must be unique non-empty strings distinct from dimension names")
+        if name.lower() in _COLOR_CHANNELS:
+            _fail("unsupported_profile", role, f"data variable name {name!r} is reserved for colour rasters")
+        names.add(name)
+        variable_dims = tuple(variable["dims"]) if isinstance(variable["dims"], list) else None
+        if variable_dims not in (_SCALAR_DIMS, _VECTOR_DIMS) or (variable_dims == _VECTOR_DIMS and "component" not in dims):
+            _fail("unsupported_profile", role, f"variable {name!r} must have dims (x, y, z) or (x, y, z, component)")
+        if variable["dtype"] != "float32":
+            _fail("unsupported_profile", role, f"variable {name!r} has dtype {variable['dtype']!r}; LiquidEarth reads float32 grids")
+        variable_shape = tuple(dims[dim] for dim in variable_dims)
+        count = math.prod(variable_shape)
+        if type(variable["byte_length"]) is not int or variable["byte_length"] != count * 4:
+            _fail("malformed", role, f"byte_length of {name!r} does not match its shape")
+        if not isinstance(variable["attrs"], dict):
+            _fail("malformed", role, f"attrs of {name!r} must be a JSON object")
+        variables.append((LEGridVariable(name, variable_dims, variable_shape), position, count))
+        position += count * 4
+    if "component" in dims and all(v.dims != _VECTOR_DIMS for v, _, _ in variables):
+        _fail("malformed", role, "dims lists 'component' but no variable uses it")
+    if len(buffer) != position:
+        _fail("malformed", role, f"payload length mismatch: expected {position - offset} bytes, got {len(buffer) - offset}")
+    for _, start, count in variables:
+        for _, chunk in _chunks(buffer, start, np.dtype("<f4"), count):
+            if np.isinf(chunk).any():
+                _fail("unsupported_profile", role, "grid values must be finite or NaN")
+    reported = tuple(v for v, _, _ in variables)
+    return _Structured("structured", tuple(shape), reported[0].name, None, offset, reported)
 
 
 def _volume(buffer, parsed, role):

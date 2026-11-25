@@ -156,6 +156,85 @@ Readers reconstruct geometry, supported numeric attributes, and dataset metadata
   2. From `data_shape`, read the required bytes for the single data array.  
   3. Reshape the array in Fortran order (`[nx, ny, (nz)]`), and attach any bounding/metadata as needed.
 
+### **Version 2 (Datasets)**
+
+Version 1 stores the active array only. `StructuredData.to_binary(format_version=2)`
+stores the whole dataset of a regular axis-aligned grid: every data variable
+with its dimension names and attrs, labels of non-spatial dimensions, and the
+dataset attrs. `StructuredData.from_binary_le()` reads both versions; a header
+with `format_version` is version 2. Version 1 stays the default writer output.
+
+```json
+{
+  "format_version": 2,
+  "data_shape": [4, 3, 2],
+  "dims": {"x": 4, "y": 3, "z": 2, "component": 3},
+  "bounds": {"x": [100.0, 130.0], "y": [-20.0, 0.0], "z": [-50.0, -40.0]},
+  "transform": null,
+  "coords": {"component": ["x", "y", "z"]},
+  "data_vars": [
+    {"name": "temperature", "dims": ["x", "y", "z"], "dtype": "float32", "byte_length": 96,
+     "attrs": {"units": "degC"}},
+    {"name": "displacement", "dims": ["x", "y", "z", "component"], "dtype": "float32", "byte_length": 288,
+     "attrs": {"units": "m", "kind": "displacement"}}
+  ],
+  "xarray_attrs": {}
+}
+```
+
+Every field is required.
+
+- `data_shape`: the sizes of the spatial dimensions, as in version 1. The
+  spatial dimensions are `x, y, z`, `x, y` or `dim0`, by rank.
+- `dims`: the size of every dimension that a variable uses. Non-spatial
+  dimensions must not be named `x`, `y`, `z` or `dim0`.
+- `bounds`: sample extrema of each spatial axis, as in version 1 (the
+  coordinates of the first and last samples, not cell edges). Readers rebuild
+  each spatial axis with `linspace(low, high, size)`; the writer rejects
+  irregular or descending axes.
+- `transform`: `null`.
+- `coords`: labels of non-spatial dimensions (strings or numbers, one per
+  index). A non-spatial dimension without labels is indexed by position.
+- `data_vars`: the variables in body order. Each one starts with the spatial
+  dimensions, in order, and may add non-spatial ones. `dtype` is one of
+  `float16/32/64`, `int8/16/32/64`, `uint8/16/32/64`; `byte_length` is the
+  product of the variable's sizes times the dtype size; `attrs` are the
+  variable's xarray attrs. Names are unique and differ from dimension names.
+- `xarray_attrs`: the dataset attrs.
+
+The body holds each variable in `data_vars` order with no padding,
+little-endian, in Fortran order: the first dimension varies fastest. For
+`displacement` above, value `[i, j, k, c]` is at float index
+`i + nx * (j + ny * (k + nz * c))` of its block.
+
+The writer stores the active variable first, and the reader makes the first
+variable active. All variables are stored in `StructuredData.dtype`. The writer
+raises `ValueError` rather than drop anything: coordinates other than those of
+stored dimensions, coordinate attrs, attrs that are not JSON-serializable
+(including NaN and infinity), a `bounds` override, and order other than `F`.
+
+Conventions for volumes that LiquidEarth displays (checked by `validate_le`):
+
+- A vector field is a variable with a `component` dimension of size 2 or 3,
+  labelled `["x", "y"]` or `["x", "y", "z"]`: its components in the grid's axes,
+  in that order.
+- A variable's units are its `attrs["units"]`.
+- `attrs["kind"]` is free text describing the field, such as `displacement`.
+  `velocity` means the field is a velocity, so particles moved by it show real
+  motion.
+- Clients draw each voxel as a cell around its sample: the volume box spans the
+  bounds plus half a spacing on each side. An axis of one sample has no
+  spacing; the box is flat along it, as in version 1.
+
+The golden file
+`tests/data/le_ingest/volume/dataset.le` (`generate.dataset_v2`) holds a scalar
+and a vector whose values encode their indices, and one NaN voxel; consumers
+test their readers against it.
+
+`inspect_le` summarizes version 2 grids. They are not yet read by the split,
+merge and transform tools (which reject grids with more than one variable or
+with attrs), or `export_time_series`.
+
 ---
 
 ## **Temporal Snapshots**
@@ -227,7 +306,7 @@ format: they follow what the LiquidEarth loaders read.
   - The JSON describes geometry shapes, attribute layout, and dataset metadata; it does not record geometry byte order or array order.
 
 - **Structured** `.le`:  
-  - Typically contains a single array plus optional bounding and transform data.  
+  - Version 1 contains a single array plus optional bounding and transform data; version 2 contains every data variable of the dataset with named dimensions.  
   - The JSON describes the grid dimensions (`data_shape`), data type, and possibly coordinates/bounds.
 
 The **core principle** is always the same: parse the header size, parse the JSON, then read and reshape the binary data as specified. Differences lie in how many arrays are written and which header fields are present, depending on whether the source is unstructured or structured.

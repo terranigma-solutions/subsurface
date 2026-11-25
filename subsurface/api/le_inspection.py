@@ -10,6 +10,7 @@ import numpy as np
 from subsurface.core.structs.base_structures._liquid_earth_mesh import (
     MAX_LE_HEADER_BYTES, read_le_header, validate_unstructured_layout,
 )
+from subsurface.core.structs.base_structures._structured_le_v2 import header_layout_v2
 
 
 @dataclass(frozen=True)
@@ -70,11 +71,49 @@ def group_object_ids(attributes, *, object_attribute: str, association: str, cel
     return np.unique(values)
 
 
+def _check_bounds(bounds, dims, shape):
+    if not isinstance(bounds, dict) or set(bounds) != set(dims):
+        raise ValueError("bounds must map each standard axis to sample extrema; flat bounds are ambiguous")
+    for dim, size in zip(dims, shape):
+        pair = bounds[dim]
+        if (not isinstance(pair, list) or len(pair) != 2
+                or any(type(value) not in (int, float) for value in pair)):
+            raise ValueError(f"Invalid bounds for axis {dim}")
+        try:
+            low, high = map(float, pair)
+        except (OverflowError, ValueError) as error:
+            raise ValueError(f"Invalid bounds for axis {dim}") from error
+        if low != pair[0] or high != pair[1]:
+            raise ValueError(f"Bounds for axis {dim} lose precision in float64 coordinates")
+        if (not math.isfinite(low) or not math.isfinite(high)
+                or not math.isfinite(high - low) or low > high
+                or (size == 1 and low != high) or (size > 1 and low == high)):
+            raise ValueError(f"Invalid sample extrema for axis {dim}")
+
+
+def _structured_v2_layout(header):
+    shape, spatial, labels, layout = header_layout_v2(header)
+    _check_bounds(header["bounds"], spatial, shape)
+    grid, offset = [], 0
+    for name, dims, variable_shape, dtype, byte_length, _attrs in layout:
+        grid.append(dict(name=name, dtype=dtype.name, shape=variable_shape, dims=dims,
+                         byte_length=byte_length, offset=offset))
+        offset += byte_length
+    if offset > np.iinfo(np.intp).max:
+        raise ValueError("Structured payload length exceeds platform limits")
+    schema = {"cell": (), "point": (), "grid": tuple(grid)}
+    metadata = dict(header["xarray_attrs"], bounds=header["bounds"], transform=None, data_name=layout[0][0],
+                    coords=labels)
+    return "structured", 2, {"data": shape}, schema, metadata, offset
+
+
 def _header_layout(header, payload_length):
     schema = {"cell": (), "point": ()}
     if "data_shape" in header:
         if "vertex_shape" in header or "cell_shape" in header:
             raise ValueError("Mixed structured and unstructured header")
+        if "format_version" in header:
+            return _structured_v2_layout(header)
         if set(header) != {"data_shape", "bounds", "transform", "dtype", "data_name"}:
             raise ValueError("Unsupported structured header fields")
         raw_shape = header["data_shape"]
@@ -87,23 +126,7 @@ def _header_layout(header, payload_length):
         if dtype.kind == "b":
             raise ValueError("Unsupported structured numeric dtype")
         bounds = header.get("bounds")
-        if not isinstance(bounds, dict) or set(bounds) != set(dims):
-            raise ValueError("bounds must map each standard axis to sample extrema; flat bounds are ambiguous")
-        for dim, size in zip(dims, shape):
-            pair = bounds[dim]
-            if (not isinstance(pair, list) or len(pair) != 2
-                    or any(type(value) not in (int, float) for value in pair)):
-                raise ValueError(f"Invalid bounds for axis {dim}")
-            try:
-                low, high = map(float, pair)
-            except (OverflowError, ValueError) as error:
-                raise ValueError(f"Invalid bounds for axis {dim}") from error
-            if low != pair[0] or high != pair[1]:
-                raise ValueError(f"Bounds for axis {dim} lose precision in float64 coordinates")
-            if (not math.isfinite(low) or not math.isfinite(high)
-                    or not math.isfinite(high - low) or low > high
-                    or (size == 1 and low != high) or (size > 1 and low == high)):
-                raise ValueError(f"Invalid sample extrema for axis {dim}")
+        _check_bounds(bounds, dims, shape)
         name = header["data_name"]
         if not isinstance(name, str) or not name.strip() or name in dims:
             raise ValueError("Structured data_name must be a nonempty string distinct from axis names")
