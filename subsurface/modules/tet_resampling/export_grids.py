@@ -1,22 +1,24 @@
-"""Resample FEM results onto a regular grid and write them as a LiquidEarth grid dataset.
+"""Resample FEM results onto a regular grid and write them as LiquidEarth volumes.
 
     python -m subsurface.modules.tet_resampling.export_grids results.xdmf --spacing 0.05 --start 2026-11-19T00:00:00Z --out /tmp/dataset
 
-A dataset is one grid with every attribute, in grid format 2 (like borehole
-files, which keep every attribute as a typed column): a scalar is a column of
-shape (nx, ny, nz), a 2D or 3D vector one column of shape (nx, ny, nz, 2|3).
-LiquidEarth shows each attribute as its own volume in the dataset's group, and
-a vector as one volume with arrows and particles. Tensor fields are skipped.
+Each time step is a StructuredData with every field as a data variable, on the
+voxel centres: a scalar on (x, y, z), a 2D or 3D vector on (x, y, z, component)
+with the components labelled x, y(, z). It is written in structured .le format
+2 (see docs/le_spec.md), so one file holds every field. LiquidEarth shows each
+field as its own volume in the file's group, and a vector as one volume with
+arrows and particles. Tensor fields are skipped.
 
 With one time step the output is volumes/<name>.le. With several it is a time
-series as subsurface-le publishes one: a frame file per step under
-time-series/<name>/<revision>/, and volumes/<name>.le, a copy of the last frame
-whose header lists every frame. Frame times are --start plus the result's
-times in seconds, so the series plays on the shared timeline.
+series laid out as subsurface-le publishes one: a frame file per step under
+time-series/<name>/<revision>/ with its series.json, and volumes/<name>.le, the
+master (time_series_master). Frame times are --start plus the result's times
+in seconds, so the series plays on the shared timeline.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 from dataclasses import dataclass, field
@@ -24,17 +26,20 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
+import xarray as xr
 
 from . import fem_results
 from . import tet_resampler
+from ...core.structs.base_structures import StructuredData
+from ..writer.time_series import INDEX_NAME, export_time_series, time_series_master
 
 FORMAT_VERSION = 2
-TIME_SERIES_SCHEMA = 2
+AXES = ("x", "y", "z")
 
 
 @dataclass
 class Column:
-    """One attribute of a grid: float32 (nx, ny, nz) or (nx, ny, nz, components) per time step."""
+    """One field on the grid: float32 (nx, ny, nz) or (nx, ny, nz, components) per time step."""
 
     name: str
     steps: list[np.ndarray]
@@ -56,13 +61,32 @@ class Dataset:
     def steps(self) -> int:
         return len(self.times)
 
+    def structured(self, step: int) -> StructuredData:
+        """Time step ``step`` as a StructuredData: every field a variable, the first one active."""
+        sizes = {c.components for c in self.columns if c.components > 1}
+        if len(sizes) > 1:
+            raise ValueError("2D and 3D vectors cannot share a dataset: they would need two component dimensions")
+        data_vars = {}
+        for column in self.columns:
+            attrs = {}
+            if column.name in self.units:
+                attrs["units"] = self.units[column.name]
+            if column.kind:
+                attrs["kind"] = column.kind
+            dims = AXES + ("component",) if column.components > 1 else AXES
+            data_vars[column.name] = (dims, np.asarray(column.steps[step], np.float32), attrs)
+        coords = {axis: self.grid.axis(a) for a, axis in enumerate(AXES)}
+        if sizes:
+            coords["component"] = list(AXES[:sizes.pop()])
+        return StructuredData(xr.Dataset(data_vars, coords=coords), self.columns[0].name)
+
 
 def dataset_from_results(results: fem_results.FemResults, sampler: tet_resampler.TetSampler,
                          include: set[str] | None = None, step: int | None = None,
                          kinds: dict[str, str] | None = None) -> Dataset:
     """Samples every scalar and vector field onto the sampler's grid; NaN outside the mesh.
 
-    Static fields repeat in every step, since every frame of a series has the same columns. With ``step``, only
+    Static fields repeat in every step, since every frame of a series has the same variables. With ``step``, only
     that time step is kept.
     """
     times = results.times if step is None else results.times[step:step + 1 or None]
@@ -85,61 +109,36 @@ def dataset_from_results(results: fem_results.FemResults, sampler: tet_resampler
     return Dataset(sampler.grid, columns, np.asarray(times, float))
 
 
-def grid_bytes(grid: tet_resampler.Grid, columns: list[tuple[Column, np.ndarray]], xarray_attrs: dict) -> bytes:
-    """One grid format 2 file: a little-endian header length, the JSON header, then each column x fastest."""
-    attrs, body = [], []
-    for column, values in columns:
-        data = np.asarray(values, np.float32).tobytes(order="F")
-        meta = {"name": column.name, "dtype": "float32", "shape": list(values.shape), "byte_length": len(data)}
-        if column.kind:
-            meta["kind"] = column.kind
-        attrs.append(meta)
-        body.append(data)
-    header = {
-        "format_version": FORMAT_VERSION,
-        "data_shape": list(grid.shape),
-        "bounds": {axis: [float(lo), float(hi)] for axis, (lo, hi) in zip("xyz", grid.bounds)},
-        "transform": None,
-        "dtype": "float32",
-        "grid_attrs": attrs,
-        "xarray_attrs": xarray_attrs,
-    }
-    header_bytes = json.dumps(header, allow_nan=False).encode("utf-8")
-    return len(header_bytes).to_bytes(4, "little") + header_bytes + b"".join(body)
+def write_dataset(dataset: Dataset, name: str, out: Path, start: datetime | None) -> list[Path]:
+    """Writes volumes/<name>.le and, for several steps, its frames; returns the files written.
 
-
-def write_dataset(dataset: Dataset, name: str, out: Path, start: datetime | None, revision: str = "1") -> list[Path]:
-    """Writes volumes/<name>.le and, for several steps, its frames; returns the files written."""
-    base_attrs = {"attribute_units": dataset.units} if dataset.units else {}
+    The frames' folder is named after a hash of their times and contents, so writing the same dataset again reuses
+    it, and a changed dataset gets a new folder, as subsurface-le publishes revisions.
+    """
+    master_path = out / "volumes" / f"{name}.le"
+    master_path.parent.mkdir(parents=True, exist_ok=True)
     if dataset.steps == 1:
-        frames = [grid_bytes(dataset.grid, [(c, c.steps[0]) for c in dataset.columns], base_attrs)]
-        master_path = out / "volumes" / f"{name}.le"
-        master_path.parent.mkdir(parents=True, exist_ok=True)
-        master_path.write_bytes(frames[0])
+        master_path.write_bytes(dataset.structured(0).to_binary(format_version=FORMAT_VERSION))
         return [master_path]
 
     if start is None:
         raise ValueError("a dataset with several time steps needs a start time (--start)")
+    stamps = [start + timedelta(seconds=float(t)) for t in dataset.times]
+    digest = hashlib.sha256()
+    for i, stamp in enumerate(stamps):
+        digest.update(stamp.isoformat().encode())
+        digest.update(dataset.structured(i).to_binary(format_version=FORMAT_VERSION))
+    revision = digest.hexdigest()[:16]
     directory = f"time-series/{name}/{revision}"
-    manifest = {
-        "schema_version": TIME_SERIES_SCHEMA, "role": "master", "time_series_id": name, "revision": revision,
-        "kind": "volume", "directory": directory, "index": "series.json",
-        "frames": [{"timestamp": (start + timedelta(seconds=float(t))).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    "path": f"volume_{i:04d}.le"} for i, t in enumerate(dataset.times)],
-    }
-    written = []
     frame_dir = out / directory
-    frame_dir.mkdir(parents=True, exist_ok=True)
-    for i in range(dataset.steps):
-        path = frame_dir / manifest["frames"][i]["path"]
-        path.write_bytes(grid_bytes(dataset.grid, [(c, c.steps[i]) for c in dataset.columns], base_attrs))
-        written.append(path)
-    (frame_dir / "series.json").write_text(json.dumps(manifest, indent=1))
-    master = grid_bytes(dataset.grid, [(c, c.steps[-1]) for c in dataset.columns], {**base_attrs, "time_series": manifest})
-    master_path = out / "volumes" / f"{name}.le"
-    master_path.parent.mkdir(parents=True, exist_ok=True)
-    master_path.write_bytes(master)
-    return [master_path] + written
+    index_path = frame_dir / INDEX_NAME
+    if not index_path.exists():  # * The index is written last, so an existing one means a complete folder
+        export_time_series(((stamp, dataset.structured(i)) for i, stamp in enumerate(stamps)), frame_dir,
+                           time_series_id=name, kind="volume", format_version=FORMAT_VERSION)
+    index = json.loads(index_path.read_text())
+    master_path.write_bytes(time_series_master(dataset.structured(dataset.steps - 1), index, directory=directory,
+                                               revision=revision, format_version=FORMAT_VERSION))
+    return [master_path, index_path] + [frame_dir / frame["path"] for frame in index["frames"]]
 
 
 def main(argv=None):

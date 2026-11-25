@@ -1,7 +1,7 @@
 # Tetrahedral resampling
 
 Resamples simulation results on linear tetrahedra onto a regular grid and
-writes them as a LiquidEarth grid dataset. LiquidEarth volumes are regular
+writes them as LiquidEarth volumes. LiquidEarth volumes are regular
 grids, while finite-element results are unstructured meshes with several
 attributes and time steps.
 
@@ -10,15 +10,15 @@ Moved from the LiquidEarth client repository, where it was a prototype under
 
 ## Status in subsurface
 
-This package is a relocation, not an integration yet:
-
-- `export_grids` writes grid format 2 with its own writer. Neither
-  `StructuredData.from_binary_le` nor `subsurface.api.le_validation` accepts
-  format 2 yet, so subsurface cannot read back or validate these files.
-- `write_dataset` writes the container layout and the master `.le` file
-  (schema 2) itself. In production that layout is published by subsurface-le.
+- `export_grids` builds a `StructuredData` per time step and writes it with
+  subsurface's writers: `StructuredData.to_binary(format_version=2)`,
+  `export_time_series` and `time_series_master`. `StructuredData.from_binary_le`
+  reads the files back, and `validate_le` accepts a single-step file
+  (time-series files are refused there by design).
+- `write_dataset` writes the container layout locally. Publishing it is
+  subsurface-le's job, which does not yet write format 2.
 - The readers return their own `FemResults`, not `UnstructuredData` /
-  `TetraMesh`, and the resampler returns NumPy arrays, not `StructuredData`.
+  `TetraMesh`, and the resampler returns NumPy arrays.
 
 ## Setup
 
@@ -47,41 +47,39 @@ voxel size is a quarter of the mean edge length.
 
 ## Output
 
-A dataset is one grid with every attribute, in grid format 2. Like borehole
-files, which keep every attribute as a typed column, the header lists the
-columns and the body holds them one after another:
+Each time step is one `StructuredData` with every field as a data variable,
+written in structured `.le` format 2 (`docs/le_spec.md`, "Version 2"):
 
-```json
-{"format_version": 2, "data_shape": [104, 24, 68], "bounds": {"x": [-2.6, 2.6], "y": [-0.6, 0.6], "z": [0, 3.4]},
- "transform": null, "dtype": "float32",
- "grid_attrs": [{"name": "temperature", "dtype": "float32", "shape": [104, 24, 68], "byte_length": 678912},
-                {"name": "displacement", "dtype": "float32", "shape": [104, 24, 68, 3], "byte_length": 2036736, "kind": "displacement"}],
- "xarray_attrs": {"attribute_units": {"displacement": "m"}}}
-```
-
-- A scalar is a column of shape (nx, ny, nz); a 2D or 3D vector is one column
-  of shape (nx, ny, nz, 2 or 3). Tensor fields are skipped.
-- Values are float32, x fastest, then y, z and the vector component. NaN is
-  no data.
-- `kind` is optional free text for vectors; `velocity` marks real motion.
-- The grid is cell-centred: the voxels tile `bounds`.
+- The coordinates are the voxel centres. A scalar has dims `(x, y, z)`; a 2D or
+  3D vector `(x, y, z, component)`, with the components labelled `x, y(, z)` in
+  the grid's axes. Tensor fields are skipped, and 2D and 3D vectors cannot
+  share a dataset.
+- Values are float32 (integer fields too), x fastest, then y, z and the vector
+  component. NaN is no data.
+- `--unit` sets a variable's `units` attr, `--kind` its `kind`: optional free
+  text, where `velocity` marks real motion.
+- `bounds` are the outer voxel centres; the voxels tile the box half a spacing
+  beyond them.
 
 With one time step (or `--step`) the output is `volumes/<name>.le`. With
 several, it is a time series laid out as subsurface-le publishes one, so the
 dataset plays on the shared timeline:
 
-- `time-series/<name>/1/volume_NNNN.le`: one grid per step, every attribute in
-  each. Static fields, such as `region`, repeat in every step.
-- `time-series/<name>/1/series.json`: the manifest.
-- `volumes/<name>.le`: a copy of the last step whose `xarray_attrs.time_series`
-  lists every frame (schema 2). Frame times are `--start` plus the result's
-  times in seconds.
+- `time-series/<name>/<revision>/volume_NNNN.le`: one file per step, every
+  field in each (`export_time_series`). Static fields, such as `region`, repeat
+  in every step. The revision is a hash of the frames' times and contents, so
+  writing the same dataset again reuses the folder.
+- `time-series/<name>/<revision>/series.json`: the index.
+- `volumes/<name>.le`: the master (`time_series_master`), the last step whose
+  `xarray_attrs.time_series` lists every frame (schema 2). Frame times are
+  `--start` plus the result's times in seconds.
 
-LiquidEarth shows each attribute as its own volume in the dataset's group,
+LiquidEarth shows each field as its own volume in the dataset's group,
 and a vector as one volume with arrows and particles.
 
-Neither the LiquidEarth SDK nor the CLI's `ops` service accepts grid format 2
-yet, so the tool writes files only.
+The tool writes files only. A single-step volume passes `validate_le`'s
+`volume` profile, which the LiquidEarth ingest uses. Time series are not
+ingested through `validate_le`, which rejects time-series attrs.
 
 ## Method
 
@@ -138,7 +136,7 @@ sets them to no data.
 
 - Linear tetrahedra only. Other cell types in the file are ignored.
 - The mesh must be the same in every time step.
-- Clients before grid format 2 reject these files.
+- LiquidEarth clients without format 2 support reject these files.
 
 ## Tests
 
@@ -148,6 +146,6 @@ pytest tests/test_tet_resampling
 
 The tests use synthetic meshes. They check exact reproduction of linear
 fields, no data outside a non-convex mesh, cell data, agreement of the
-Numba and NumPy paths, the grid format 2 layout and the series layout, and
+Numba and NumPy paths, the format 2 datasets and the series layout, and
 that the XDMF and VTK readers return the same results. Tests that need h5py
 or meshio are skipped when those are not installed.

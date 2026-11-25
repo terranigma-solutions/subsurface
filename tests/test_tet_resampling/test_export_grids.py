@@ -7,6 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
+from subsurface import StructuredData
+from subsurface.api.le_validation import validate_le
 from subsurface.modules.tet_resampling import export_grids
 from subsurface.modules.tet_resampling import fem_results
 from subsurface.modules.tet_resampling import tet_resampler as tr
@@ -59,18 +61,42 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(last.steps, 1)
         self.assertEqual(last.times.tolist(), [3.0])
 
-    def test_columns_follow_the_header_x_fastest_component_slowest(self):
-        column = next(c for c in self.dataset.columns if c.name == "displacement")
-        values = column.steps[1]
-        header, body = read_le(export_grids.grid_bytes(self.sampler.grid, [(column, values)], {}))
+    def test_a_step_is_a_structured_dataset_on_the_voxel_centres(self):
+        self.dataset.units = {"displacement": "m"}
+        data = self.dataset.structured(1).data
+        grid = self.sampler.grid
+        self.assertEqual(list(data.data_vars), ["displacement", "region"])
+        self.assertEqual(data["displacement"].dims, ("x", "y", "z", "component"))
+        self.assertEqual(data["displacement"].attrs, {"units": "m", "kind": "displacement"})
+        self.assertEqual(data["region"].attrs, {})
+        self.assertEqual(data["component"].values.tolist(), ["x", "y", "z"])
+        for a, axis in enumerate("xyz"):
+            np.testing.assert_array_equal(data[axis].values, grid.axis(a))
+        columns = {c.name: c for c in self.dataset.columns}
+        np.testing.assert_array_equal(data["displacement"].values, columns["displacement"].steps[1])
+
+    def test_format_2_keeps_every_field_x_fastest_component_slowest(self):
+        binary = self.dataset.structured(1).to_binary(format_version=2)
+        header, body = read_le(binary)
         nx, ny, nz = self.sampler.grid.shape
-        self.assertEqual(header["format_version"], 2)
         self.assertEqual(header["data_shape"], [nx, ny, nz])
-        self.assertEqual(header["grid_attrs"], [{"name": "displacement", "dtype": "float32", "shape": [nx, ny, nz, 3],
-                                                 "byte_length": nx * ny * nz * 3 * 4, "kind": "displacement"}])
+        self.assertEqual([(v["name"], v["dims"]) for v in header["data_vars"]],
+                         [("displacement", ["x", "y", "z", "component"]), ("region", ["x", "y", "z"])])
+        # * Bounds are the outer voxel centres; the voxels tile the mesh's box around them
+        lo, hi = self.sampler.grid.bounds.T
+        spacing = self.sampler.grid.spacing
+        np.testing.assert_allclose([header["bounds"][axis] for axis in "xyz"], np.column_stack([lo + spacing / 2, hi - spacing / 2]))
         floats = np.frombuffer(body, np.float32)
+        values = next(c for c in self.dataset.columns if c.name == "displacement").steps[1]
         i, j, k, c = 5, 2, 3, 2
         self.assertEqual(floats[i + nx * (j + ny * (k + nz * c))], values[i, j, k, c])
+        self.assertEqual(validate_le(binary, family="volume", role="volume").grid_variables[0].name, "displacement")
+
+    def test_2d_and_3d_vectors_cannot_share_a_dataset(self):
+        flat = export_grids.Column("flat", [np.zeros(self.sampler.grid.shape + (2,), np.float32)] * 3)
+        self.dataset.columns.append(flat)
+        with self.assertRaises(ValueError):
+            self.dataset.structured(0)
 
 
 class SeriesTests(unittest.TestCase):
@@ -90,28 +116,45 @@ class SeriesTests(unittest.TestCase):
             written = export_grids.write_dataset(self.dataset, "box", out, START)
             master_header, master_body = read_le((out / "volumes/box.le").read_bytes())
             manifest = master_header["xarray_attrs"]["time_series"]
-            self.assertEqual(len(written), 4)
-            self.assertEqual((manifest["schema_version"], manifest["kind"], manifest["directory"]),
-                             (2, "volume", "time-series/box/1"))
+            self.assertEqual(len(written), 5)
+            self.assertEqual(master_header["format_version"], 2)
+            self.assertEqual((manifest["schema_version"], manifest["kind"]), (2, "volume"))
+            self.assertRegex(manifest["directory"], r"^time-series/box/[0-9a-f]{16}$")
+            self.assertEqual(manifest["directory"].rsplit("/", 1)[1], manifest["revision"])
             self.assertEqual([f["timestamp"] for f in manifest["frames"]],
-                             ["2026-11-19T00:00:01.000000Z", "2026-11-19T00:00:02.000000Z", "2026-11-19T00:00:03.000000Z"])
-            self.assertEqual(master_header["xarray_attrs"]["attribute_units"], {"displacement": "m"})
-            frames = [read_le((out / manifest["directory"] / f["path"]).read_bytes()) for f in manifest["frames"]]
-            for header, _ in frames:
-                self.assertEqual(header["grid_attrs"], master_header["grid_attrs"])
-                self.assertNotIn("time_series", header["xarray_attrs"])
-            self.assertEqual(frames[-1][1], master_body, "The master is the last frame.")
-            self.assertNotEqual(frames[0][1], master_body)
-            self.assertEqual(json.loads((out / manifest["directory"] / "series.json").read_text()), manifest)
+                             ["2026-11-19T00:00:01Z", "2026-11-19T00:00:02Z", "2026-11-19T00:00:03Z"])
+            frames = [out / manifest["directory"] / f["path"] for f in manifest["frames"]]
+            for path in frames:
+                frame = StructuredData.from_binary_le(path)
+                self.assertEqual(frame.data["displacement"].attrs, {"units": "m"})
+                self.assertNotIn("time_series", frame.data.attrs)
+            self.assertEqual(read_le(frames[-1].read_bytes())[1], master_body, "The master is the last frame.")
+            self.assertNotEqual(read_le(frames[0].read_bytes())[1], master_body)
+            index = json.loads((out / manifest["directory"] / "series.json").read_text())
+            self.assertEqual(index["frames"], manifest["frames"])
+
+    def test_the_same_dataset_keeps_its_revision_and_a_changed_one_gets_another(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+
+            def revision():
+                export_grids.write_dataset(self.dataset, "box", out, START)
+                return read_le((out / "volumes/box.le").read_bytes())[0]["xarray_attrs"]["time_series"]["revision"]
+
+            first = revision()
+            self.assertEqual(revision(), first)
+            self.dataset.columns[0].steps[0] = self.dataset.columns[0].steps[0] + 1
+            self.assertNotEqual(revision(), first)
+            self.assertEqual(len(list((out / "time-series/box").iterdir())), 2)
 
     def test_one_step_is_a_plain_grid(self):
         with tempfile.TemporaryDirectory() as tmp:
             sampler = tr.build_sampler(results().points, results().tets, 0.25)
             last = export_grids.dataset_from_results(results(), sampler, step=-1)
             written = export_grids.write_dataset(last, "box", Path(tmp), None)
-            header, _ = read_le(written[0].read_bytes())
             self.assertEqual([p.relative_to(tmp).as_posix() for p in written], ["volumes/box.le"])
-            self.assertNotIn("time_series", header["xarray_attrs"])
+            report = validate_le(written[0].read_bytes(), family="volume", role="volume")
+            self.assertEqual([v.name for v in report.grid_variables], ["displacement", "region"])
 
 
 @unittest.skipUnless(HAS_READERS, "h5py and meshio are needed")
