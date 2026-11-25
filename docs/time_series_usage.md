@@ -103,10 +103,15 @@ option. This says nothing about the external CSV source timezone.
 - Snapshot JSON headers carry matching `xarray_attrs.time_series_id` and
   `xarray_attrs.timestamp`. Dataset metadata must be JSON-safe; measurement NaNs
   are preserved in payloads, but non-finite metadata numbers are rejected.
-- No new binary payload version or 4D volume payload is introduced. Static
-  structured output remains unchanged, and unstructured readers restore header
-  metadata. See [LE Specification](le_spec.md). Compatibility with strict client
+- No 4D volume payload is introduced: each time step is its own file. By
+  default volume frames are structured version 1, holding the active array;
+  `export_time_series(..., format_version=2)` (and `export_volume_time_series`)
+  writes version 2 frames with every data variable, such as vector fields.
+  Static structured output remains unchanged, and unstructured readers restore
+  header metadata. See [LE Specification](le_spec.md). Compatibility with strict client
   parsers of optional headers must still be tested with the actual client.
+- `time_series_master` builds the master file that publishers upload next to
+  the frames (see [LE Specification](le_spec.md), Temporal Snapshots).
 - Clients need explicit support for index discovery and grouping snapshots into
   one logical series. Local files alone do not enable time controls, playback,
   interpolation, caching, or Azure publication. Those remain planned work in
