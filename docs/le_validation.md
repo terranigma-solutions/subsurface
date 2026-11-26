@@ -95,6 +95,27 @@ A wells dataset also needs as many collars as the trajectory has wells.
 
 `rgb` and `rgba` are reserved for colour rasters. One-dimensional grids are rejected.
 
+### Format 2 volumes
+
+A structured header with `format_version` is format 2 (see `le_spec.md`). It is
+accepted for the `volume` role only:
+
+- The header has exactly the format 2 fields, `format_version` is 2 and `transform` is null.
+- `data_shape` is `[nx, ny, nz]`. `dims` holds `x`, `y` and `z` with those sizes and, optionally,
+  `component` with size 2 or 3, used by at least one variable. `coords` may only label `component`,
+  and must label it `["x", "y"]` or `["x", "y", "z"]`: clients map components to the grid's axes
+  by position.
+- `bounds` follow the version 1 rules.
+- Each variable has dims `[x, y, z]` (a scalar) or `[x, y, z, component]` (a vector), dtype
+  `float32` and the matching `byte_length`. Names are unique, differ from the dimension names and
+  are not `rgb` or `rgba`.
+  At most 256 variables.
+- The payload is exactly the variables' bytes; values are finite or NaN.
+- Time-series metadata in `xarray_attrs` is rejected, as in version 1.
+
+The report's `data_name` is the first variable, and `grid_variables` lists every variable
+with its dims and shape.
+
 ## Fixtures
 
 `tests/data/le_ingest/` holds a file for each profile, written by the public

@@ -1,7 +1,8 @@
 # Structured LiquidEarth Read-Back
 
 `StructuredData.from_binary_le(path)` reads the existing regular axis-aligned
-scalar format into the existing `StructuredData` container. It accepts a string
+scalar format into the existing `StructuredData` container. Files with `format_version` are format 2, which
+stores every data variable; see `le_spec.md`. This page describes format 1. It accepts a string
 or `pathlib.Path`. Invalid or unsupported files raise `ValueError`; filesystem
 errors are not masked.
 

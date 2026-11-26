@@ -26,6 +26,7 @@ from .le_validation import (
     LEValidationError,
     LEValidationReport,
     LEFileReport,
+    LEGridVariable,
     PNGTextureReport,
     validate_le,
     validate_le_dataset,
