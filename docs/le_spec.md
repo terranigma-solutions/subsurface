@@ -231,9 +231,11 @@ The golden file
 and a vector whose values encode their indices, and one NaN voxel; consumers
 test their readers against it.
 
-`inspect_le` summarizes version 2 grids. They are not yet read by the split,
-merge and transform tools (which reject grids with more than one variable or
-with attrs), or `export_time_series`.
+`inspect_le` summarizes version 2 grids, and
+`export_time_series(..., format_version=2)` writes time-series frames in
+version 2 (see Temporal Snapshots). They are not yet read by the split, merge
+and transform tools (which reject grids with more than one variable or with
+attrs).
 
 ---
 
@@ -284,6 +286,38 @@ A sidecar index can identify frames without changing `.le` files, for example:
   ]
 }
 ```
+
+With `format_version=2`, `export_time_series` writes each volume frame in
+structured version 2, with every data variable. Every variable must keep its
+dims, shape, dtype and attrs across frames, and bounds come from the spatial
+coordinates, so a bounds override is rejected.
+
+A published series also has a master file: the latest frame, whose
+`xarray_attrs.time_series` (schema 2) tells a client where the frames are.
+`time_series_master(latest, index, directory=..., revision=...)` writes it, in
+the same format version as the frames:
+
+```json
+{
+  "xarray_attrs": {
+    "time_series_id": "temperature-series",
+    "timestamp": "2025-12-12T11:45:39Z",
+    "time_series": {
+      "schema_version": 2, "role": "master", "time_series_id": "temperature-series",
+      "revision": "3f2a9c0d1e4b5a6f", "kind": "volume",
+      "directory": "time-series/temperature-series/3f2a9c0d1e4b5a6f", "index": "series.json",
+      "frames": [
+        {"timestamp": "2025-12-12T10:45:39Z", "path": "volume_0000.le"},
+        {"timestamp": "2025-12-12T11:45:39Z", "path": "volume_0001.le"}
+      ]
+    }
+  }
+}
+```
+
+`directory` is relative to the storage container and frame paths relative to
+`directory`. The revision identifies one publication of the frames; the
+publisher chooses it, for example as a hash of the sources.
 
 Index discovery and client playback are separate contracts; this metadata
 support does not implement them or establish compatibility with strict client

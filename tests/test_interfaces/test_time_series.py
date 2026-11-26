@@ -9,7 +9,7 @@ import xarray as xr
 
 from subsurface.core.structs.base_structures import StructuredData, UnstructuredData
 from subsurface.core.structs.base_structures._liquid_earth_mesh import LiquidEarthMesh
-from subsurface.modules.writer.time_series import export_time_series, export_volume_time_series
+from subsurface.modules.writer.time_series import export_time_series, export_volume_time_series, time_series_master
 
 
 def trajectory(value=1.0):
@@ -262,3 +262,106 @@ def test_single_volume_frame(tmp_path):
     data.data = data.data.isel(time=[0])
     path = export_volume_time_series(data, tmp_path / "single", time_series_id="test", source_timezone="UTC")
     assert len(json.loads(path.read_text())["frames"]) == 1
+
+
+# region Format 2
+
+def flow_volume(value=1.0, **variable_attrs):
+    """A format 2 volume: a scalar temperature and a 3D velocity flow on a 3 x 2 x 2 grid."""
+    shape = (3, 2, 2)
+    temperature = np.full(shape, value, dtype="float32")
+    flow = np.stack([np.full(shape, value), np.zeros(shape), -np.full(shape, value)], axis=-1).astype("float32")
+    flow[2, 1, 1] = np.nan
+    ds = xr.Dataset({"temperature": (("x", "y", "z"), temperature, {"units": "degC"}),
+                     "flow"       : (("x", "y", "z", "component"), flow,
+                                     dict({"units": "m/s", "kind": "velocity"}, **variable_attrs))},
+                    coords={"x": [0., 1., 2.], "y": [5., 7.], "z": [-1., 0.], "component": ["x", "y", "z"]},
+                    attrs={"source": "synthetic"})
+    return StructuredData(ds, "temperature")
+
+
+def test_volume_frames_in_format_2_keep_every_variable(tmp_path):
+    frames = [("2025-01-01T01:00:00Z", flow_volume(2.0)), ("2025-01-01T00:00:00Z", flow_volume(1.0))]
+    path = export_time_series(frames, tmp_path / "series", time_series_id="flow", kind="volume", format_version=2)
+    index = json.loads(path.read_text())
+    assert index["schema_version"] == 1
+    assert [frame["path"] for frame in index["frames"]] == ["volume_0001.le", "volume_0000.le"]
+    for entry, value in zip(index["frames"], [1.0, 2.0]):
+        header, _ = decode(path.parent / entry["path"])
+        assert header["format_version"] == 2
+        assert header["xarray_attrs"] == {"source": "synthetic", "time_series_id": "flow", "timestamp": entry["timestamp"]}
+        snapshot = StructuredData.from_binary_le(path.parent / entry["path"])
+        expected = flow_volume(value).data
+        assert list(snapshot.data.data_vars) == ["temperature", "flow"]
+        xr.testing.assert_identical(snapshot.data.drop_attrs(deep=False), expected.drop_attrs(deep=False))
+
+
+def test_volume_time_series_in_format_2(tmp_path):
+    data = flow_volume().data
+    stacked = xr.concat([data, data * 2], dim=xr.DataArray(
+            np.array(["2025-01-01T00:00:00", "2025-01-01T01:00:00"], dtype="datetime64[us]"), dims="time", name="time"))
+    for name in stacked.data_vars:
+        stacked[name].attrs = data[name].attrs
+    stacked.attrs = data.attrs
+    path = export_volume_time_series(StructuredData(stacked, "temperature"), tmp_path / "series", time_series_id="flow",
+                                     source_timezone="UTC", format_version=2)
+    last = StructuredData.from_binary_le(path.parent / json.loads(path.read_text())["frames"][-1]["path"])
+    np.testing.assert_array_equal(last.data["flow"].values, data["flow"].values * 2)
+    assert last.data["flow"].attrs == {"units": "m/s", "kind": "velocity"}
+
+
+@pytest.mark.parametrize("second, match", [
+        (lambda: flow_volume(kind="displacement"), "attribute schema"),
+        (lambda: StructuredData(flow_volume().data.drop_vars("flow").drop_vars("component"), "temperature"),
+         "attribute schema"),
+        (lambda: StructuredData(flow_volume().data, "temperature", _bounds=(0., 2., 5., 7., -1., 0.)), "bounds override"),
+])
+def test_format_2_frames_must_match(tmp_path, second, match):
+    with pytest.raises(ValueError, match=match):
+        export_time_series([("2025-01-01T00:00:00Z", flow_volume()), ("2025-01-01T01:00:00Z", second())],
+                           tmp_path / "bad", time_series_id="flow", kind="volume", format_version=2)
+    assert not (tmp_path / "bad").exists()
+
+
+@pytest.mark.parametrize("kind, data, format_version", [("trajectory", trajectory, 2), ("volume", flow_volume, 3),
+                                                        ("volume", flow_volume, True)])
+def test_format_2_is_for_volumes(tmp_path, kind, data, format_version):
+    with pytest.raises(ValueError, match="format"):
+        export_time_series([("2025-01-01T00:00:00Z", data())], tmp_path / "bad", time_series_id="flow", kind=kind,
+                           format_version=format_version)
+    assert not (tmp_path / "bad").exists()
+
+
+@pytest.mark.parametrize("format_version", [1, 2])
+def test_time_series_master(tmp_path, format_version):
+    frames = [("2025-01-01T00:00:00Z", flow_volume(1.0)), ("2025-01-01T01:00:00Z", flow_volume(2.0))]
+    if format_version == 1:
+        frames = [(stamp, StructuredData(data.data.drop_vars(["flow", "component"]), "temperature")) for stamp, data in frames]
+    path = export_time_series(frames, tmp_path / "series", time_series_id="flow", kind="volume", format_version=format_version)
+    index = json.loads(path.read_text())
+
+    binary = time_series_master(frames[-1][1], index, directory="time-series/flow/abc", revision="abc",
+                                format_version=format_version)
+    header, _ = decode_bytes(binary)
+    assert header.get("format_version", 1) == format_version
+    assert header["xarray_attrs"] == {
+            "source"     : "synthetic", "time_series_id": "flow", "timestamp": "2025-01-01T01:00:00Z",
+            "time_series": {"schema_version": 2, "role": "master", "time_series_id": "flow", "revision": "abc",
+                            "kind"          : "volume", "directory": "time-series/flow/abc", "index": "series.json",
+                            "frames"        : index["frames"]}}
+    master_path = tmp_path / "master.le"
+    master_path.write_bytes(binary)
+    np.testing.assert_array_equal(StructuredData.from_binary_le(master_path).data["temperature"].values,
+                                  frames[-1][1].data["temperature"].values)
+    assert "time_series" not in frames[-1][1].data.attrs
+
+
+def test_trajectory_master_names_its_well(tmp_path):
+    path = export_time_series([("2025-01-01T00:00:00Z", trajectory())], tmp_path / "series", time_series_id="m",
+                              kind="trajectory")
+    header, _ = decode_bytes(time_series_master(trajectory(), json.loads(path.read_text()), directory="d", revision="r"))
+    assert header["xarray_attrs"]["well_id_mapper"] == {"m": 0}
+    with pytest.raises(TypeError):
+        time_series_master(flow_volume(), json.loads(path.read_text()), directory="d", revision="r")
+
+# endregion
